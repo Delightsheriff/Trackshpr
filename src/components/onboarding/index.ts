@@ -1,0 +1,5 @@
+export { default as SlideOne }   from './slide-one'
+export { default as SlideTwo }   from './slide-two'
+export { default as SlideThree } from './slide-three'
+export { default as NavRow }     from './nav-row'
+export type { SlideProps }       from './types'

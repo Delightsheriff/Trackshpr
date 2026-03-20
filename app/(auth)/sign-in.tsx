@@ -1,18 +1,13 @@
 /**
  * Sign-in screen — always dark, brand entry point (DS §9.2).
- * Auth logic lives in src/lib/auth.ts; hero visuals in src/components/auth/.
+ *
+ * Visual spec (trackshpr-signin.html):
+ *  - Hero: 58% height, radial-gradient background, orbit rings, floating card
+ *  - Headline: "Your customers know." uses gradient text (#4647D3 → #9396FF 135°)
+ *  - Button: real 4-colour Google G logo, pill shape, subtle shadow
+ *  - Entrance: staggered fadeUp animation (matches HTML keyframe)
  */
-import {
-  colors,
-  font,
-  gradients,
-  radius,
-  type as t,
-} from "@/src/constants/tokens";
-import { signInWithGoogle } from "@/src/lib/auth";
-import { supabase } from "@/src/lib/supabase";
-import SignInHero from "@/src/components/auth/sign-in-hero";
-import { AntDesign } from "@expo/vector-icons";
+import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -35,6 +30,37 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SignInHero from "@/src/components/auth/sign-in-hero";
+import GoogleIcon from "@/src/components/shared/google-icon";
+import { colors, font, radius, type as t } from "@/src/constants/tokens";
+import { signInWithGoogle } from "@/src/lib/auth";
+import { supabase } from "@/src/lib/supabase";
+
+// ── Gradient headline text ─────────────────────────────────────────────────────
+
+function GradientText({
+  children,
+  style,
+}: {
+  children: string;
+  style: object;
+}) {
+  return (
+    <MaskedView
+      maskElement={<Text style={[style, { backgroundColor: "transparent" }]}>{children}</Text>}
+    >
+      <LinearGradient
+        colors={["#4647D3", "#9396FF"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Text style={[style, { opacity: 0 }]}>{children}</Text>
+      </LinearGradient>
+    </MaskedView>
+  );
+}
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function SignInScreen() {
   const { width, height } = useWindowDimensions();
@@ -45,26 +71,25 @@ export default function SignInScreen() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Content entrance animations
-  const w0 = useSharedValue(0);
-  const w1 = useSharedValue(0);
-  const w2 = useSharedValue(0);
-  const w3 = useSharedValue(0);
-  const w4 = useSharedValue(0);
+  // Staggered content entrance — matches HTML fadeUp keyframe
+  const w0 = useSharedValue(0); // wordmark     delay 200ms
+  const w1 = useSharedValue(0); // headline     delay 350ms
+  const w2 = useSharedValue(0); // subtext      delay 450ms
+  const w3 = useSharedValue(0); // google btn   delay 550ms
+  const w4 = useSharedValue(0); // legal        delay 650ms
 
-  // Toast animation
-  const toastY = useSharedValue(-20);
+  // Toast
+  const toastY  = useSharedValue(-20);
   const toastOp = useSharedValue(0);
 
   useEffect(() => {
-    w0.value = withDelay(200, withTiming(1, { duration: 500 }));
-    w1.value = withDelay(350, withTiming(1, { duration: 500 }));
-    w2.value = withDelay(450, withTiming(1, { duration: 500 }));
-    w3.value = withDelay(550, withTiming(1, { duration: 500 }));
-    w4.value = withDelay(650, withTiming(1, { duration: 500 }));
+    const delays = [200, 350, 450, 550, 650];
+    [w0, w1, w2, w3, w4].forEach((sv, i) => {
+      sv.value = withDelay(delays[i], withTiming(1, { duration: 500 }));
+    });
   }, []);
 
-  const entrance = (sv: { value: number }) =>
+  const fadeUp = (sv: { value: number }) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useAnimatedStyle(() => ({
       opacity: sv.value,
@@ -73,32 +98,29 @@ export default function SignInScreen() {
       ],
     }));
 
-  const w0Style = entrance(w0);
-  const w1Style = entrance(w1);
-  const w2Style = entrance(w2);
-  const w3Style = entrance(w3);
-  const w4Style = entrance(w4);
+  const w0s = fadeUp(w0);
+  const w1s = fadeUp(w1);
+  const w2s = fadeUp(w2);
+  const w3s = fadeUp(w3);
+  const w4s = fadeUp(w4);
 
   const toastStyle = useAnimatedStyle(() => ({
     opacity: toastOp.value,
     transform: [{ translateY: toastY.value }],
   }));
 
-  const showToast = useCallback(
-    (msg: string) => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      setToastMsg(msg);
-      toastY.value = -20;
-      toastOp.value = 0;
-      toastY.value = withSpring(0, { damping: 20, stiffness: 300 });
-      toastOp.value = withTiming(1, { duration: 300 });
-      toastTimer.current = setTimeout(() => {
-        toastY.value = withTiming(-20, { duration: 200 });
-        toastOp.value = withTiming(0, { duration: 200 });
-      }, 3000);
-    },
-    [],
-  );
+  const showToast = useCallback((msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMsg(msg);
+    toastY.value = -20;
+    toastOp.value = 0;
+    toastY.value = withSpring(0, { damping: 20, stiffness: 300 });
+    toastOp.value = withTiming(1, { duration: 300 });
+    toastTimer.current = setTimeout(() => {
+      toastY.value = withTiming(-20, { duration: 200 });
+      toastOp.value = withTiming(0,   { duration: 200 });
+    }, 3000);
+  }, []);
 
   const handleSignIn = useCallback(async () => {
     setLoading(true);
@@ -106,20 +128,14 @@ export default function SignInScreen() {
     const result = await signInWithGoogle();
 
     if (!result.ok) {
-      if ("cancelled" in result) {
-        setLoading(false);
-        return;
-      }
+      if ("cancelled" in result) { setLoading(false); return; }
       showToast(result.error);
       setLoading(false);
       return;
     }
 
-    // Auth succeeded — check profile to decide where to navigate
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user");
 
       const { data: profile } = await supabase
@@ -128,11 +144,7 @@ export default function SignInScreen() {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (!profile?.onboarding_complete) {
-        router.replace("/(auth)/profile-setup");
-      } else {
-        router.replace("/(tabs)");
-      }
+      router.replace(profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup");
     } catch {
       showToast("Couldn't complete sign-in. Please try again.");
       setLoading(false);
@@ -153,45 +165,50 @@ export default function SignInScreen() {
           { paddingBottom: Math.max(insets.bottom + 24, 40) },
         ]}
       >
-        <Animated.View style={w0Style}>
+        {/* Wordmark */}
+        <Animated.View style={w0s}>
           <Text style={styles.wordmark}>Trackshpr</Text>
         </Animated.View>
 
-        <Animated.View style={w1Style}>
-          <Text style={styles.headline}>
-            {"Your riders move.\n"}
-            <Text style={{ color: colors.primary }}>Your customers know.</Text>
-          </Text>
+        {/* Headline — second line gets gradient text matching HTML <em> */}
+        <Animated.View style={w1s}>
+          <Text style={styles.headlineLine1}>Your riders move.</Text>
+          <GradientText style={styles.headlineLine2}>
+            Your customers know.
+          </GradientText>
         </Animated.View>
 
-        <Animated.View style={w2Style}>
+        {/* Sub-text */}
+        <Animated.View style={[styles.subWrap, w2s]}>
           <Text style={styles.sub}>
             Real-time delivery visibility for Nigerian social commerce sellers.
             No more "where is my order?" messages.
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.googleBtnWrap, w3Style]}>
+        {/* Google sign-in button */}
+        <Animated.View style={[styles.btnWrap, w3s]}>
           <Pressable
             onPress={() => !loading && handleSignIn()}
             disabled={loading}
             style={({ pressed }) => [
               styles.googleBtn,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+              pressed && { transform: [{ scale: 0.98 }] },
             ]}
           >
             {loading ? (
               <ActivityIndicator color={colors.textPrimary} size="small" />
             ) : (
               <>
-                <AntDesign name="google" size={20} color="#4285F4" />
+                <GoogleIcon size={20} />
                 <Text style={styles.googleBtnText}>Continue with Google</Text>
               </>
             )}
           </Pressable>
         </Animated.View>
 
-        <Animated.View style={w4Style}>
+        {/* Legal */}
+        <Animated.View style={w4s}>
           <Text style={styles.legal}>
             By continuing you agree to our{" "}
             <Text style={styles.legalLink}>Terms of Service</Text>
@@ -206,8 +223,7 @@ export default function SignInScreen() {
           style={[styles.toast, { top: insets.top + 16 }, toastStyle]}
         >
           <Text style={[t.bodySm, { color: colors.error }]}>
-            ❌{"  "}
-            {toastMsg}
+            ❌{"  "}{toastMsg}
           </Text>
         </Animated.View>
       )}
@@ -215,48 +231,70 @@ export default function SignInScreen() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: "#FAF4FF", // --surface
   },
+
+  // Content panel — flex: 1, justify flex-end, matching HTML .content
   content: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: "#FAF4FF",
     paddingHorizontal: 24,
     paddingTop: 8,
     justifyContent: "flex-end",
   },
+
+  // Wordmark — 13px, 600, letterSpacing 0.12em, uppercase, primary
   wordmark: {
     fontSize: 13,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    letterSpacing: 1.56,
+    letterSpacing: 13 * 0.12,
     textTransform: "uppercase",
-    color: colors.primary,
+    color: "#4647D3",
     marginBottom: 10,
   },
-  headline: {
+
+  // Headline — 30px, 700, letterSpacing -0.03em, lineHeight 1.15
+  headlineLine1: {
     fontSize: 30,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: "#302950",
     letterSpacing: -0.9,
     lineHeight: 34.5,
-    marginBottom: 10,
+  },
+  headlineLine2: {
+    fontSize: 30,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.9,
+    lineHeight: 34.5,
+  },
+
+  // Sub-text
+  subWrap: {
+    marginBottom: 32,
   },
   sub: {
     fontSize: 14,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
-    lineHeight: 21.7,
-    marginBottom: 32,
+    color: "#9590B0",
+    lineHeight: 14 * 1.55,
+    marginTop: 10,
   },
-  googleBtnWrap: {
+
+  // Google button — pill, white card, subtle shadow
+  btnWrap: {
     marginBottom: 16,
   },
   googleBtn: {
-    backgroundColor: colors.surfaceCard,
+    width: "100%",
+    backgroundColor: "#FFFFFF",
     borderRadius: radius.full,
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -266,26 +304,30 @@ const styles = StyleSheet.create({
     gap: 12,
     minHeight: 54,
     boxShadow:
-      "0 2px 12px rgba(48, 41, 80, 0.08), 0 0 0 1px rgba(48, 41, 80, 0.06)",
+      "0 2px 12px rgba(48,41,80,0.08), 0 0 0 1px rgba(48,41,80,0.06)",
   },
   googleBtnText: {
     fontSize: 15,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.textPrimary,
+    color: "#302950",
     letterSpacing: -0.15,
   },
+
+  // Legal
   legal: {
     textAlign: "center",
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
-    lineHeight: 17.6,
+    color: "#9590B0",
+    lineHeight: 11 * 1.6,
   },
   legalLink: {
-    color: colors.primary,
+    color: "#4647D3",
     fontWeight: "500",
   },
+
+  // Toast
   toast: {
     position: "absolute",
     left: 18,

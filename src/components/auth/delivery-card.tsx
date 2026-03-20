@@ -1,6 +1,6 @@
 /**
  * Floating glassmorphic delivery card shown in the sign-in hero.
- * Owns its own blink animation — float is applied externally by the hero.
+ * Matches the HTML reference exactly — blink animation owned internally.
  */
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
@@ -12,9 +12,15 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { colors, font, radius, signInColors } from "@/src/constants/tokens";
+import { font, radius } from "@/src/constants/tokens";
 
-const PROGRESS_LABELS = ["Confirmed", "Picked Up", "Transit", "Delivered"] as const;
+// ── Progress labels — first 3 active, last inactive (matches HTML .active) ──
+const LABELS: { text: string; active: boolean }[] = [
+  { text: "Confirmed", active: true },
+  { text: "Picked Up", active: true },
+  { text: "Transit",   active: true },
+  { text: "Delivered", active: false },
+];
 
 export default function DeliveryCard() {
   const blink = useSharedValue(1);
@@ -22,7 +28,7 @@ export default function DeliveryCard() {
   useEffect(() => {
     blink.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 750 }),
+        withTiming(1,   { duration: 750 }),
         withTiming(0.3, { duration: 750 }),
       ),
       -1,
@@ -34,7 +40,7 @@ export default function DeliveryCard() {
 
   return (
     <View style={styles.card}>
-      {/* Header */}
+      {/* Header row */}
       <View style={styles.header}>
         <Text style={styles.orderLabel}>Order #TRK-2847</Text>
         <View style={styles.statusPill}>
@@ -43,40 +49,37 @@ export default function DeliveryCard() {
         </View>
       </View>
 
+      {/* Order info */}
       <Text style={styles.orderName}>Ankara Tote Bag × 2</Text>
       <Text style={styles.dest}>→ Lekki Phase 1, Lagos</Text>
 
-      {/* Progress bar */}
-      <View style={styles.progressWrapper}>
-        <View style={styles.progressTrack}>
+      {/* Progress track */}
+      <View style={styles.trackWrapper}>
+        <View style={styles.track}>
           <LinearGradient
-            colors={[colors.primary, colors.primaryContainer]}
+            colors={["#4647D3", "#9396FF"]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={styles.progressFill}
+            style={styles.fill}
           />
         </View>
-        <View style={styles.progressRider}>
+        {/* Rider bubble — positioned at 65% */}
+        <View style={styles.riderBubble}>
           <Text style={{ fontSize: 11 }}>🚴</Text>
         </View>
       </View>
 
-      {/* Labels */}
-      <View style={styles.progressLabels}>
-        {PROGRESS_LABELS.map((label, i) => (
+      {/* Progress labels */}
+      <View style={styles.labelsRow}>
+        {LABELS.map(({ text, active }) => (
           <Text
-            key={label}
+            key={text}
             style={[
               styles.progressLabel,
-              {
-                color:
-                  i < 3
-                    ? signInColors.progressLabelActive
-                    : signInColors.progressLabel,
-              },
+              { color: active ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.35)" },
             ]}
           >
-            {label}
+            {text}
           </Text>
         ))}
       </View>
@@ -86,13 +89,15 @@ export default function DeliveryCard() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: signInColors.cardBg,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: signInColors.cardBorder,
+    borderColor: "rgba(255,255,255,0.12)",
     padding: 18,
     paddingHorizontal: 20,
   },
+
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -103,15 +108,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    letterSpacing: 0.8,
+    letterSpacing: 0.08 * 10,
     textTransform: "uppercase",
-    color: signInColors.cardLabel,
+    color: "rgba(255,255,255,0.50)",
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: signInColors.statusBg,
+    backgroundColor: "rgba(0,135,58,0.20)",
     borderRadius: radius.full,
     paddingVertical: 3,
     paddingHorizontal: 10,
@@ -120,65 +125,74 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: radius.full,
-    backgroundColor: signInColors.statusText,
+    backgroundColor: "#4ade80",
   },
   statusText: {
     fontSize: 10,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: signInColors.statusText,
+    letterSpacing: 0.04 * 10,
+    color: "#4ade80",
   },
+
+  // Order info
   orderName: {
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
+    color: "#FFFFFF",
     letterSpacing: -0.15,
     marginBottom: 4,
   },
   dest: {
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: signInColors.cardDest,
+    color: "rgba(255,255,255,0.50)",
     marginBottom: 16,
   },
-  progressWrapper: {
-    height: 24,
+
+  // Progress track
+  trackWrapper: {
+    height: 22,
     justifyContent: "center",
     marginBottom: 10,
   },
-  progressTrack: {
+  track: {
     height: 3,
-    backgroundColor: signInColors.progressTrack,
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderRadius: radius.full,
     overflow: "hidden",
   },
-  progressFill: {
+  fill: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
     width: "65%",
+    borderRadius: radius.full,
   },
-  progressRider: {
+  riderBubble: {
     position: "absolute",
     left: "65%",
     marginLeft: -11,
     width: 22,
     height: 22,
-    backgroundColor: colors.white,
+    backgroundColor: "#FFFFFF",
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0 2px 8px rgba(70, 71, 211, 0.40)",
+    boxShadow: "0 2px 8px rgba(70,71,211,0.40)",
   },
-  progressLabels: {
+
+  // Labels
+  labelsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   progressLabel: {
     fontSize: 9,
     fontFamily: font.sans.regular,
-    letterSpacing: 0.04,
+    fontWeight: "500",
+    letterSpacing: 0.04 * 9,
   },
 });

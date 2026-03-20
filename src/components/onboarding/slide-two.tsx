@@ -248,16 +248,30 @@ export default function SlideTwo({ isActive }: SlideProps) {
         ))}
       </View>
 
+      {/* Thin fade — matches design's 100px s2-fade */}
       <LinearGradient
         colors={["transparent", colors.surface]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={{
           position: "absolute",
+          bottom: 120,
+          left: 0,
+          right: 0,
+          height: 120,
+          zIndex: 5,
+        }}
+        pointerEvents="none"
+      />
+      {/* Solid surface block under the fade so content bg is clean */}
+      <View
+        style={{
+          position: "absolute",
           bottom: 0,
           left: 0,
           right: 0,
-          height: height * 0.42,
+          height: 120,
+          backgroundColor: colors.surface,
           zIndex: 5,
         }}
         pointerEvents="none"

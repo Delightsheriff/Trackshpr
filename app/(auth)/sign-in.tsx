@@ -204,7 +204,9 @@ export default function SignInScreen() {
           </Text>
         </Animated.View>
 
-        {/* Google sign-in button */}
+        {/* Google sign-in button
+             Outer Animated.View owns the shadow/elevation so Android renders
+             a rounded shadow correctly. Inner Pressable clips the ripple. */}
         <Animated.View style={[styles.btnWrap, w3s]}>
           <Pressable
             onPress={() => !loading && handleSignIn()}
@@ -305,10 +307,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  // Google button — pill, white card, visible on Android + iOS
+  // Google button
+  // btnWrap: elevation lives here so Android draws a rounded shadow, not a box
   btnWrap: {
     marginBottom: 16,
+    borderRadius: 100,
+    backgroundColor: "#FFFFFF",
+    // iOS shadow
+    shadowColor: "#302950",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    // Android shadow — on the wrapper, not the Pressable, so it's rounded
+    elevation: 4,
   },
+  // googleBtn: overflow:hidden clips the ripple to the pill shape
   googleBtn: {
     backgroundColor: "#FFFFFF",
     borderRadius: 100,
@@ -318,16 +331,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 54,
-    // Ring border — replaces the 0 0 0 1px box-shadow spread (works on all platforms)
+    overflow: "hidden",
+    // Subtle ring border (replaces 0 0 0 1px spread shadow)
     borderWidth: 1,
     borderColor: "rgba(48,41,80,0.08)",
-    // iOS shadow
-    shadowColor: "#302950",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    // Android shadow
-    elevation: 4,
   },
   googleBtnText: {
     fontSize: 15,

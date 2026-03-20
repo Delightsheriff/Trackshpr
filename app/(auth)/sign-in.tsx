@@ -288,23 +288,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  // Google button — pill, white card, subtle shadow
+  // Google button — pill, white card, visible on Android + iOS
   btnWrap: {
     marginBottom: 16,
   },
   googleBtn: {
-    width: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: radius.full,
+    borderRadius: 100,
     paddingVertical: 16,
     paddingHorizontal: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
     minHeight: 54,
-    boxShadow:
-      "0 2px 12px rgba(48,41,80,0.08), 0 0 0 1px rgba(48,41,80,0.06)",
+    // Ring border — replaces the 0 0 0 1px box-shadow spread (works on all platforms)
+    borderWidth: 1,
+    borderColor: "rgba(48,41,80,0.08)",
+    // iOS shadow
+    shadowColor: "#302950",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    // Android shadow
+    elevation: 4,
   },
   googleBtnText: {
     fontSize: 15,
@@ -312,6 +318,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#302950",
     letterSpacing: -0.15,
+    marginLeft: 12,
   },
 
   // Legal

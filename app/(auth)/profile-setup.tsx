@@ -1,18 +1,20 @@
 /**
- * Profile setup screen — light mode always (DS §9.2)
- * One-time setup: business_name, phone, city, description, logo
+ * Profile setup screen — light mode always (DS §9.2).
+ * One-time setup: business_name, phone, city, description, logo.
+ * API calls live in src/lib/profiles.ts; sub-components in src/components/auth/.
  */
 import {
   colors,
   font,
   gradients,
   radius,
-  type as t,
 } from "@/src/constants/tokens";
+import { pickLogoUri, saveProfile, uploadLogo } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
+import LogoUploader from "@/src/components/auth/logo-uploader";
+import SetupProgress from "@/src/components/auth/setup-progress";
+import type { ProgressStep } from "@/src/components/auth/setup-progress";
 import { LinearGradient } from "expo-linear-gradient";
-import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -29,132 +31,51 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-type StepStatus = "active" | "pending" | "done";
-
-function ProgressStep({
-  num,
-  label,
-  status,
-}: {
-  num: string;
-  label: string;
-  status: StepStatus;
-}) {
-  const circleStyle = [
-    styles.stepCircle,
-    status === "active" && styles.stepCircleActive,
-    status === "done" && styles.stepCircleDone,
-    status === "pending" && styles.stepCirclePending,
-  ];
-  const labelStyle = [
-    styles.stepLabel,
-    status === "active" && styles.stepLabelActive,
-    status === "done" && styles.stepLabelDone,
-  ];
-
-  return (
-    <View style={styles.stepItem}>
-      <View style={circleStyle}>
-        <Text
-          style={[
-            styles.stepNum,
-            status === "active" && { color: colors.white },
-            status === "done" && { color: colors.success },
-            status === "pending" && { color: colors.textMuted },
-          ]}
-        >
-          {status === "done" ? "✓" : num}
-        </Text>
-      </View>
-      <Text style={labelStyle}>{label}</Text>
-    </View>
-  );
-}
-
-function StepConnector({ done = false }: { done?: boolean }) {
-  return (
-    <View
-      style={[
-        styles.stepConnector,
-        done && { backgroundColor: colors.successBg },
-      ]}
-    />
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
+const STEPS: ProgressStep[] = [
+  { num: "1", label: "Profile", status: "active" },
+  { num: "2", label: "Explore", status: "pending" },
+  { num: "3", label: "Dashboard", status: "pending" },
+];
 
 export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
 
-  // ── Form state ──
+  // Form state
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [description, setDescription] = useState("");
 
-  // ── Logo state ──
+  // Logo state
   const [logoLocalUri, setLogoLocalUri] = useState<string | null>(null);
   const [logoPublicUrl, setLogoPublicUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // ── UI state ──
+  // UI state
   const [saving, setSaving] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [requiredFocused, setRequiredFocused] = useState(false);
 
-  // ── Derived ──
   const isFilled = businessName.trim().length > 0;
   const firstName = businessName.trim().split(" ")[0];
 
-  // ── Logo upload ──
-  const pickLogo = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") return;
+  // ── Logo ──
+  const handlePickLogo = async () => {
+    const uri = await pickLogoUri();
+    if (!uri) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    setLogoLocalUri(asset.uri);
+    setLogoLocalUri(uri);
     setLogoPublicUrl(null);
-    uploadLogo(asset.uri);
-  };
-
-  const uploadLogo = async (uri: string) => {
     setUploading(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
 
-      const ext = uri.split(".").pop()?.toLowerCase() ?? "jpg";
-      const fileName = `${user.id}.${ext}`;
-      const contentType = ext === "png" ? "image/png" : "image/jpeg";
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) { setUploading(false); return; }
 
-      const res = await fetch(uri);
-      const blob = await res.blob();
-
-      const { error } = await supabase.storage
-        .from("logos")
-        .upload(fileName, blob, { upsert: true, contentType });
-
-      if (!error) {
-        const { data } = supabase.storage.from("logos").getPublicUrl(fileName);
-        setLogoPublicUrl(data.publicUrl);
-      }
-    } finally {
-      setUploading(false);
-    }
+    const { publicUrl } = await uploadLogo(user.id, uri);
+    setLogoPublicUrl(publicUrl);
+    setUploading(false);
   };
 
   // ── Save ──
@@ -174,39 +95,32 @@ export default function ProfileSetupScreen() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated.");
 
-      const { error } = await supabase.from("profiles").upsert({
+      const { error } = await saveProfile({
         id: user.id,
         business_name: businessName.trim(),
         phone: phone.trim(),
         city: city.trim() || null,
-        brand_name: description.trim() || null, // maps description → brand_name
+        brand_name: description.trim() || null,
         logo_url: logoPublicUrl ?? null,
-        onboarding_complete: true,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
       router.replace("/(tabs)");
     } catch {
-      // Could show a toast here — keeping it simple for now
+      // Toast would go here — keeping simple for now
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Skip ──
-  const handleSkip = () => {
-    // Navigate without setting onboarding_complete
-    router.replace("/(tabs)");
-  };
+  const handleSkip = () => router.replace("/(tabs)");
 
-  // ── Field group shadow ──
   const requiredGroupShadow = hasError
     ? styles.fieldGroupError
     : requiredFocused
       ? styles.fieldGroupFocused
       : undefined;
 
-  // ── Render ──
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
@@ -230,11 +144,8 @@ export default function ProfileSetupScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.header}
           >
-            {/* Decorative orbs */}
             <View style={styles.orb1} />
             <View style={styles.orb2} />
-
-            {/* Content */}
             <View style={styles.headerContent}>
               <View style={styles.stepTag}>
                 <View style={styles.stepTagDot} />
@@ -249,59 +160,20 @@ export default function ProfileSetupScreen() {
             </View>
           </LinearGradient>
 
-          {/* ── Avatar upload (overlaps header) ───────────────────────── */}
-          <View style={styles.avatarWrapRow}>
-            <Pressable
-              onPress={pickLogo}
-              style={[
-                styles.avatarWrap,
-                logoLocalUri && styles.avatarWrapFilled,
-              ]}
-            >
-              {uploading ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : logoLocalUri ? (
-                <Image
-                  source={{ uri: logoLocalUri }}
-                  style={styles.avatarImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <>
-                  <Text style={styles.avatarEmoji}>🏪</Text>
-                  <Text style={styles.avatarLabel}>Add logo</Text>
-                </>
-              )}
-
-              <View
-                style={[
-                  styles.avatarBadge,
-                  logoLocalUri && {
-                    backgroundColor: uploading
-                      ? colors.primary
-                      : colors.success,
-                  },
-                ]}
-              >
-                <Text style={styles.avatarBadgeText}>
-                  {logoLocalUri && !uploading ? "✓" : "+"}
-                </Text>
-              </View>
-            </Pressable>
+          {/* ── Avatar upload (overlaps header) ──────────────────────── */}
+          <View style={styles.avatarRow}>
+            <LogoUploader
+              uri={logoLocalUri}
+              uploading={uploading}
+              onPress={handlePickLogo}
+            />
           </View>
 
           {/* ── Progress steps ────────────────────────────────────────── */}
-          <View style={styles.progressRow}>
-            <ProgressStep num="1" label="Profile" status="active" />
-            <StepConnector />
-            <ProgressStep num="2" label="Explore" status="pending" />
-            <StepConnector />
-            <ProgressStep num="3" label="Dashboard" status="pending" />
-          </View>
+          <SetupProgress steps={STEPS} />
 
-          {/* ── Form body ─────────────────────────────────────────────── */}
+          {/* ── Form ─────────────────────────────────────────────────── */}
           <View style={styles.formBody}>
-            {/* Welcome chip — appears when business name has a value */}
             {isFilled && (
               <View style={styles.welcomeChip}>
                 <Text style={styles.welcomeChipIcon}>👋</Text>
@@ -311,97 +183,56 @@ export default function ProfileSetupScreen() {
               </View>
             )}
 
-            {/* Required fields group */}
+            {/* Required fields */}
             <View style={[styles.fieldGroup, requiredGroupShadow]}>
-              {/* Business name */}
-              <View style={styles.inputRow}>
-                <View
-                  style={[
-                    styles.rowIcon,
-                    {
-                      backgroundColor: hasError
-                        ? colors.errorBg
-                        : colors.primarySoft,
-                    },
-                  ]}
-                >
-                  <Text style={styles.rowIconEmoji}>🏪</Text>
-                </View>
-                <View style={styles.inputInner}>
-                  <View style={styles.labelRow}>
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        hasError && { color: colors.error },
-                      ]}
-                    >
-                      Business name
-                    </Text>
-                    <Text style={styles.requiredAsterisk}> *</Text>
-                  </View>
-                  <TextInput
-                    value={businessName}
-                    onChangeText={(v) => {
-                      setBusinessName(v);
-                      if (hasError) setHasError(false);
-                    }}
-                    onFocus={() => setRequiredFocused(true)}
-                    onBlur={() => setRequiredFocused(false)}
-                    placeholder="e.g. Zara's Closet"
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.textInput}
-                    returnKeyType="next"
-                  />
-                </View>
-              </View>
+              <FieldRow
+                icon="🏪"
+                iconBg={hasError ? colors.errorBg : colors.primarySoft}
+                label="Business name"
+                required
+                hasError={hasError}
+              >
+                <TextInput
+                  value={businessName}
+                  onChangeText={(v) => {
+                    setBusinessName(v);
+                    if (hasError) setHasError(false);
+                  }}
+                  onFocus={() => setRequiredFocused(true)}
+                  onBlur={() => setRequiredFocused(false)}
+                  placeholder="e.g. Zara's Closet"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.textInput}
+                  returnKeyType="next"
+                />
+              </FieldRow>
 
               <View style={styles.rowDivider} />
 
-              {/* WhatsApp number */}
-              <View style={styles.inputRow}>
-                <View
-                  style={[
-                    styles.rowIcon,
-                    {
-                      backgroundColor: hasError
-                        ? colors.errorBg
-                        : colors.warningBg,
-                    },
-                  ]}
-                >
-                  <Text style={styles.rowIconEmoji}>📱</Text>
-                </View>
-                <View style={styles.inputInner}>
-                  <View style={styles.labelRow}>
-                    <Text
-                      style={[
-                        styles.fieldLabel,
-                        hasError && { color: colors.error },
-                      ]}
-                    >
-                      WhatsApp number
-                    </Text>
-                    <Text style={styles.requiredAsterisk}> *</Text>
-                  </View>
-                  <TextInput
-                    value={phone}
-                    onChangeText={(v) => {
-                      setPhone(v);
-                      if (hasError) setHasError(false);
-                    }}
-                    onFocus={() => setRequiredFocused(true)}
-                    onBlur={() => setRequiredFocused(false)}
-                    placeholder="0800 000 0000"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
-                    style={styles.textInput}
-                    returnKeyType="next"
-                  />
-                </View>
-              </View>
+              <FieldRow
+                icon="📱"
+                iconBg={hasError ? colors.errorBg : colors.warningBg}
+                label="WhatsApp number"
+                required
+                hasError={hasError}
+              >
+                <TextInput
+                  value={phone}
+                  onChangeText={(v) => {
+                    setPhone(v);
+                    if (hasError) setHasError(false);
+                  }}
+                  onFocus={() => setRequiredFocused(true)}
+                  onBlur={() => setRequiredFocused(false)}
+                  placeholder="0800 000 0000"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
+                  style={styles.textInput}
+                  returnKeyType="next"
+                />
+              </FieldRow>
             </View>
 
-            {/* Validation error message */}
             {hasError && (
               <View style={styles.errorRow}>
                 <Text style={styles.errorIcon}>⚠️</Text>
@@ -411,64 +242,43 @@ export default function ProfileSetupScreen() {
               </View>
             )}
 
-            {/* Optional fields group */}
+            {/* Optional fields */}
             <View style={styles.fieldGroup}>
-              {/* City */}
-              <View style={styles.inputRow}>
-                <View
-                  style={[
-                    styles.rowIcon,
-                    { backgroundColor: colors.infoBg },
-                  ]}
-                >
-                  <Text style={styles.rowIconEmoji}>📍</Text>
-                </View>
-                <View style={styles.inputInner}>
-                  <Text style={styles.fieldLabel}>City</Text>
-                  <TextInput
-                    value={city}
-                    onChangeText={setCity}
-                    placeholder="e.g. Lagos"
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.textInput}
-                    returnKeyType="next"
-                  />
-                </View>
-                <View style={styles.optionalTag}>
-                  <Text style={styles.optionalTagText}>Optional</Text>
-                </View>
-              </View>
+              <FieldRow
+                icon="📍"
+                iconBg={colors.infoBg}
+                label="City"
+                optional
+              >
+                <TextInput
+                  value={city}
+                  onChangeText={setCity}
+                  placeholder="e.g. Lagos"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.textInput}
+                  returnKeyType="next"
+                />
+              </FieldRow>
 
               <View style={styles.rowDivider} />
 
-              {/* Short description */}
-              <View style={styles.inputRow}>
-                <View
-                  style={[
-                    styles.rowIcon,
-                    { backgroundColor: colors.successBg },
-                  ]}
-                >
-                  <Text style={styles.rowIconEmoji}>✏️</Text>
-                </View>
-                <View style={styles.inputInner}>
-                  <Text style={styles.fieldLabel}>Short description</Text>
-                  <TextInput
-                    value={description}
-                    onChangeText={setDescription}
-                    placeholder="What do you sell?"
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.textInput}
-                    returnKeyType="done"
-                  />
-                </View>
-                <View style={styles.optionalTag}>
-                  <Text style={styles.optionalTagText}>Optional</Text>
-                </View>
-              </View>
+              <FieldRow
+                icon="✏️"
+                iconBg={colors.successBg}
+                label="Short description"
+                optional
+              >
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="What do you sell?"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.textInput}
+                  returnKeyType="done"
+                />
+              </FieldRow>
             </View>
 
-            {/* Info note — only when no welcome chip */}
             {!isFilled && (
               <View style={styles.infoNote}>
                 <Text style={styles.infoNoteIcon}>👁️</Text>
@@ -485,7 +295,7 @@ export default function ProfileSetupScreen() {
             )}
           </View>
 
-          {/* ── CTA button ────────────────────────────────────────────── */}
+          {/* ── CTA ──────────────────────────────────────────────────── */}
           <Pressable
             onPress={handleSave}
             disabled={saving}
@@ -510,7 +320,7 @@ export default function ProfileSetupScreen() {
             </LinearGradient>
           </Pressable>
 
-          {/* ── Skip link ─────────────────────────────────────────────── */}
+          {/* ── Skip ─────────────────────────────────────────────────── */}
           <Pressable
             onPress={handleSkip}
             style={[
@@ -530,6 +340,53 @@ export default function ProfileSetupScreen() {
   );
 }
 
+// ── FieldRow ──────────────────────────────────────────────────────────────────
+
+function FieldRow({
+  icon,
+  iconBg,
+  label,
+  required,
+  optional,
+  hasError,
+  children,
+}: {
+  icon: string;
+  iconBg: string;
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  hasError?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.inputRow}>
+      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
+        <Text style={styles.rowIconEmoji}>{icon}</Text>
+      </View>
+      <View style={styles.inputInner}>
+        <View style={styles.labelRow}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              hasError && required && { color: colors.error },
+            ]}
+          >
+            {label}
+          </Text>
+          {required && <Text style={styles.requiredAsterisk}> *</Text>}
+        </View>
+        {children}
+      </View>
+      {optional && (
+        <View style={styles.optionalTag}>
+          <Text style={styles.optionalTagText}>Optional</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -541,7 +398,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  // ── Header ──
+  // Header
   header: {
     height: 116,
     overflow: "hidden",
@@ -597,16 +454,16 @@ const styles = StyleSheet.create({
   },
   stepTagText: {
     fontSize: 10,
-    fontWeight: "600",
     fontFamily: font.sans.semiBold,
-    letterSpacing: 0.06 * 10,
+    fontWeight: "600",
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     color: "rgba(255,255,255,0.8)",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "700",
     fontFamily: font.sans.bold,
+    fontWeight: "700",
     color: colors.white,
     letterSpacing: -0.4,
     lineHeight: 24,
@@ -618,130 +475,20 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // ── Avatar ──
-  avatarWrapRow: {
+  // Avatar
+  avatarRow: {
     alignItems: "center",
     marginTop: -28,
     marginBottom: 20,
     zIndex: 10,
   },
-  avatarWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: colors.surfaceCard,
-    borderWidth: 3,
-    borderColor: colors.surfaceCard,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    boxShadow: "0 4px 20px rgba(48, 41, 80, 0.15)",
-  },
-  avatarWrapFilled: {
-    backgroundColor: "#FFF7ED",
-  },
-  avatarImage: {
-    width: 66,
-    height: 66,
-    borderRadius: 20,
-  },
-  avatarEmoji: {
-    fontSize: 24,
-  },
-  avatarLabel: {
-    fontSize: 9,
-    fontWeight: "600",
-    fontFamily: font.sans.semiBold,
-    color: colors.primary,
-    letterSpacing: 0.04 * 9,
-    textTransform: "uppercase",
-  },
-  avatarBadge: {
-    position: "absolute",
-    bottom: -4,
-    right: -4,
-    width: 22,
-    height: 22,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.surface,
-    boxShadow: "0 2px 8px rgba(70, 71, 211, 0.40)",
-  },
-  avatarBadgeText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "700",
-    fontFamily: font.sans.bold,
-  },
 
-  // ── Progress steps ──
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 14,
-    paddingBottom: 6,
-  },
-  stepItem: {
-    alignItems: "center",
-    gap: 5,
-  },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircleActive: {
-    backgroundColor: colors.primary,
-  },
-  stepCircleDone: {
-    backgroundColor: colors.successBg,
-  },
-  stepCirclePending: {
-    backgroundColor: colors.surfaceContainer,
-  },
-  stepNum: {
-    fontSize: 11,
-    fontWeight: "700",
-    fontFamily: font.sans.bold,
-  },
-  stepLabel: {
-    fontSize: 9,
-    fontWeight: "500",
-    fontFamily: font.sans.regular,
-    color: colors.textMuted,
-    letterSpacing: 0.02 * 9,
-  },
-  stepLabelActive: {
-    color: colors.primary,
-    fontWeight: "700",
-    fontFamily: font.sans.bold,
-  },
-  stepLabelDone: {
-    color: colors.success,
-  },
-  stepConnector: {
-    width: 24,
-    height: 2,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: 2,
-    marginBottom: 14,
-  },
-
-  // ── Form ──
+  // Form
   formBody: {
     paddingHorizontal: 18,
     paddingBottom: 20,
     gap: 10,
   },
-
-  // Welcome chip
   welcomeChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -751,18 +498,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  welcomeChipIcon: {
-    fontSize: 18,
-  },
+  welcomeChipIcon: { fontSize: 18 },
   welcomeChipText: {
     fontSize: 13,
-    fontWeight: "600",
     fontFamily: font.sans.semiBold,
+    fontWeight: "600",
     color: colors.success,
     flex: 1,
   },
-
-  // Field group card
   fieldGroup: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
@@ -776,8 +519,6 @@ const styles = StyleSheet.create({
     boxShadow:
       "0 0 0 2px rgba(220, 38, 38, 1), 0 1px 8px rgba(48, 41, 80, 0.05)",
   },
-
-  // Input row inside card
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -788,7 +529,7 @@ const styles = StyleSheet.create({
   rowDivider: {
     height: 1,
     backgroundColor: colors.surfaceContainer,
-    marginLeft: 14 + 36 + 12, // align with text content
+    marginLeft: 62, // icon width + padding + gap
   },
   rowIcon: {
     width: 36,
@@ -798,12 +539,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  rowIconEmoji: {
-    fontSize: 16,
-  },
-  inputInner: {
-    flex: 1,
-  },
+  rowIconEmoji: { fontSize: 16 },
+  inputInner: { flex: 1 },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -811,28 +548,26 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 10,
-    fontWeight: "600",
     fontFamily: font.sans.semiBold,
-    letterSpacing: 0.05 * 10,
+    fontWeight: "600",
+    letterSpacing: 0.5,
     textTransform: "uppercase",
     color: colors.textMuted,
   },
   requiredAsterisk: {
     fontSize: 10,
-    fontWeight: "600",
     fontFamily: font.sans.semiBold,
+    fontWeight: "600",
     color: colors.error,
   },
   textInput: {
     fontSize: 14,
-    fontWeight: "500",
     fontFamily: font.sans.semiBold,
+    fontWeight: "500",
     color: colors.textPrimary,
     padding: 0,
     margin: 0,
   },
-
-  // Optional tag
   optionalTag: {
     backgroundColor: colors.surfaceContainer,
     borderRadius: radius.full,
@@ -842,14 +577,12 @@ const styles = StyleSheet.create({
   },
   optionalTagText: {
     fontSize: 9,
-    fontWeight: "600",
     fontFamily: font.sans.semiBold,
-    letterSpacing: 0.04 * 9,
+    fontWeight: "600",
+    letterSpacing: 0.36,
     textTransform: "uppercase",
     color: colors.textMuted,
   },
-
-  // Validation error
   errorRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -857,17 +590,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginTop: -4,
   },
-  errorIcon: {
-    fontSize: 12,
-  },
+  errorIcon: { fontSize: 12 },
   errorText: {
     fontSize: 11,
-    fontWeight: "500",
     fontFamily: font.sans.semiBold,
+    fontWeight: "500",
     color: colors.error,
   },
-
-  // Info note
   infoNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -877,10 +606,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 14,
   },
-  infoNoteIcon: {
-    fontSize: 16,
-    flexShrink: 0,
-  },
+  infoNoteIcon: { fontSize: 16, flexShrink: 0 },
   infoNoteText: {
     fontSize: 11,
     fontFamily: font.sans.regular,
@@ -889,7 +615,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── CTA ──
+  // CTA
   saveBtnWrap: {
     marginHorizontal: 18,
     marginTop: 4,
@@ -904,12 +630,12 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     fontSize: 15,
-    fontWeight: "700",
     fontFamily: font.sans.bold,
+    fontWeight: "700",
     color: colors.white,
   },
 
-  // ── Skip ──
+  // Skip
   skipWrap: {
     alignItems: "center",
     paddingVertical: 12,
@@ -917,7 +643,6 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontSize: 13,
-    fontWeight: "500",
     fontFamily: font.sans.regular,
     color: colors.textMuted,
   },

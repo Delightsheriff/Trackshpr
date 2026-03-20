@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(ls /c/Users/delig/Documents/Trackshpr/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(ls \"C:\\\\Users\\\\delig\\\\Downloads\"/*.html)",
+      "Read(//mnt/c/Users/delig/**)",
+      "Bash(cd:*)"
+    ]
+  }
+}

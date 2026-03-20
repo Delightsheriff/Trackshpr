@@ -104,6 +104,35 @@ export const onboardingColors = {
   darkBgS3GradTop:    '#0d1a12',
 } as const
 
+// ── Sign-in screen semantic tokens ───────────────────────────────────────────
+// Dark hero + glassmorphic delivery card. Always dark — brand entry point.
+export const signInColors = {
+  heroBg:              '#0e0c1a',
+  heroGradBase:        '#1a1040',   // linear base layer top color
+  heroPurpleBloom:     'rgba(70, 71, 211, 0.55)',   // top radial bloom approximation
+  heroRightAccent:     'rgba(147, 150, 255, 0.20)', // right-side accent
+
+  // Glassmorphic delivery card
+  cardBg:              'rgba(255, 255, 255, 0.08)',
+  cardBorder:          'rgba(255, 255, 255, 0.12)',
+  cardLabel:           'rgba(255, 255, 255, 0.50)',
+  cardDest:            'rgba(255, 255, 255, 0.50)',
+
+  // In-transit status pill inside card
+  statusBg:            'rgba(0, 135, 58, 0.20)',
+  statusText:          '#4ade80',
+
+  // Progress track
+  progressTrack:       'rgba(255, 255, 255, 0.10)',
+  progressLabel:       'rgba(255, 255, 255, 0.35)',
+  progressLabelActive: 'rgba(255, 255, 255, 0.70)',
+
+  // Orbit rings
+  orbitRing:           'rgba(147, 150, 255, 0.15)',
+  orbitRingOuter:      'rgba(147, 150, 255, 0.07)',
+  orbitDot:            'rgba(147, 150, 255, 0.60)',
+} as const
+
 // ── Gradients ───────────────────────────────────────────────────────────────
 // Rule: max 2 gradient elements visible on screen at once.
 export const gradients = {

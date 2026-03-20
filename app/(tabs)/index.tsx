@@ -1,27 +1,463 @@
-import { Link } from "expo-router";
-import { ScrollView, Text } from "react-native";
+/**
+ * Home / Dashboard tab (DS §8.1, §8.4).
+ * TODO: replace DUMMY_* with real Supabase queries.
+ */
+import { colors, font, gradients, layout, radius, shadows, type as t } from "@/src/constants/tokens";
+import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function HomeScreen() {
+// ── Dummy data — TODO: replace with real Supabase query ──────────────────────
+const DUMMY_STATS = { total: 18, delivered: 11, inTransit: 5, failed: 2 };
+
+const DUMMY_ORDERS = [
+  { id: "1", item: "Adire Maxi Dress × 2", customer: "Amara Obi",
+    area: "Lekki Phase 1", status: "in_transit" as const, time: "12m ago" },
+  { id: "2", item: "Ankara Tote Bag",       customer: "Tunde Bello",
+    area: "Yaba",          status: "pending"    as const, time: "34m ago" },
+  { id: "3", item: "Beaded Necklace Set",   customer: "Chisom Eze",
+    area: "Surulere",      status: "delivered"  as const, time: "1h ago" },
+];
+
+const QUICK_ACTIONS = [
+  { icon: "🗺️", label: "Fleet map" },
+  { icon: "📊", label: "Analytics" },
+  { icon: "📋", label: "Export CSV" },
+  { icon: "🔗", label: "Copy link" },
+];
+
+// ── Status config ─────────────────────────────────────────────────────────────
+type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
+
+const STATUS_MAP: Record<OrderStatus, { label: string; fg: string; bg: string; emoji: string }> = {
+  in_transit: { label: "In Transit", fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
+  pending:    { label: "Pending",    fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
+  delivered:  { label: "Delivered",  fg: colors.success, bg: colors.successBg, emoji: "✅" },
+  failed:     { label: "Failed",     fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
+};
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning 👋";
+  if (h < 17) return "Good afternoon 👋";
+  return "Good evening 👋";
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+function StatusPill({ status }: { status: OrderStatus }) {
+  const cfg = STATUS_MAP[status];
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-zinc-900 px-6 py-8">
-      <Text className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-4">
-        Welcome!
-      </Text>
-      <Text className="text-lg text-zinc-600 dark:text-zinc-400">
-        This is the home page. Start building your app here.
-      </Text>
-      <Link
-        href="/(auth)/sign-in"
-        className="mt-4 text-blue-500 dark:text-blue-400 font-medium"
-      >
-        Go to Profile
-      </Link>
-      <Link
-        href="/(auth)/profile-setup"
-        className="mt-4 text-blue-500 dark:text-blue-400 font-medium"
-      >
-        Go to Profile set up
-      </Link>
-    </ScrollView>
+    <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
+      <View style={[styles.pillDot, { backgroundColor: cfg.fg }]} />
+      <Text style={[styles.pillText, { color: cfg.fg }]}>{cfg.label}</Text>
+    </View>
   );
 }
+
+function OrderCard({ item, customer, area, status, time }: {
+  item: string; customer: string; area: string; status: OrderStatus; time: string;
+}) {
+  const cfg = STATUS_MAP[status];
+  return (
+    <View style={styles.orderCard}>
+      <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
+        <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
+      </View>
+      <View style={styles.orderInfo}>
+        <Text style={styles.orderName} numberOfLines={1}>{item}</Text>
+        <Text style={styles.orderMeta}>{customer} · {area}</Text>
+      </View>
+      <View style={styles.orderRight}>
+        <StatusPill status={status} />
+        <Text style={styles.orderTime}>{time}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={styles.root}>
+      <StatusBar style="dark" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top + layout.screenPaddingTop },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header ───────────────────────────────────────────────────── */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>{greeting()}</Text>
+            <Text style={styles.businessName}>Zara's Closet</Text>
+          </View>
+          <View style={styles.avatarWrap}>
+            <LinearGradient
+              colors={gradients.avatar}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatar}
+            >
+              <Text style={styles.avatarInitial}>Z</Text>
+            </LinearGradient>
+            <View style={styles.notifDot} />
+          </View>
+        </View>
+
+        {/* ── Hero stat card ────────────────────────────────────────────── */}
+        <View style={styles.heroCardShadow}>
+          <LinearGradient
+            colors={["#4647D3", "#5354e8", "#6366f1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroOrb1} />
+            <View style={styles.heroOrb2} />
+            <View style={styles.heroLeft}>
+              <Text style={styles.heroLabel}>Today's Deliveries</Text>
+              <Text style={styles.heroNum}>{DUMMY_STATS.total}</Text>
+              <Text style={styles.heroSub}>↑ 3 more than yesterday</Text>
+            </View>
+            <View style={styles.heroIconWrap}>
+              <Text style={styles.heroIconEmoji}>🚴</Text>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* ── Mini stat row ─────────────────────────────────────────────── */}
+        <View style={styles.statRow}>
+          <View style={styles.statMini}>
+            <Text style={styles.statLabel}>Done</Text>
+            <Text style={[styles.statNum, { color: colors.success }]}>
+              {DUMMY_STATS.delivered}
+            </Text>
+          </View>
+          <View style={styles.statMini}>
+            <Text style={styles.statLabel}>Moving</Text>
+            <Text style={[styles.statNum, { color: colors.warning }]}>
+              {DUMMY_STATS.inTransit}
+            </Text>
+          </View>
+          <View style={styles.statMini}>
+            <Text style={styles.statLabel}>Failed</Text>
+            <Text style={[styles.statNum, { color: colors.error }]}>
+              {DUMMY_STATS.failed}
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Quick actions ─────────────────────────────────────────────── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickRow}
+        >
+          {QUICK_ACTIONS.map(({ icon, label }) => (
+            <View key={label} style={styles.quickChip}>
+              <Text style={styles.quickChipIcon}>{icon}</Text>
+              <Text style={styles.quickChipLabel}>{label}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* ── Active orders ─────────────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Active Orders</Text>
+          <Text style={styles.sectionLink}>See all</Text>
+        </View>
+
+        {DUMMY_ORDERS.map((o) => (
+          <OrderCard key={o.id} {...o} />
+        ))}
+
+        <View style={{ height: 16 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.surface },
+  scroll: { paddingHorizontal: layout.screenPaddingH },
+
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: layout.sectionGap,
+    paddingTop: 6,
+  },
+  greeting: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    color: colors.textMuted,
+    marginBottom: 2,
+  },
+  businessName: {
+    fontSize: 20,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.6,
+    color: colors.textPrimary,
+  },
+  avatarWrap: { position: "relative" },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    fontSize: 16,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    color: colors.white,
+  },
+  notifDot: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.error,
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+
+  // Hero card
+  heroCardShadow: {
+    borderRadius: radius.card,
+    marginBottom: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+    backgroundColor: colors.primary,
+  },
+  heroCard: {
+    borderRadius: radius.card,
+    padding: 18,
+    paddingBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  heroOrb1: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    top: -30,
+    right: -20,
+  },
+  heroOrb2: {
+    position: "absolute",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    bottom: -20,
+    right: 40,
+  },
+  heroLeft: { zIndex: 1 },
+  heroLabel: {
+    fontSize: 10,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.60)",
+    marginBottom: 4,
+  },
+  heroNum: {
+    fontSize: 40,
+    fontFamily: font.mono.medium,
+    fontWeight: "700",
+    letterSpacing: -1.6,
+    color: colors.white,
+    lineHeight: 44,
+  },
+  heroSub: {
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    color: "rgba(255,255,255,0.50)",
+    marginTop: 4,
+  },
+  heroIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  heroIconEmoji: { fontSize: 22 },
+
+  // Mini stats
+  statRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: layout.sectionGap,
+  },
+  statMini: {
+    flex: 1,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: 16,
+    padding: 12,
+    paddingHorizontal: 10,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    letterSpacing: 0.45,
+    textTransform: "uppercase",
+    color: colors.textMuted,
+    marginBottom: 5,
+  },
+  statNum: {
+    fontSize: 22,
+    fontFamily: font.mono.medium,
+    fontWeight: "700",
+    letterSpacing: -0.44,
+  },
+
+  // Quick actions
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 2,
+    marginBottom: layout.sectionGap,
+  },
+  quickChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  quickChipIcon: { fontSize: 14 },
+  quickChipLabel: {
+    fontSize: 12,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+
+  // Section header
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.15,
+    color: colors.textPrimary,
+  },
+  sectionLink: {
+    fontSize: 12,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+
+  // Order card
+  orderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radius.xl,
+    padding: layout.cardPadding,
+    gap: 12,
+    marginBottom: layout.listGap,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  orderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  orderIconEmoji: { fontSize: 17 },
+  orderInfo: { flex: 1, minWidth: 0 },
+  orderName: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.13,
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  orderMeta: {
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    color: colors.textMuted,
+  },
+  orderRight: {
+    alignItems: "flex-end",
+    gap: 4,
+    flexShrink: 0,
+  },
+  orderTime: {
+    fontSize: 10,
+    fontFamily: font.mono.regular,
+    color: colors.textMuted,
+  },
+
+  // Status pill (DS §8.4)
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: radius.full,
+    gap: 4,
+  },
+  pillDot: {
+    width: 5,
+    height: 5,
+    borderRadius: radius.full,
+  },
+  pillText: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
+  },
+});

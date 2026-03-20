@@ -91,7 +91,7 @@ export default function SignInScreen() {
     [w0, w1, w2, w3, w4].forEach((sv, i) => {
       sv.value = withDelay(delays[i], withTiming(1, { duration: 500 }));
     });
-  }, []);
+  }, [w0, w1, w2, w3, w4]);
 
   const fadeUp = (sv: { value: number }) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -120,18 +120,21 @@ export default function SignInScreen() {
     transform: [{ translateY: toastY.value }],
   }));
 
-  const showToast = useCallback((msg: string) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToastMsg(msg);
-    toastY.value = -20;
-    toastOp.value = 0;
-    toastY.value = withSpring(0, { damping: 20, stiffness: 300 });
-    toastOp.value = withTiming(1, { duration: 300 });
-    toastTimer.current = setTimeout(() => {
-      toastY.value = withTiming(-20, { duration: 200 });
-      toastOp.value = withTiming(0, { duration: 200 });
-    }, 3000);
-  }, []);
+  const showToast = useCallback(
+    (msg: string) => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      setToastMsg(msg);
+      toastY.value = -20;
+      toastOp.value = 0;
+      toastY.value = withSpring(0, { damping: 20, stiffness: 300 });
+      toastOp.value = withTiming(1, { duration: 300 });
+      toastTimer.current = setTimeout(() => {
+        toastY.value = withTiming(-20, { duration: 200 });
+        toastOp.value = withTiming(0, { duration: 200 });
+      }, 3000);
+    },
+    [toastOp, toastY],
+  );
 
   const handleSignIn = useCallback(async () => {
     setLoading(true);
@@ -200,7 +203,7 @@ export default function SignInScreen() {
         <Animated.View style={[styles.subWrap, w2s]}>
           <Text style={styles.sub}>
             Real-time delivery visibility for Nigerian social commerce sellers.
-            No more "where is my order?" messages.
+            No more &quot;where is my order?&quot; messages.
           </Text>
         </Animated.View>
 
@@ -316,7 +319,7 @@ const styles = StyleSheet.create({
     // iOS shadow
     shadowColor: "#302950",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     // Android shadow — on the wrapper, not the Pressable, so it's rounded
     elevation: 4,

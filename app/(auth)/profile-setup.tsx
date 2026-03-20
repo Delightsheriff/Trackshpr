@@ -12,8 +12,6 @@ import {
 import { pickLogoUri, saveProfile, uploadLogo } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
 import LogoUploader from "@/src/components/auth/logo-uploader";
-import SetupProgress from "@/src/components/auth/setup-progress";
-import type { ProgressStep } from "@/src/components/auth/setup-progress";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -30,12 +28,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const STEPS: ProgressStep[] = [
-  { num: "1", label: "Profile", status: "active" },
-  { num: "2", label: "Explore", status: "pending" },
-  { num: "3", label: "Dashboard", status: "pending" },
-];
 
 export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
@@ -107,7 +99,7 @@ export default function ProfileSetupScreen() {
       if (error) throw new Error(error);
       router.replace("/(tabs)");
     } catch {
-      // Toast would go here — keeping simple for now
+      // Toast would go here
     } finally {
       setSaving(false);
     }
@@ -115,14 +107,15 @@ export default function ProfileSetupScreen() {
 
   const handleSkip = () => router.replace("/(tabs)");
 
-  const requiredGroupShadow = hasError
-    ? styles.fieldGroupError
+  // Ring border: use borderWidth/borderColor instead of boxShadow spread for Android
+  const requiredGroupBorder = hasError
+    ? { borderWidth: 2, borderColor: colors.error }
     : requiredFocused
-      ? styles.fieldGroupFocused
-      : undefined;
+      ? { borderWidth: 2, borderColor: colors.primary }
+      : { borderWidth: 2, borderColor: "transparent" };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
@@ -137,12 +130,12 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header band ──────────────────────────────────────────── */}
+          {/* ── Header band — extends into status bar ─────────────────── */}
           <LinearGradient
             colors={["#4647D3", "#5354e8", "#6366f1"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.header}
+            style={[styles.header, { paddingTop: insets.top }]}
           >
             <View style={styles.orb1} />
             <View style={styles.orb2} />
@@ -160,20 +153,17 @@ export default function ProfileSetupScreen() {
             </View>
           </LinearGradient>
 
-          {/* ── Avatar upload (overlaps header) ──────────────────────── */}
-          <View style={styles.avatarRow}>
-            <LogoUploader
-              uri={logoLocalUri}
-              uploading={uploading}
-              onPress={handlePickLogo}
-            />
-          </View>
-
-          {/* ── Progress steps ────────────────────────────────────────── */}
-          <SetupProgress steps={STEPS} />
-
           {/* ── Form ─────────────────────────────────────────────────── */}
           <View style={styles.formBody}>
+            {/* Avatar sits inside the form, centred above the business name group */}
+            <View style={styles.avatarRow}>
+              <LogoUploader
+                uri={logoLocalUri}
+                uploading={uploading}
+                onPress={handlePickLogo}
+              />
+            </View>
+
             {isFilled && (
               <View style={styles.welcomeChip}>
                 <Text style={styles.welcomeChipIcon}>👋</Text>
@@ -184,7 +174,7 @@ export default function ProfileSetupScreen() {
             )}
 
             {/* Required fields */}
-            <View style={[styles.fieldGroup, requiredGroupShadow]}>
+            <View style={[styles.fieldGroup, requiredGroupBorder]}>
               <FieldRow
                 icon="🏪"
                 iconBg={hasError ? colors.errorBg : colors.primarySoft}
@@ -243,7 +233,7 @@ export default function ProfileSetupScreen() {
             )}
 
             {/* Optional fields */}
-            <View style={styles.fieldGroup}>
+            <View style={[styles.fieldGroup, styles.fieldGroupDefault]}>
               <FieldRow
                 icon="📍"
                 iconBg={colors.infoBg}
@@ -295,39 +285,39 @@ export default function ProfileSetupScreen() {
             )}
           </View>
 
-          {/* ── CTA ──────────────────────────────────────────────────── */}
-          <Pressable
-            onPress={handleSave}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.saveBtnWrap,
-              pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <LinearGradient
-              colors={gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.saveBtn}
+          {/* ── CTA — Android-safe shadow pattern ────────────────────── */}
+          <View style={styles.saveBtnShadow}>
+            <Pressable
+              onPress={handleSave}
+              disabled={saving}
+              android_ripple={{ color: "rgba(255,255,255,0.20)", borderless: false }}
+              style={styles.saveBtnPressable}
             >
-              {saving ? (
-                <ActivityIndicator color={colors.white} size="small" />
-              ) : (
-                <Text style={styles.saveBtnText}>
-                  {isFilled ? "Save & Continue →" : "Continue →"}
-                </Text>
-              )}
-            </LinearGradient>
-          </Pressable>
+              <LinearGradient
+                colors={gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.saveBtnGradient}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>
+                    {isFilled ? "Save & Continue →" : "Continue →"}
+                  </Text>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </View>
 
           {/* ── Skip ─────────────────────────────────────────────────── */}
           <Pressable
             onPress={handleSkip}
             style={[
               styles.skipWrap,
-              isFilled && { opacity: 0, pointerEvents: "none" },
+              isFilled && { opacity: 0 },
             ]}
-            pointerEvents={isFilled ? "none" : "auto"}
+            disabled={isFilled}
           >
             <Text style={styles.skipText}>
               Fill in later?{" "}
@@ -373,8 +363,8 @@ function FieldRow({
             ]}
           >
             {label}
+            {required && <Text style={styles.requiredAsterisk}> *</Text>}
           </Text>
-          {required && <Text style={styles.requiredAsterisk}> *</Text>}
         </View>
         {children}
       </View>
@@ -398,11 +388,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  // Header
+  // Header — height grows with safe area so gradient covers status bar
   header: {
-    height: 116,
+    minHeight: 120,
     overflow: "hidden",
-    position: "relative",
   },
   orb1: {
     position: "absolute",
@@ -423,14 +412,8 @@ const styles = StyleSheet.create({
     left: 24,
   },
   headerContent: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     padding: 16,
     paddingHorizontal: 20,
-    justifyContent: "center",
     zIndex: 2,
   },
   stepTag: {
@@ -475,12 +458,11 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // Avatar
+  // Avatar — centred in form body, above the required fields group
   avatarRow: {
     alignItems: "center",
-    marginTop: -28,
-    marginBottom: 20,
-    zIndex: 10,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
 
   // Form
@@ -509,15 +491,19 @@ const styles = StyleSheet.create({
   fieldGroup: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
-    boxShadow: "0 1px 8px rgba(48, 41, 80, 0.05)",
+    overflow: "hidden",
+    // iOS shadow
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    // Android shadow
+    elevation: 2,
   },
-  fieldGroupFocused: {
-    boxShadow:
-      "0 0 0 2px rgba(70, 71, 211, 1), 0 1px 8px rgba(48, 41, 80, 0.05)",
-  },
-  fieldGroupError: {
-    boxShadow:
-      "0 0 0 2px rgba(220, 38, 38, 1), 0 1px 8px rgba(48, 41, 80, 0.05)",
+  // Default: transparent 2px border so layout stays stable when ring appears
+  fieldGroupDefault: {
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   inputRow: {
     flexDirection: "row",
@@ -615,18 +601,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // CTA
-  saveBtnWrap: {
+  // CTA — Android-safe shadow: elevation on outer wrapper, overflow:hidden on Pressable
+  saveBtnShadow: {
     marginHorizontal: 18,
     marginTop: 4,
+    borderRadius: 100,
+    // iOS shadow
+    shadowColor: "rgba(70,71,211,1)",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    // Android — must live here (not on Pressable) to get rounded shadow
+    elevation: 8,
+    backgroundColor: colors.primary,
   },
-  saveBtn: {
-    borderRadius: radius.full,
+  saveBtnPressable: {
+    borderRadius: 100,
+    overflow: "hidden",
+  },
+  saveBtnGradient: {
+    borderRadius: 100,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 50,
-    boxShadow: "0 8px 24px rgba(70, 71, 211, 0.35)",
   },
   saveBtnText: {
     fontSize: 15,

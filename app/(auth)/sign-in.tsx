@@ -7,6 +7,11 @@
  *  - Button: real 4-colour Google G logo, pill shape, subtle shadow
  *  - Entrance: staggered fadeUp animation (matches HTML keyframe)
  */
+import SignInHero from "@/src/components/auth/sign-in-hero";
+import GoogleIcon from "@/src/components/shared/google-icon";
+import { colors, font, radius, type as t } from "@/src/constants/tokens";
+import { signInWithGoogle } from "@/src/lib/auth";
+import { supabase } from "@/src/lib/supabase";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -30,11 +35,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import SignInHero from "@/src/components/auth/sign-in-hero";
-import GoogleIcon from "@/src/components/shared/google-icon";
-import { colors, font, radius, type as t } from "@/src/constants/tokens";
-import { signInWithGoogle } from "@/src/lib/auth";
-import { supabase } from "@/src/lib/supabase";
 
 // ── Gradient headline text ─────────────────────────────────────────────────────
 
@@ -47,7 +47,11 @@ function GradientText({
 }) {
   return (
     <MaskedView
-      maskElement={<Text style={[style, { backgroundColor: "transparent" }]}>{children}</Text>}
+      maskElement={
+        <Text style={[style, { backgroundColor: "transparent" }]}>
+          {children}
+        </Text>
+      }
     >
       <LinearGradient
         colors={["#4647D3", "#9396FF"]}
@@ -79,7 +83,7 @@ export default function SignInScreen() {
   const w4 = useSharedValue(0); // legal        delay 650ms
 
   // Toast
-  const toastY  = useSharedValue(-20);
+  const toastY = useSharedValue(-20);
   const toastOp = useSharedValue(0);
 
   useEffect(() => {
@@ -94,7 +98,14 @@ export default function SignInScreen() {
     useAnimatedStyle(() => ({
       opacity: sv.value,
       transform: [
-        { translateY: interpolate(sv.value, [0, 1], [16, 0], Extrapolation.CLAMP) },
+        {
+          translateY: interpolate(
+            sv.value,
+            [0, 1],
+            [16, 0],
+            Extrapolation.CLAMP,
+          ),
+        },
       ],
     }));
 
@@ -118,7 +129,7 @@ export default function SignInScreen() {
     toastOp.value = withTiming(1, { duration: 300 });
     toastTimer.current = setTimeout(() => {
       toastY.value = withTiming(-20, { duration: 200 });
-      toastOp.value = withTiming(0,   { duration: 200 });
+      toastOp.value = withTiming(0, { duration: 200 });
     }, 3000);
   }, []);
 
@@ -128,14 +139,19 @@ export default function SignInScreen() {
     const result = await signInWithGoogle();
 
     if (!result.ok) {
-      if ("cancelled" in result) { setLoading(false); return; }
+      if ("cancelled" in result) {
+        setLoading(false);
+        return;
+      }
       showToast(result.error);
       setLoading(false);
       return;
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("No user");
 
       const { data: profile } = await supabase
@@ -144,7 +160,9 @@ export default function SignInScreen() {
         .eq("id", user.id)
         .maybeSingle();
 
-      router.replace(profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup");
+      router.replace(
+        profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup",
+      );
     } catch {
       showToast("Couldn't complete sign-in. Please try again.");
       setLoading(false);
@@ -191,10 +209,8 @@ export default function SignInScreen() {
           <Pressable
             onPress={() => !loading && handleSignIn()}
             disabled={loading}
-            style={({ pressed }) => [
-              styles.googleBtn,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
+            android_ripple={{ color: "rgba(48,41,80,0.06)", borderless: false }}
+            style={styles.googleBtn}
           >
             {loading ? (
               <ActivityIndicator color={colors.textPrimary} size="small" />
@@ -223,7 +239,8 @@ export default function SignInScreen() {
           style={[styles.toast, { top: insets.top + 16 }, toastStyle]}
         >
           <Text style={[t.bodySm, { color: colors.error }]}>
-            ❌{"  "}{toastMsg}
+            ❌{"  "}
+            {toastMsg}
           </Text>
         </Animated.View>
       )}
@@ -307,7 +324,7 @@ const styles = StyleSheet.create({
     // iOS shadow
     shadowColor: "#302950",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     // Android shadow
     elevation: 4,

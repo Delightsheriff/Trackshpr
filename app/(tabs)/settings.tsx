@@ -4,8 +4,9 @@
  * TODO: replace DUMMY_PROFILE with real Supabase session.
  * TODO: wire sign-out to supabase.auth.signOut() + confirmation sheet.
  */
-import { colors, font, gradients, layout, radius } from "@/src/constants/tokens";
+import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { router } from "expo-router";
+import { useTheme } from "@/src/stores/themeStore";
 import { useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -35,6 +36,8 @@ const DUMMY_PROFILE = {
 
 // ── Toggle switch (DS §8.7) ───────────────────────────────────────────────────
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const { colors } = useTheme();
+
   const progress = useDerivedValue(() =>
     withTiming(value ? 1 : 0, { duration: 200 })
   );
@@ -78,6 +81,7 @@ function SettingRow({
   onPress?: () => void;
   danger?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -89,10 +93,12 @@ function SettingRow({
         <Text style={styles.settingIconEmoji}>{icon}</Text>
       </View>
       <View style={styles.settingBody}>
-        <Text style={[styles.settingLabel, danger && { color: colors.error }]}>
+        <Text style={[styles.settingLabel, { color: danger ? colors.error : colors.textPrimary }]}>
           {label}
         </Text>
-        {sublabel && <Text style={styles.settingSubLabel}>{sublabel}</Text>}
+        {sublabel && (
+          <Text style={[styles.settingSubLabel, { color: colors.textMuted }]}>{sublabel}</Text>
+        )}
       </View>
       {right ?? (
         onPress && <Feather name="chevron-right" size={16} color={colors.textMuted} />
@@ -102,25 +108,39 @@ function SettingRow({
 }
 
 function SettingGroup({ children }: { children: React.ReactNode }) {
-  return <View style={styles.settingGroup}>{children}</View>;
+  const { colors, isDark } = useTheme();
+  const groupShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 };
+  return (
+    <View style={[styles.settingGroup, { backgroundColor: colors.surfaceCard }, groupShadow]}>
+      {children}
+    </View>
+  );
 }
 
 function SectionLabel({ label }: { label: string }) {
-  return <Text style={styles.sectionLabel}>{label}</Text>;
+  const { colors } = useTheme();
+  return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
 }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { isDark, toggle } = useThemeStore();
+  const { colors, isDark } = useTheme();
+  const { toggle } = useThemeStore();
   const [notifs, setNotifs] = useState(true);
+
+  const profileSectionShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
 
   const initials = DUMMY_PROFILE.business_name
     .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <View style={styles.root}>
-      <StatusBar style="dark" />
+    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -141,23 +161,33 @@ export default function SettingsScreen() {
           </LinearGradient>
 
           {/* Avatar overlapping banner */}
-          <View style={styles.profileSection}>
+          <View
+            style={[
+              styles.profileSection,
+              { backgroundColor: colors.surfaceCard },
+              profileSectionShadow,
+            ]}
+          >
             <View style={styles.profileAvatarWrap}>
               <LinearGradient
                 colors={gradients.avatar}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.profileAvatar}
+                style={[styles.profileAvatar, { borderColor: colors.surfaceCard }]}
               >
                 <Text style={styles.profileAvatarText}>{initials}</Text>
               </LinearGradient>
             </View>
             <View style={styles.profileMeta}>
-              <Text style={styles.profileName}>{DUMMY_PROFILE.business_name}</Text>
+              <Text style={[styles.profileName, { color: colors.textPrimary }]}>
+                {DUMMY_PROFILE.business_name}
+              </Text>
               <View style={styles.profileMetaRow}>
-                <Text style={styles.profileCity}>📍 {DUMMY_PROFILE.city}</Text>
-                <View style={styles.planBadge}>
-                  <Text style={styles.planBadgeText}>Free plan</Text>
+                <Text style={[styles.profileCity, { color: colors.textMuted }]}>
+                  📍 {DUMMY_PROFILE.city}
+                </Text>
+                <View style={[styles.planBadge, { backgroundColor: colors.primarySoft }]}>
+                  <Text style={[styles.planBadgeText, { color: colors.primary }]}>Free plan</Text>
                 </View>
               </View>
             </View>
@@ -165,14 +195,16 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Upgrade banner ────────────────────────────────────────────── */}
-        <View style={styles.upgradeBanner}>
+        <View style={[styles.upgradeBanner, { backgroundColor: colors.primarySoft }]}>
           <View style={styles.upgradeBannerLeft}>
-            <Text style={styles.upgradeBannerTitle}>Unlock Trackshpr Pro</Text>
-            <Text style={styles.upgradeBannerSub}>
+            <Text style={[styles.upgradeBannerTitle, { color: colors.primary }]}>
+              Unlock Trackshpr Pro
+            </Text>
+            <Text style={[styles.upgradeBannerSub, { color: colors.textSecondary }]}>
               Unlimited orders, custom branding, priority support
             </Text>
           </View>
-          <View style={styles.upgradeBtn}>
+          <View style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}>
             <Text style={styles.upgradeBtnText}>Upgrade</Text>
           </View>
         </View>
@@ -187,7 +219,7 @@ export default function SettingsScreen() {
             sublabel="Name, phone, city"
             onPress={() => router.push("/(settings)/business-details")}
           />
-          <View style={styles.rowDivider} />
+          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
           <SettingRow
             icon="🎨"
             iconBg={colors.warningBg}
@@ -195,7 +227,7 @@ export default function SettingsScreen() {
             sublabel="Logo, colors"
             onPress={() => router.push("/(settings)/brand-customization")}
           />
-          <View style={styles.rowDivider} />
+          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
           <SettingRow
             icon="📊"
             iconBg={colors.successBg}
@@ -214,7 +246,7 @@ export default function SettingsScreen() {
             label="Dark mode"
             right={<Toggle value={isDark} onChange={toggle} />}
           />
-          <View style={styles.rowDivider} />
+          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
           <SettingRow
             icon="🔔"
             iconBg={colors.primarySoft}
@@ -248,7 +280,7 @@ export default function SettingsScreen() {
         </SettingGroup>
 
         {/* ── Version ───────────────────────────────────────────────────── */}
-        <Text style={styles.version}>v1.0.0</Text>
+        <Text style={[styles.version, { color: colors.textMuted }]}>v1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -256,7 +288,7 @@ export default function SettingsScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
+  root: { flex: 1 },
   scroll: {},
 
   // Profile banner
@@ -287,13 +319,7 @@ const styles = StyleSheet.create({
   profileSection: {
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 16,
-    backgroundColor: colors.surfaceCard,
     marginBottom: layout.sectionGap,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   profileAvatarWrap: {
     marginTop: -28,
@@ -306,13 +332,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 3,
-    borderColor: colors.surfaceCard,
   },
   profileAvatarText: {
     fontSize: 22,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
+    color: "#FFFFFF",
   },
   profileMeta: { gap: 4 },
   profileName: {
@@ -320,7 +345,6 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.4,
-    color: colors.textPrimary,
   },
   profileMetaRow: {
     flexDirection: "row",
@@ -330,10 +354,8 @@ const styles = StyleSheet.create({
   profileCity: {
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
   },
   planBadge: {
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingVertical: 2,
     paddingHorizontal: 8,
@@ -344,7 +366,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.1,
     textTransform: "uppercase",
-    color: colors.primary,
   },
 
   // Upgrade banner
@@ -354,7 +375,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginHorizontal: layout.screenPaddingH,
     marginBottom: layout.sectionGap,
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.xl,
     padding: 14,
     gap: 12,
@@ -364,18 +384,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.primary,
     letterSpacing: -0.13,
     marginBottom: 2,
   },
   upgradeBannerSub: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textSecondary,
     lineHeight: 15,
   },
   upgradeBtn: {
-    backgroundColor: colors.primary,
     borderRadius: radius.full,
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -385,7 +402,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
+    color: "#FFFFFF",
   },
 
   // Section label
@@ -395,7 +412,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.55,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginHorizontal: layout.screenPaddingH,
     marginBottom: 8,
     marginTop: 4,
@@ -403,16 +419,10 @@ const styles = StyleSheet.create({
 
   // Setting group
   settingGroup: {
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     marginHorizontal: layout.screenPaddingH,
     marginBottom: layout.sectionGap,
     overflow: "hidden",
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
   },
   settingRow: {
     flexDirection: "row",
@@ -423,7 +433,6 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     height: 1,
-    backgroundColor: colors.surfaceContainer,
     marginLeft: 62,
   },
   settingIcon: {
@@ -440,13 +449,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.textPrimary,
     letterSpacing: -0.14,
   },
   settingSubLabel: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     marginTop: 1,
   },
 
@@ -461,7 +468,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.white,
+    backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -474,7 +481,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 11,
     fontFamily: font.mono.regular,
-    color: colors.textMuted,
     paddingTop: 8,
   },
 });

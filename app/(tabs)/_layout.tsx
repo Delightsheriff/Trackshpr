@@ -3,7 +3,8 @@
  * Custom tab bar: frosted glass 68px, raised gradient FAB center (52×52 r18),
  * active dot below label, Feather icons. DS §8.5.
  */
-import { colors, font, gradients, radius } from "@/src/constants/tokens";
+import { font, gradients, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs, router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -31,13 +32,24 @@ function CustomTabBar({
   navigation: { navigate: (name: string) => void };
 }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   // Height = 68px visible nav area + device safe area below home indicator
   const barHeight     = 68 + insets.bottom;
   const paddingBottom = insets.bottom + 6;
 
   return (
-    <View style={[styles.bar, { height: barHeight, paddingBottom }]}>
+    <View
+      style={[
+        styles.bar,
+        {
+          height: barHeight,
+          paddingBottom,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+      ]}
+    >
       {VISUAL_TABS.map((tab) => {
         if (tab.isFab) {
           return (
@@ -76,10 +88,10 @@ function CustomTabBar({
             <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>
               {tab.emoji}
             </Text>
-            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+            <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.textMuted }]}>
               {tab.label}
             </Text>
-            {isActive && <View style={styles.activeDot} />}
+            {isActive && <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />}
           </Pressable>
         );
       })}
@@ -95,9 +107,7 @@ const styles = StyleSheet.create({
     // Content (icons) sits centred in the 68px visible zone
     alignItems: "flex-start",   // align from top of content area, not centre
     paddingTop: 10,             // ~10px from border to icons — matches HTML spec 8px
-    backgroundColor: "rgba(250,244,255,0.94)",
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingHorizontal: 8,
   },
   tabItem: {
@@ -120,19 +130,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
-    color: colors.textMuted,
     letterSpacing: 0.03 * 9,
-  },
-  tabLabelActive: {
-    color: colors.primary,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
   },
   activeDot: {
     width: 4,
     height: 4,
     borderRadius: radius.full,
-    backgroundColor: colors.primary,
     marginTop: 1,
   },
 
@@ -145,9 +148,9 @@ const styles = StyleSheet.create({
   },
   fabShadow: {
     borderRadius: 18,
-    backgroundColor: colors.primary,
+    backgroundColor: "#4647D3",
     // iOS
-    shadowColor: colors.primary,
+    shadowColor: "#4647D3",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 20,

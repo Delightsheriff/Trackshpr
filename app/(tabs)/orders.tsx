@@ -2,8 +2,10 @@
  * Orders tab — searchable, filterable order list (DS §8.1, §8.4).
  * TODO: replace DUMMY_ORDERS_FULL with real Supabase query.
  */
-import { colors, font, layout, radius } from "@/src/constants/tokens";
+import { font, layout, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
@@ -33,12 +35,14 @@ const DUMMY_ORDERS_FULL = [
 // ── Status config ─────────────────────────────────────────────────────────────
 type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
 
-const STATUS_MAP: Record<OrderStatus, { label: string; fg: string; bg: string; emoji: string }> = {
-  in_transit: { label: "Transit",   fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
-  pending:    { label: "Pending",   fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
-  delivered:  { label: "Done",      fg: colors.success, bg: colors.successBg, emoji: "✅" },
-  failed:     { label: "Failed",    fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
-};
+function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
+  return {
+    in_transit: { label: "Transit",   fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
+    pending:    { label: "Pending",   fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
+    delivered:  { label: "Done",      fg: colors.success, bg: colors.successBg, emoji: "✅" },
+    failed:     { label: "Failed",    fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
+  } as const;
+}
 
 type FilterKey = "all" | OrderStatus;
 
@@ -52,7 +56,8 @@ const FILTER_TABS: { key: FilterKey; label: string }[] = [
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: OrderStatus }) {
-  const cfg = STATUS_MAP[status];
+  const { colors } = useTheme();
+  const cfg = getStatusMap(colors)[status];
   return (
     <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
       <View style={[styles.pillDot, { backgroundColor: cfg.fg }]} />
@@ -61,32 +66,45 @@ function StatusPill({ status }: { status: OrderStatus }) {
   );
 }
 
-function OrderCard({ item, customer, area, status, time }: {
-  item: string; customer: string; area: string; status: OrderStatus; time: string;
+function OrderCard({ id, item, customer, area, status, time }: {
+  id: string; item: string; customer: string; area: string; status: OrderStatus; time: string;
 }) {
-  const cfg = STATUS_MAP[status];
+  const { colors, isDark } = useTheme();
+  const cfg = getStatusMap(colors)[status];
+  const cardShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
   return (
-    <View style={styles.orderCard}>
+    <Pressable
+      style={[styles.orderCard, { backgroundColor: colors.surfaceCard }, cardShadow]}
+      onPress={() => router.push({ pathname: "/(screens)/order-detail", params: { id } })}
+      android_ripple={{ color: colors.surfaceContainer, borderless: false }}
+    >
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
         <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
       </View>
       <View style={styles.orderInfo}>
-        <Text style={styles.orderName} numberOfLines={1}>{item}</Text>
-        <Text style={styles.orderMeta}>{customer} · {area}</Text>
+        <Text style={[styles.orderName, { color: colors.textPrimary }]} numberOfLines={1}>{item}</Text>
+        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>{customer} · {area}</Text>
       </View>
       <View style={styles.orderRight}>
         <StatusPill status={status} />
-        <Text style={styles.orderTime}>{time}</Text>
+        <Text style={[styles.orderTime, { color: colors.textMuted }]}>{time}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const [query, setQuery]       = useState("");
-  const [filter, setFilter]     = useState<FilterKey>("all");
+  const { colors, isDark } = useTheme();
+  const [query, setQuery]   = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+
+  const searchBarShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
 
   const filtered = DUMMY_ORDERS_FULL.filter((o) => {
     const matchesFilter = filter === "all" || o.status === filter;
@@ -100,8 +118,8 @@ export default function OrdersScreen() {
   });
 
   return (
-    <View style={styles.root}>
-      <StatusBar style="dark" />
+    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -112,19 +130,19 @@ export default function OrdersScreen() {
       >
         {/* ── Page title ────────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
-          <Text style={styles.pageTitle}>Orders</Text>
-          <Text style={styles.pageSubtitle}>147 total · 18 today</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Orders</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>147 total · 18 today</Text>
         </View>
 
         {/* ── Search bar ────────────────────────────────────────────────── */}
-        <View style={styles.searchBar}>
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceCard }, searchBarShadow]}>
           <Feather name="search" size={15} color={colors.textMuted} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search orders, customers..."
             placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
             returnKeyType="search"
           />
           {query.length > 0 && (
@@ -146,9 +164,15 @@ export default function OrdersScreen() {
               <Pressable
                 key={key}
                 onPress={() => setFilter(key)}
-                style={[styles.filterTab, active && styles.filterTabActive]}
+                style={[
+                  styles.filterTab,
+                  { backgroundColor: active ? colors.primary : colors.surfaceCard },
+                ]}
               >
-                <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
+                <Text style={[
+                  styles.filterTabText,
+                  { color: active ? colors.white : colors.textMuted },
+                ]}>
                   {label}
                 </Text>
               </Pressable>
@@ -160,8 +184,12 @@ export default function OrdersScreen() {
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyTitle}>No {filter === "all" ? "" : filter.replace("_", " ")} orders</Text>
-            <Text style={styles.emptySub}>Switch filters to see other orders.</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              No {filter === "all" ? "" : filter.replace("_", " ")} orders
+            </Text>
+            <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+              Switch filters to see other orders.
+            </Text>
           </View>
         ) : (
           filtered.map((o) => <OrderCard key={o.id} {...o} />)
@@ -175,7 +203,7 @@ export default function OrdersScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
+  root: { flex: 1 },
   scroll: { paddingHorizontal: layout.screenPaddingH },
 
   titleBlock: { paddingTop: 8, marginBottom: 14 },
@@ -184,13 +212,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.6,
-    color: colors.textPrimary,
     marginBottom: 2,
   },
   pageSubtitle: {
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
   },
 
   // Search
@@ -198,22 +224,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: colors.surfaceCard,
     borderRadius: 14,
     paddingVertical: 11,
     paddingHorizontal: 14,
     marginBottom: 14,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
     fontFamily: font.sans.regular,
-    color: colors.textPrimary,
     padding: 0,
     margin: 0,
   },
@@ -229,35 +248,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceCard,
-  },
-  filterTabActive: {
-    backgroundColor: colors.primary,
   },
   filterTabText: {
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.textMuted,
-  },
-  filterTabTextActive: {
-    color: colors.white,
   },
 
   // Order card (shared pattern with Dashboard)
   orderCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     padding: layout.cardPadding,
     gap: 12,
     marginBottom: layout.listGap,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   orderIcon: {
     width: 42,
@@ -274,13 +279,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.13,
-    color: colors.textPrimary,
     marginBottom: 2,
   },
   orderMeta: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
   },
   orderRight: {
     alignItems: "flex-end",
@@ -290,7 +293,6 @@ const styles = StyleSheet.create({
   orderTime: {
     fontSize: 10,
     fontFamily: font.mono.regular,
-    color: colors.textMuted,
   },
   pill: {
     flexDirection: "row",
@@ -320,14 +322,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.textPrimary,
     letterSpacing: -0.34,
     textTransform: "capitalize",
   },
   emptySub: {
     fontSize: 13,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     textAlign: "center",
   },
 });

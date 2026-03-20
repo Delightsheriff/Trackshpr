@@ -3,7 +3,8 @@
  * Back + Save header, logo upload, required/optional fields, validation.
  * TODO: upsert to Supabase profiles table on save.
  */
-import { colors, font, gradients, layout, radius } from "@/src/constants/tokens";
+import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -40,7 +41,8 @@ const DUMMY_PROFILE = {
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
-  return <Text style={styles.sectionLabel}>{label}</Text>;
+  const { colors } = useTheme();
+  return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
 }
 
 // ── Form input ────────────────────────────────────────────────────────────────
@@ -65,17 +67,32 @@ function FormInput({
   hasError?: boolean;
   errorMsg?: string;
 }) {
+  const { colors, isDark } = useTheme();
   const [focused, setFocused] = useState(false);
   const showError = hasError && !focused;
+
+  const fieldShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+
+  const fieldBg = focused ? colors.surfaceCard : colors.surfaceContainer;
+  const borderColor = showError
+    ? colors.error
+    : focused
+    ? colors.primary
+    : "transparent";
 
   return (
     <View>
       <View style={[
         styles.inputField,
-        focused   && styles.inputFocused,
-        showError && styles.inputError,
+        { backgroundColor: fieldBg, borderColor },
+        !focused && !showError && fieldShadow,
       ]}>
-        <Text style={[styles.inputLabel, showError && styles.inputLabelError]}>
+        <Text style={[
+          styles.inputLabel,
+          { color: showError ? colors.error : colors.textMuted },
+        ]}>
           {label}{showError ? " — required" : ""}
         </Text>
         <TextInput
@@ -90,16 +107,17 @@ function FormInput({
           maxLength={maxLength}
           style={[
             styles.inputValue,
+            { color: colors.textPrimary },
             multiline && { minHeight: 56, textAlignVertical: "top" },
           ]}
           returnKeyType={multiline ? "default" : "next"}
         />
         {maxLength !== undefined && (
-          <Text style={styles.charCount}>{value.length} / {maxLength}</Text>
+          <Text style={[styles.charCount, { color: colors.textMuted }]}>{value.length} / {maxLength}</Text>
         )}
       </View>
       {showError && errorMsg ? (
-        <Text style={styles.errorMsg}>⚠️ {errorMsg}</Text>
+        <Text style={[styles.errorMsg, { color: colors.error }]}>⚠️ {errorMsg}</Text>
       ) : null}
     </View>
   );
@@ -107,6 +125,7 @@ function FormInput({
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function BusinessDetailsScreen() {
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [businessName, setBusinessName] = useState(DUMMY_PROFILE.business_name);
@@ -122,6 +141,14 @@ export default function BusinessDetailsScreen() {
   const bannerOp  = useSharedValue(0);
 
   const hasErrors = nameErr || phoneErr;
+
+  const cardShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+
+  const backBtnShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 };
 
   const handlePickLogo = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -165,38 +192,41 @@ export default function BusinessDetailsScreen() {
   }));
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surfaceCard }]}>
         <Pressable
           onPress={() => router.back()}
-          style={styles.backBtn}
+          style={[styles.backBtn, { backgroundColor: colors.surfaceContainer }, backBtnShadow]}
           android_ripple={{ color: colors.surfaceContainer, borderless: false }}
         >
           <Feather name="arrow-left" size={18} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Business Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Business Details</Text>
         <Pressable
           onPress={handleSave}
           style={[
             styles.headerSaveBtn,
-            saved   && styles.headerSaveBtnSaved,
+            { backgroundColor: saved ? colors.successBg : colors.primarySoft },
             hasErrors && { opacity: 0.4 },
           ]}
           android_ripple={{ color: saved ? colors.successBg : colors.primarySoft, borderless: false }}
         >
-          <Text style={[styles.headerSaveText, saved && styles.headerSaveTextSaved]}>
+          <Text style={[styles.headerSaveText, { color: saved ? colors.success : colors.primary }]}>
             {saved ? "Saved ✓" : "Save"}
           </Text>
         </Pressable>
       </View>
 
       {/* ── Saved banner ── */}
-      <Animated.View style={[styles.savedBanner, bannerStyle]} pointerEvents="none">
+      <Animated.View
+        style={[styles.savedBanner, { backgroundColor: colors.successBg }, bannerStyle]}
+        pointerEvents="none"
+      >
         <Text style={styles.savedBannerIcon}>✅</Text>
-        <Text style={styles.savedBannerText}>Business details saved successfully</Text>
+        <Text style={[styles.savedBannerText, { color: colors.success }]}>Business details saved successfully</Text>
       </Animated.View>
 
       {/* ── Form ── */}
@@ -211,20 +241,29 @@ export default function BusinessDetailsScreen() {
         >
 
           {/* Logo upload card */}
-          <View style={styles.logoCard}>
-            <View style={[styles.logoPreview, logoUri ? styles.logoPreviewFilled : styles.logoPreviewEmpty]}>
+          <View style={[styles.logoCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+            <View style={[
+              styles.logoPreview,
+              logoUri
+                ? styles.logoPreviewFilled
+                : [styles.logoPreviewEmpty, { backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainer }],
+            ]}>
               {logoUri
                 ? <Image source={{ uri: logoUri }} style={styles.logoImage} />
                 : <Text style={styles.logoEmoji}>🏪</Text>
               }
-              <View style={[styles.logoBadge, logoUri ? styles.logoBadgeOk : styles.logoBadgeAdd]}>
-                <Text style={styles.logoBadgeText}>{logoUri ? "✓" : "+"}</Text>
+              <View style={[
+                styles.logoBadge,
+                { borderColor: colors.surfaceCard },
+                logoUri ? { backgroundColor: colors.success } : { backgroundColor: colors.primary },
+              ]}>
+                <Text style={[styles.logoBadgeText, { color: "#fff" }]}>{logoUri ? "✓" : "+"}</Text>
               </View>
             </View>
 
             <View style={styles.logoInfo}>
-              <Text style={styles.logoTitle}>Business logo</Text>
-              <Text style={styles.logoSub}>
+              <Text style={[styles.logoTitle, { color: colors.textPrimary }]}>Business logo</Text>
+              <Text style={[styles.logoSub, { color: colors.textMuted }]}>
                 {logoUri
                   ? "Looking great. This shows on all tracking pages."
                   : "Shows on customer tracking pages. Square image, min 200×200px."}
@@ -232,20 +271,20 @@ export default function BusinessDetailsScreen() {
               <View style={styles.logoActions}>
                 <Pressable
                   onPress={handlePickLogo}
-                  style={styles.logoBtnPrimary}
+                  style={[styles.logoBtnPrimary, { backgroundColor: colors.primarySoft }]}
                   android_ripple={{ color: colors.primarySoft, borderless: false }}
                 >
-                  <Text style={styles.logoBtnPrimaryText}>
+                  <Text style={[styles.logoBtnPrimaryText, { color: colors.primary }]}>
                     {logoUri ? "Change photo" : "Upload photo"}
                   </Text>
                 </Pressable>
                 {logoUri ? (
                   <Pressable
                     onPress={() => setLogoUri(null)}
-                    style={styles.logoBtnDanger}
+                    style={[styles.logoBtnDanger, { backgroundColor: colors.errorBg }]}
                     android_ripple={{ color: colors.errorBg, borderless: false }}
                   >
-                    <Text style={styles.logoBtnDangerText}>Remove</Text>
+                    <Text style={[styles.logoBtnDangerText, { color: colors.error }]}>Remove</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -294,9 +333,9 @@ export default function BusinessDetailsScreen() {
           />
 
           {/* Info card */}
-          <View style={styles.infoCard}>
+          <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
             <Text style={styles.infoCardIcon}>👁️</Text>
-            <Text style={styles.infoCardText}>
+            <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
               Your{" "}
               <Text style={styles.bold}>business name</Text>,{" "}
               <Text style={styles.bold}>logo</Text> and{" "}
@@ -306,7 +345,7 @@ export default function BusinessDetailsScreen() {
           </View>
 
           {/* Save button */}
-          <View style={[styles.saveShadow, hasErrors && styles.saveShadowDim]}>
+          <View style={[styles.saveShadow, { backgroundColor: colors.primary }, hasErrors && styles.saveShadowDim]}>
             <Pressable
               onPress={handleSave}
               style={styles.savePressable}
@@ -318,7 +357,7 @@ export default function BusinessDetailsScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.saveBtn}
               >
-                <Text style={styles.saveBtnText}>Save Changes</Text>
+                <Text style={[styles.saveBtnText, { color: "#fff" }]}>Save Changes</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -331,7 +370,7 @@ export default function BusinessDetailsScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
+  root: { flex: 1 },
 
   // Header
   header: {
@@ -341,19 +380,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 14,
     paddingTop: 10,
-    backgroundColor: colors.surface,
   },
   backBtn: {
     width: 34, height: 34,
     borderRadius: 11,
-    backgroundColor: colors.surfaceCard,
     alignItems: "center", justifyContent: "center",
     flexShrink: 0,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 1,
   },
   headerTitle: {
     flex: 1,
@@ -361,26 +393,17 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.34,
-    color: colors.textPrimary,
   },
   headerSaveBtn: {
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingVertical: 7,
     paddingHorizontal: 16,
     overflow: "hidden",
   },
-  headerSaveBtnSaved: {
-    backgroundColor: colors.successBg,
-  },
   headerSaveText: {
     fontSize: 12,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.primary,
-  },
-  headerSaveTextSaved: {
-    color: colors.success,
   },
 
   // Saved banner
@@ -390,7 +413,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginHorizontal: layout.screenPaddingH,
     marginBottom: 4,
-    backgroundColor: colors.successBg,
     borderRadius: radius.lg,
     paddingVertical: 11,
     paddingHorizontal: 14,
@@ -400,7 +422,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.success,
   },
 
   // Scroll
@@ -418,7 +439,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.1 * 10,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginTop: 4,
     marginBottom: -4,
   },
@@ -428,14 +448,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     padding: 16,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
   logoPreview: {
     width: 64, height: 64,
@@ -445,13 +459,10 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   logoPreviewEmpty: {
-    backgroundColor: colors.surfaceContainer,
     borderWidth: 2,
-    borderColor: "rgba(70,71,211,0.2)",
     borderStyle: "dashed",
   },
   logoPreviewFilled: {
-    backgroundColor: "#FFF7ED",
     overflow: "hidden",
   },
   logoImage: {
@@ -466,15 +477,11 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     alignItems: "center", justifyContent: "center",
     borderWidth: 2,
-    borderColor: colors.surfaceCard,
   },
-  logoBadgeAdd: { backgroundColor: colors.primary },
-  logoBadgeOk:  { backgroundColor: colors.success },
   logoBadgeText: {
     fontSize: 9,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
   logoInfo: { flex: 1 },
   logoTitle: {
@@ -482,13 +489,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.14,
-    color: colors.textPrimary,
     marginBottom: 3,
   },
   logoSub: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     lineHeight: 16,
   },
   logoActions: {
@@ -497,7 +502,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   logoBtnPrimary: {
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -507,10 +511,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.primary,
   },
   logoBtnDanger: {
-    backgroundColor: colors.errorBg,
     borderRadius: radius.full,
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -520,32 +522,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.error,
   },
 
   // Input field
   inputField: {
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.lg,
     paddingVertical: 13,
     paddingHorizontal: 14,
     borderWidth: 2,
-    borderColor: "transparent",
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  inputError: {
-    borderColor: colors.error,
-    shadowOpacity: 0,
-    elevation: 0,
   },
   inputLabel: {
     fontSize: 10,
@@ -553,24 +537,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.06 * 10,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginBottom: 4,
-  },
-  inputLabelError: {
-    color: colors.error,
   },
   inputValue: {
     fontSize: 14,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
-    color: colors.textPrimary,
     padding: 0,
     margin: 0,
   },
   charCount: {
     fontSize: 10,
     fontFamily: font.mono.regular,
-    color: colors.textMuted,
     textAlign: "right",
     marginTop: 4,
   },
@@ -578,7 +556,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.error,
     marginTop: 4,
     marginLeft: 2,
   },
@@ -588,7 +565,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: colors.successBg,
     borderRadius: radius.lg,
     padding: 12,
     paddingHorizontal: 14,
@@ -598,7 +574,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: "#2d6a4a",
     lineHeight: 18,
   },
   bold: { fontFamily: font.sans.bold, fontWeight: "700" },
@@ -606,8 +581,6 @@ const styles = StyleSheet.create({
   // Save button
   saveShadow: {
     borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 24,
@@ -633,6 +606,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
 });

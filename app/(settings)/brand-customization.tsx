@@ -4,7 +4,8 @@
  * Pro state: live preview card, colour swatches, display options, save.
  * TODO: upsert brand_color + display_option to Supabase profiles table.
  */
-import { colors, font, gradients, layout, radius } from "@/src/constants/tokens";
+import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -55,7 +56,8 @@ type DisplayOption = "logo_name" | "name_only";
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ label }: { label: string }) {
-  return <Text style={styles.sectionLabel}>{label}</Text>;
+  const { colors } = useTheme();
+  return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
 }
 
 /** Live preview card — header bg uses selected accent color */
@@ -68,8 +70,14 @@ function PreviewCard({
   accentEnd: string;
   isPro: boolean;
 }) {
+  const { colors, isDark } = useTheme();
+
+  const cardShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 20, elevation: 3 };
+
   return (
-    <View style={styles.previewCard}>
+    <View style={[styles.previewCard, cardShadow]}>
       {/* Header */}
       <LinearGradient
         colors={[accentHex, accentEnd]}
@@ -78,24 +86,24 @@ function PreviewCard({
         style={styles.previewHeader}
       >
         {/* Decorative orb */}
-        <View style={styles.previewOrb} />
+        <View style={[styles.previewOrb, { backgroundColor: "rgba(255,255,255,0.08)" }]} />
 
         <View style={styles.previewBrandRow}>
-          <View style={styles.previewLogo}>
+          <View style={[styles.previewLogo, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
             <Text style={styles.previewLogoEmoji}>
               {isPro ? DUMMY_PROFILE.logo_emoji : "📦"}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.previewBrandName}>
+            <Text style={[styles.previewBrandName, { color: "#fff" }]}>
               {isPro ? DUMMY_PROFILE.business_name : "Trackshpr"}
             </Text>
-            <Text style={styles.previewBrandTag}>
+            <Text style={[styles.previewBrandTag, { color: "rgba(255,255,255,0.55)" }]}>
               {isPro ? DUMMY_PROFILE.tagline : "Delivery tracking"}
             </Text>
           </View>
-          <View style={styles.previewVerified}>
-            <Text style={styles.previewVerifiedText}>
+          <View style={[styles.previewVerified, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
+            <Text style={[styles.previewVerifiedText, { color: "rgba(255,255,255,0.7)" }]}>
               {isPro ? "✓ Verified" : "Free"}
             </Text>
           </View>
@@ -103,16 +111,16 @@ function PreviewCard({
       </LinearGradient>
 
       {/* Body */}
-      <View style={styles.previewBody}>
-        <Text style={styles.previewBodyLabel}>Customer sees this</Text>
-        <View style={styles.previewProgressTrack}>
+      <View style={[styles.previewBody, { backgroundColor: colors.surfaceCard }]}>
+        <Text style={[styles.previewBodyLabel, { color: colors.textMuted }]}>Customer sees this</Text>
+        <View style={[styles.previewProgressTrack, { backgroundColor: colors.surfaceContainer }]}>
           <View style={[styles.previewProgressFill, { backgroundColor: accentHex }]} />
         </View>
         <View style={styles.previewPillRow}>
-          <Text style={styles.previewStatusText}>In Transit → Lekki</Text>
+          <Text style={[styles.previewStatusText, { color: colors.textMuted }]}>In Transit → Lekki</Text>
           <View style={[styles.previewPill, { backgroundColor: accentHex }]}>
-            <View style={styles.previewPillDot} />
-            <Text style={styles.previewPillText}>Tracking</Text>
+            <View style={[styles.previewPillDot, { backgroundColor: "rgba(255,255,255,0.7)" }]} />
+            <Text style={[styles.previewPillText, { color: "#fff" }]}>Tracking</Text>
           </View>
         </View>
       </View>
@@ -134,14 +142,18 @@ function FeatureRow({
   sub: string;
   divider?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.featureRow, divider && styles.featureRowDivider]}>
+    <View style={[
+      styles.featureRow,
+      divider && [styles.featureRowDivider, { borderBottomColor: colors.surfaceContainer }],
+    ]}>
       <View style={[styles.featureIcon, { backgroundColor: bg }]}>
         <Text style={styles.featureIconEmoji}>{emoji}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureSub}>{sub}</Text>
+        <Text style={[styles.featureTitle, { color: colors.textPrimary }]}>{title}</Text>
+        <Text style={[styles.featureSub, { color: colors.textMuted }]}>{sub}</Text>
       </View>
     </View>
   );
@@ -167,7 +179,7 @@ function Swatch({
       ]}
     >
       {selected ? (
-        <Text style={styles.swatchCheck}>✓</Text>
+        <Text style={[styles.swatchCheck, { color: "#fff" }]}>✓</Text>
       ) : null}
     </Pressable>
   );
@@ -187,21 +199,38 @@ function DisplayOptionRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const { colors, isDark } = useTheme();
+
+  const rowShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.displayOption, selected && styles.displayOptionSelected]}
+      style={[
+        styles.displayOption,
+        { backgroundColor: selected ? colors.primarySoft : colors.surfaceCard },
+        !selected && rowShadow,
+      ]}
       android_ripple={{ color: colors.primarySoft, borderless: false }}
     >
-      <View style={[styles.displayOptionIcon, selected && styles.displayOptionIconSelected]}>
+      <View style={[
+        styles.displayOptionIcon,
+        { backgroundColor: selected ? colors.primarySoft : colors.surfaceContainer },
+      ]}>
         <Text style={styles.displayOptionEmoji}>{icon}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.displayOptionLabel}>{label}</Text>
-        <Text style={styles.displayOptionSub}>{sub}</Text>
+        <Text style={[styles.displayOptionLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text style={[styles.displayOptionSub, { color: colors.textMuted }]}>{sub}</Text>
       </View>
-      <View style={[styles.radioOuter, selected && styles.radioOuterChecked]}>
-        {selected ? <View style={styles.radioDot} /> : null}
+      <View style={[
+        styles.radioOuter,
+        { borderColor: selected ? colors.primary : colors.surfaceContainer },
+        selected && { backgroundColor: colors.primary },
+      ]}>
+        {selected ? <View style={[styles.radioDot, { backgroundColor: colors.white }]} /> : null}
       </View>
     </Pressable>
   );
@@ -209,6 +238,7 @@ function DisplayOptionRow({
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function BrandCustomizationScreen() {
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [selectedIdx,    setSelectedIdx]    = useState(0);
@@ -220,6 +250,18 @@ export default function BrandCustomizationScreen() {
 
   const isPro = DUMMY_PLAN === "pro";
   const accent = ACCENT_COLORS[selectedIdx];
+
+  const cardShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+
+  const backBtnShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 };
+
+  const lockOverlayBg = isDark
+    ? 'rgba(15,14,26,0.88)'
+    : 'rgba(250,244,255,0.88)';
 
   const showBanner = () => {
     bannerY.value  = -40;
@@ -244,26 +286,29 @@ export default function BrandCustomizationScreen() {
   }));
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surfaceCard }]}>
         <Pressable
           onPress={() => router.back()}
-          style={styles.backBtn}
+          style={[styles.backBtn, { backgroundColor: colors.surfaceContainer }, backBtnShadow]}
           android_ripple={{ color: colors.surfaceContainer, borderless: false }}
         >
           <Feather name="arrow-left" size={18} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Brand Customization</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Brand Customization</Text>
         {isPro ? (
           <Pressable
             onPress={handleSave}
-            style={[styles.headerSaveBtn, saved && styles.headerSaveBtnSaved]}
+            style={[
+              styles.headerSaveBtn,
+              { backgroundColor: saved ? colors.successBg : colors.primarySoft },
+            ]}
             android_ripple={{ color: saved ? colors.successBg : colors.primarySoft, borderless: false }}
           >
-            <Text style={[styles.headerSaveText, saved && styles.headerSaveTextSaved]}>
+            <Text style={[styles.headerSaveText, { color: saved ? colors.success : colors.primary }]}>
               {saved ? "Saved ✓" : "Save"}
             </Text>
           </Pressable>
@@ -272,9 +317,12 @@ export default function BrandCustomizationScreen() {
 
       {/* ── Saved banner ── */}
       {isPro ? (
-        <Animated.View style={[styles.savedBanner, bannerStyle]} pointerEvents="none">
+        <Animated.View
+          style={[styles.savedBanner, { backgroundColor: colors.successBg }, bannerStyle]}
+          pointerEvents="none"
+        >
           <Text style={styles.savedBannerIcon}>✅</Text>
-          <Text style={styles.savedBannerText}>Brand settings saved · Changes are live</Text>
+          <Text style={[styles.savedBannerText, { color: colors.success }]}>Brand settings saved · Changes are live</Text>
         </Animated.View>
       ) : null}
 
@@ -295,10 +343,10 @@ export default function BrandCustomizationScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.upgradeBanner}
             >
-              <View style={styles.upgradeBannerOrb} />
-              <Text style={styles.upgradeBannerCaps}>Pro Feature</Text>
-              <Text style={styles.upgradeBannerTitle}>Make it yours</Text>
-              <Text style={styles.upgradeBannerSub}>
+              <View style={[styles.upgradeBannerOrb, { backgroundColor: "rgba(255,255,255,0.07)" }]} />
+              <Text style={[styles.upgradeBannerCaps, { color: "rgba(255,255,255,0.6)" }]}>Pro Feature</Text>
+              <Text style={[styles.upgradeBannerTitle, { color: "#fff" }]}>Make it yours</Text>
+              <Text style={[styles.upgradeBannerSub, { color: "rgba(255,255,255,0.65)" }]}>
                 Remove Trackshpr branding from every customer tracking page.
                 Show your logo, your colours, your name.
               </Text>
@@ -307,8 +355,8 @@ export default function BrandCustomizationScreen() {
                   style={styles.upgradeCtaPressable}
                   android_ripple={{ color: colors.primarySoft, borderless: false }}
                 >
-                  <View style={styles.upgradeCta}>
-                    <Text style={styles.upgradeCtaText}>Upgrade to Pro — ₦3,500/mo</Text>
+                  <View style={[styles.upgradeCta, { backgroundColor: colors.white }]}>
+                    <Text style={[styles.upgradeCtaText, { color: colors.primary }]}>Upgrade to Pro — ₦3,500/mo</Text>
                   </View>
                 </Pressable>
               </View>
@@ -319,16 +367,16 @@ export default function BrandCustomizationScreen() {
             <View style={styles.proLock}>
               <PreviewCard accentHex={colors.primary} accentEnd="#6366F1" isPro={false} />
               {/* Overlay */}
-              <View style={styles.proLockOverlay}>
-                <View style={styles.proLockBadge}>
-                  <Text style={styles.proLockBadgeText}>⚡ Pro only</Text>
+              <View style={[styles.proLockOverlay, { backgroundColor: lockOverlayBg }]}>
+                <View style={[styles.proLockBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.proLockBadgeText, { color: colors.white }]}>⚡ Pro only</Text>
                 </View>
-                <Text style={styles.proLockText}>Upgrade to customise</Text>
+                <Text style={[styles.proLockText, { color: colors.textMuted }]}>Upgrade to customise</Text>
               </View>
             </View>
 
             {/* Feature list */}
-            <View style={styles.featureList}>
+            <View style={[styles.featureList, { backgroundColor: colors.surfaceCard }, cardShadow]}>
               <FeatureRow
                 emoji="🎨"
                 bg={colors.primarySoft}
@@ -364,7 +412,7 @@ export default function BrandCustomizationScreen() {
 
             {/* Colour picker */}
             <SectionLabel label="Accent colour" />
-            <View style={styles.swatchCard}>
+            <View style={[styles.swatchCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
               <View style={styles.swatchGrid}>
                 {ACCENT_COLORS.map((c, i) => (
                   <Swatch
@@ -377,13 +425,13 @@ export default function BrandCustomizationScreen() {
               </View>
 
               {/* Divider */}
-              <View style={styles.swatchDivider} />
+              <View style={[styles.swatchDivider, { backgroundColor: colors.surfaceContainer }]} />
 
               {/* Selected label */}
               <View style={styles.swatchLabel}>
                 <View style={[styles.swatchLabelDot, { backgroundColor: accent.hex }]} />
-                <Text style={styles.swatchLabelName}>{accent.name}</Text>
-                <Text style={styles.swatchLabelHex}>{accent.hex}</Text>
+                <Text style={[styles.swatchLabelName, { color: colors.textPrimary }]}>{accent.name}</Text>
+                <Text style={[styles.swatchLabelHex, { color: colors.textMuted }]}>{accent.hex}</Text>
               </View>
             </View>
 
@@ -406,9 +454,9 @@ export default function BrandCustomizationScreen() {
 
             {/* Info card (shown after save) */}
             {saved ? (
-              <View style={styles.infoCard}>
+              <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
                 <Text style={styles.infoCardIcon}>🔗</Text>
-                <Text style={styles.infoCardText}>
+                <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
                   All{" "}
                   <Text style={styles.bold}>new tracking links</Text>{" "}
                   you send will use these brand settings immediately.
@@ -417,7 +465,7 @@ export default function BrandCustomizationScreen() {
             ) : null}
 
             {/* Save button */}
-            <View style={styles.saveShadow}>
+            <View style={[styles.saveShadow, { backgroundColor: colors.primary }]}>
               <Pressable
                 onPress={handleSave}
                 style={styles.savePressable}
@@ -429,7 +477,7 @@ export default function BrandCustomizationScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.saveBtn}
                 >
-                  <Text style={styles.saveBtnText}>Save Brand Settings</Text>
+                  <Text style={[styles.saveBtnText, { color: "#fff" }]}>Save Brand Settings</Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -443,7 +491,7 @@ export default function BrandCustomizationScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
+  root: { flex: 1 },
 
   // Header
   header: {
@@ -453,19 +501,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 14,
     paddingTop: 10,
-    backgroundColor: colors.surface,
   },
   backBtn: {
     width: 34, height: 34,
     borderRadius: 11,
-    backgroundColor: colors.surfaceCard,
     alignItems: "center", justifyContent: "center",
     flexShrink: 0,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 1,
   },
   headerTitle: {
     flex: 1,
@@ -473,23 +514,18 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.34,
-    color: colors.textPrimary,
   },
   headerSaveBtn: {
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingVertical: 7,
     paddingHorizontal: 16,
     overflow: "hidden",
   },
-  headerSaveBtnSaved: { backgroundColor: colors.successBg },
   headerSaveText: {
     fontSize: 12,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.primary,
   },
-  headerSaveTextSaved: { color: colors.success },
 
   // Saved banner
   savedBanner: {
@@ -498,7 +534,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginHorizontal: layout.screenPaddingH,
     marginBottom: 4,
-    backgroundColor: colors.successBg,
     borderRadius: radius.lg,
     paddingVertical: 11,
     paddingHorizontal: 14,
@@ -508,7 +543,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.success,
   },
 
   // Scroll
@@ -526,7 +560,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.1 * 10,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginTop: 4,
     marginBottom: -2,
   },
@@ -542,7 +575,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 100, height: 100,
     borderRadius: 50,
-    backgroundColor: "rgba(255,255,255,0.07)",
     top: -30, right: -15,
   },
   upgradeBannerCaps: {
@@ -551,7 +583,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.55,
     textTransform: "uppercase",
-    color: "rgba(255,255,255,0.6)",
     marginBottom: 6,
   },
   upgradeBannerTitle: {
@@ -559,20 +590,16 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.34,
-    color: colors.white,
     marginBottom: 6,
   },
   upgradeBannerSub: {
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: "rgba(255,255,255,0.65)",
     lineHeight: 18,
     marginBottom: 14,
   },
   upgradeCtaShadow: {
     borderRadius: radius.full,
-    backgroundColor: colors.white,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
@@ -584,7 +611,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   upgradeCta: {
-    backgroundColor: colors.white,
     borderRadius: radius.full,
     paddingVertical: 9,
     paddingHorizontal: 20,
@@ -593,7 +619,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.primary,
   },
 
   // ── Pro lock overlay ─────────────────────────────────────────────────────
@@ -605,7 +630,6 @@ const styles = StyleSheet.create({
   proLockOverlay: {
     position: "absolute",
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(250,244,255,0.88)",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
@@ -614,7 +638,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: colors.primary,
     borderRadius: radius.full,
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -623,25 +646,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
   proLockText: {
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
-    color: colors.textMuted,
   },
 
   // ── Feature list ─────────────────────────────────────────────────────────
   featureList: {
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     overflow: "hidden",
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
   featureRow: {
     flexDirection: "row",
@@ -652,7 +667,6 @@ const styles = StyleSheet.create({
   },
   featureRowDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceContainer,
   },
   featureIcon: {
     width: 32, height: 32,
@@ -666,12 +680,10 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.13,
-    color: colors.textPrimary,
   },
   featureSub: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     marginTop: 1,
   },
 
@@ -679,11 +691,6 @@ const styles = StyleSheet.create({
   previewCard: {
     borderRadius: radius.xl,
     overflow: "hidden",
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    elevation: 3,
   },
   previewHeader: {
     paddingVertical: 14,
@@ -695,7 +702,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 100, height: 100,
     borderRadius: 50,
-    backgroundColor: "rgba(255,255,255,0.08)",
     top: -30, right: -15,
   },
   previewBrandRow: {
@@ -707,7 +713,6 @@ const styles = StyleSheet.create({
   previewLogo: {
     width: 36, height: 36,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center", justifyContent: "center",
     flexShrink: 0,
   },
@@ -717,17 +722,14 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.15,
-    color: colors.white,
   },
   previewBrandTag: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: "rgba(255,255,255,0.55)",
     marginTop: 1,
   },
   previewVerified: {
     marginLeft: "auto",
-    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: radius.full,
     paddingVertical: 3,
     paddingHorizontal: 8,
@@ -736,10 +738,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.7)",
   },
   previewBody: {
-    backgroundColor: colors.surfaceCard,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
@@ -749,12 +749,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.08 * 9,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginBottom: 8,
   },
   previewProgressTrack: {
     height: 4,
-    backgroundColor: colors.surfaceContainer,
     borderRadius: radius.full,
     overflow: "hidden",
     marginBottom: 10,
@@ -773,7 +771,6 @@ const styles = StyleSheet.create({
   previewStatusText: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
   },
   previewPill: {
     flexDirection: "row",
@@ -786,25 +783,17 @@ const styles = StyleSheet.create({
   previewPillDot: {
     width: 5, height: 5,
     borderRadius: radius.full,
-    backgroundColor: "rgba(255,255,255,0.7)",
   },
   previewPillText: {
     fontSize: 11,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
 
   // ── Colour swatches ──────────────────────────────────────────────────────
   swatchCard: {
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     padding: 14,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
   swatchGrid: {
     flexDirection: "row",
@@ -820,7 +809,6 @@ const styles = StyleSheet.create({
   },
   swatchSelected: {
     transform: [{ scale: 1.08 }],
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -830,11 +818,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
   swatchDivider: {
     height: 1,
-    backgroundColor: colors.surfaceContainer,
     marginVertical: 10,
   },
   swatchLabel: {
@@ -851,12 +837,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.textPrimary,
   },
   swatchLabelHex: {
     fontSize: 11,
     fontFamily: font.mono.regular,
-    color: colors.textMuted,
     marginLeft: "auto",
   },
 
@@ -867,27 +851,14 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.lg,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
     overflow: "hidden",
-  },
-  displayOptionSelected: {
-    backgroundColor: colors.primarySoft,
   },
   displayOptionIcon: {
     width: 36, height: 36,
     borderRadius: 12,
-    backgroundColor: colors.surfaceContainer,
     alignItems: "center", justifyContent: "center",
     flexShrink: 0,
-  },
-  displayOptionIconSelected: {
-    backgroundColor: colors.primarySoft,
   },
   displayOptionEmoji: { fontSize: 16 },
   displayOptionLabel: {
@@ -895,30 +866,22 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.13,
-    color: colors.textPrimary,
   },
   displayOptionSub: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     marginTop: 1,
   },
   radioOuter: {
     width: 20, height: 20,
     borderRadius: radius.full,
     borderWidth: 2,
-    borderColor: colors.surfaceContainer,
     alignItems: "center", justifyContent: "center",
     flexShrink: 0,
-  },
-  radioOuterChecked: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
   },
   radioDot: {
     width: 7, height: 7,
     borderRadius: radius.full,
-    backgroundColor: colors.white,
   },
 
   // ── Info card ────────────────────────────────────────────────────────────
@@ -926,7 +889,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: colors.primarySoft,
     borderRadius: radius.lg,
     padding: 12,
     paddingHorizontal: 14,
@@ -936,7 +898,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: colors.textSecondary,
     lineHeight: 18,
   },
   bold: { fontFamily: font.sans.bold, fontWeight: "700" },
@@ -944,8 +905,6 @@ const styles = StyleSheet.create({
   // ── Save button ──────────────────────────────────────────────────────────
   saveShadow: {
     borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 24,
@@ -966,6 +925,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
   },
 });

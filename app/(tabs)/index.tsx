@@ -2,10 +2,12 @@
  * Home / Dashboard tab (DS §8.1, §8.4).
  * TODO: replace DUMMY_* with real Supabase queries.
  */
-import { colors, font, gradients, layout, radius, shadows, type as t } from "@/src/constants/tokens";
+import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Dummy data — TODO: replace with real Supabase query ──────────────────────
@@ -20,9 +22,9 @@ const DUMMY_ORDERS = [
     area: "Surulere",      status: "delivered"  as const, time: "1h ago" },
 ];
 
-const QUICK_ACTIONS = [
-  { icon: "🗺️", label: "Fleet map" },
-  { icon: "📊", label: "Analytics" },
+const QUICK_ACTIONS: { icon: string; label: string; route?: string }[] = [
+  { icon: "🗺️", label: "Fleet map",  route: "/(screens)/fleet-map" },
+  { icon: "📊", label: "Analytics",  route: "/(screens)/analytics" },
   { icon: "📋", label: "Export CSV" },
   { icon: "🔗", label: "Copy link" },
 ];
@@ -30,12 +32,15 @@ const QUICK_ACTIONS = [
 // ── Status config ─────────────────────────────────────────────────────────────
 type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
 
-const STATUS_MAP: Record<OrderStatus, { label: string; fg: string; bg: string; emoji: string }> = {
-  in_transit: { label: "In Transit", fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
-  pending:    { label: "Pending",    fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
-  delivered:  { label: "Delivered",  fg: colors.success, bg: colors.successBg, emoji: "✅" },
-  failed:     { label: "Failed",     fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
-};
+// STATUS_MAP is resolved at render time from live colors — built inline per component
+function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
+  return {
+    in_transit: { label: "In Transit", fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
+    pending:    { label: "Pending",    fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
+    delivered:  { label: "Delivered",  fg: colors.success, bg: colors.successBg, emoji: "✅" },
+    failed:     { label: "Failed",     fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
+  } as const;
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -46,7 +51,8 @@ function greeting() {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: OrderStatus }) {
-  const cfg = STATUS_MAP[status];
+  const { colors } = useTheme();
+  const cfg = getStatusMap(colors)[status];
   return (
     <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
       <View style={[styles.pillDot, { backgroundColor: cfg.fg }]} />
@@ -58,19 +64,23 @@ function StatusPill({ status }: { status: OrderStatus }) {
 function OrderCard({ item, customer, area, status, time }: {
   item: string; customer: string; area: string; status: OrderStatus; time: string;
 }) {
-  const cfg = STATUS_MAP[status];
+  const { colors, isDark } = useTheme();
+  const cfg = getStatusMap(colors)[status];
+  const cardShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
   return (
-    <View style={styles.orderCard}>
+    <View style={[styles.orderCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
         <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
       </View>
       <View style={styles.orderInfo}>
-        <Text style={styles.orderName} numberOfLines={1}>{item}</Text>
-        <Text style={styles.orderMeta}>{customer} · {area}</Text>
+        <Text style={[styles.orderName, { color: colors.textPrimary }]} numberOfLines={1}>{item}</Text>
+        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>{customer} · {area}</Text>
       </View>
       <View style={styles.orderRight}>
         <StatusPill status={status} />
-        <Text style={styles.orderTime}>{time}</Text>
+        <Text style={[styles.orderTime, { color: colors.textMuted }]}>{time}</Text>
       </View>
     </View>
   );
@@ -79,10 +89,19 @@ function OrderCard({ item, customer, area, status, time }: {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+
+  const statCardShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 };
+
+  const chipShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
 
   return (
-    <View style={styles.root}>
-      <StatusBar style="dark" />
+    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -90,11 +109,11 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ───────────────────────────────────────────────────── */}
+        {/* ── Header ───────────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{greeting()}</Text>
-            <Text style={styles.businessName}>Zara's Closet</Text>
+            <Text style={[styles.greeting, { color: colors.textMuted }]}>{greeting()}</Text>
+            <Text style={[styles.businessName, { color: colors.textPrimary }]}>Zara's Closet</Text>
           </View>
           <View style={styles.avatarWrap}>
             <LinearGradient
@@ -105,7 +124,7 @@ export default function HomeScreen() {
             >
               <Text style={styles.avatarInitial}>Z</Text>
             </LinearGradient>
-            <View style={styles.notifDot} />
+            <View style={[styles.notifDot, { borderColor: colors.surface }]} />
           </View>
         </View>
 
@@ -132,20 +151,20 @@ export default function HomeScreen() {
 
         {/* ── Mini stat row ─────────────────────────────────────────────── */}
         <View style={styles.statRow}>
-          <View style={styles.statMini}>
-            <Text style={styles.statLabel}>Done</Text>
+          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Done</Text>
             <Text style={[styles.statNum, { color: colors.success }]}>
               {DUMMY_STATS.delivered}
             </Text>
           </View>
-          <View style={styles.statMini}>
-            <Text style={styles.statLabel}>Moving</Text>
+          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Moving</Text>
             <Text style={[styles.statNum, { color: colors.warning }]}>
               {DUMMY_STATS.inTransit}
             </Text>
           </View>
-          <View style={styles.statMini}>
-            <Text style={styles.statLabel}>Failed</Text>
+          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Failed</Text>
             <Text style={[styles.statNum, { color: colors.error }]}>
               {DUMMY_STATS.failed}
             </Text>
@@ -158,18 +177,22 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.quickRow}
         >
-          {QUICK_ACTIONS.map(({ icon, label }) => (
-            <View key={label} style={styles.quickChip}>
+          {QUICK_ACTIONS.map(({ icon, label, route }) => (
+            <Pressable
+              key={label}
+              style={[styles.quickChip, { backgroundColor: colors.surfaceCard }, chipShadow]}
+              onPress={route ? () => router.push(route as any) : undefined}
+            >
               <Text style={styles.quickChipIcon}>{icon}</Text>
-              <Text style={styles.quickChipLabel}>{label}</Text>
-            </View>
+              <Text style={[styles.quickChipLabel, { color: colors.textPrimary }]}>{label}</Text>
+            </Pressable>
           ))}
         </ScrollView>
 
         {/* ── Active orders ─────────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Orders</Text>
-          <Text style={styles.sectionLink}>See all</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Active Orders</Text>
+          <Text style={[styles.sectionLink, { color: colors.primary }]}>See all</Text>
         </View>
 
         {DUMMY_ORDERS.map((o) => (
@@ -184,7 +207,7 @@ export default function HomeScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
+  root: { flex: 1 },
   scroll: { paddingHorizontal: layout.screenPaddingH },
 
   header: {
@@ -197,7 +220,6 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 12,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
     marginBottom: 2,
   },
   businessName: {
@@ -205,7 +227,6 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.6,
-    color: colors.textPrimary,
   },
   avatarWrap: { position: "relative" },
   avatar: {
@@ -219,7 +240,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: colors.white,
+    color: "#FFFFFF",
   },
   notifDot: {
     position: "absolute",
@@ -228,21 +249,20 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: radius.full,
-    backgroundColor: colors.error,
+    backgroundColor: "#DC2626",
     borderWidth: 2,
-    borderColor: colors.surface,
   },
 
   // Hero card
   heroCardShadow: {
     borderRadius: radius.card,
     marginBottom: 10,
-    shadowColor: colors.primary,
+    shadowColor: "#4647D3",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 6,
-    backgroundColor: colors.primary,
+    backgroundColor: "#4647D3",
   },
   heroCard: {
     borderRadius: radius.card,
@@ -286,7 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: font.mono.medium,
     fontWeight: "700",
     letterSpacing: -1.6,
-    color: colors.white,
+    color: "#FFFFFF",
     lineHeight: 44,
   },
   heroSub: {
@@ -314,15 +334,9 @@ const styles = StyleSheet.create({
   },
   statMini: {
     flex: 1,
-    backgroundColor: colors.surfaceCard,
     borderRadius: 16,
     padding: 12,
     paddingHorizontal: 10,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
   statLabel: {
     fontSize: 9,
@@ -330,7 +344,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.45,
     textTransform: "uppercase",
-    color: colors.textMuted,
     marginBottom: 5,
   },
   statNum: {
@@ -351,22 +364,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: colors.surfaceCard,
     borderRadius: 12,
     paddingVertical: 9,
     paddingHorizontal: 12,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
   quickChipIcon: { fontSize: 14 },
   quickChipLabel: {
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.textPrimary,
   },
 
   // Section header
@@ -381,29 +387,21 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.15,
-    color: colors.textPrimary,
   },
   sectionLink: {
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: colors.primary,
   },
 
   // Order card
   orderCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     padding: layout.cardPadding,
     gap: 12,
     marginBottom: layout.listGap,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   orderIcon: {
     width: 42,
@@ -420,13 +418,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.13,
-    color: colors.textPrimary,
     marginBottom: 2,
   },
   orderMeta: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: colors.textMuted,
   },
   orderRight: {
     alignItems: "flex-end",
@@ -436,7 +432,6 @@ const styles = StyleSheet.create({
   orderTime: {
     fontSize: 10,
     fontFamily: font.mono.regular,
-    color: colors.textMuted,
   },
 
   // Status pill (DS §8.4)

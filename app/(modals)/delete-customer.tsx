@@ -3,8 +3,9 @@
  * Receives customerId and customerName as search params.
  * TODO: replace deleteCustomer with Supabase delete.
  */
-import { colors, font, layout, radius } from "@/src/constants/tokens";
+import { font, layout, radius } from "@/src/constants/tokens";
 import { useDataStore } from "@/src/stores/dataStore";
+import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import { router, useLocalSearchParams } from "expo-router";
@@ -13,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function DeleteCustomerSheet() {
+  const { colors, isDark } = useTheme();
   const insets        = useSafeAreaInsets();
   const { id, name }  = useLocalSearchParams<{ id: string; name: string }>();
   const sheetRef      = useRef<BottomSheet>(null);
@@ -32,22 +34,44 @@ export default function DeleteCustomerSheet() {
     router.back();
   };
 
+  const sheetShadow = isDark
+    ? { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 10 }
+    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 8 };
+
   return (
     <View style={styles.root}>
-      <BottomSheet ref={sheetRef} index={0} snapPoints={[320 + insets.bottom]} enablePanDownToClose onClose={handleClose}
-        backdropComponent={renderBackdrop} backgroundStyle={styles.sheetBg} handleIndicatorStyle={styles.handle}>
+      <BottomSheet
+        ref={sheetRef}
+        index={0}
+        snapPoints={[320 + insets.bottom]}
+        enablePanDownToClose
+        onClose={handleClose}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={[styles.sheetBg, { backgroundColor: colors.surfaceElevated }, sheetShadow]}
+        handleIndicatorStyle={{ backgroundColor: colors.surfaceHighlight }}
+      >
         <BottomSheetView style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={styles.iconWrap}><Text style={styles.icon}>🗑️</Text></View>
-          <Text style={styles.title}>Remove {name}?</Text>
-          <Text style={styles.sub}>
+          <View style={[styles.iconWrap, { backgroundColor: colors.errorBg }]}>
+            <Text style={styles.icon}>🗑️</Text>
+          </View>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>Remove {name}?</Text>
+          <Text style={[styles.sub, { color: colors.textMuted }]}>
             This removes them from your address book.{"\n"}Their order history stays on record.
           </Text>
           <View style={styles.btnWrap}>
-            <Pressable onPress={handleDelete} android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }} style={styles.dangerBtn}>
+            <Pressable
+              onPress={handleDelete}
+              android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+              style={[styles.dangerBtn, { backgroundColor: colors.error }]}
+            >
               <Text style={styles.dangerBtnText}>Yes, Remove Customer</Text>
             </Pressable>
-            <Pressable onPress={() => router.back()} android_ripple={{ color: colors.textMuted, borderless: false }} style={styles.cancelBtn}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Pressable
+              onPress={() => router.back()}
+              android_ripple={{ color: colors.textMuted, borderless: false }}
+              style={[styles.cancelBtn, { backgroundColor: colors.surfaceContainer }]}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancel</Text>
             </Pressable>
           </View>
         </BottomSheetView>
@@ -57,17 +81,16 @@ export default function DeleteCustomerSheet() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "transparent" },
-  sheetBg: { backgroundColor: colors.surfaceCard },
-  handle: { backgroundColor: colors.surfaceContainer },
-  content: { paddingHorizontal: layout.screenPaddingH, alignItems: "center" },
-  iconWrap: { width: 56, height: 56, borderRadius: 18, backgroundColor: colors.errorBg, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  icon: { fontSize: 24 },
-  title: { fontSize: 17, fontFamily: font.sans.bold, fontWeight: "700", color: colors.textPrimary, textAlign: "center", letterSpacing: -0.34, marginBottom: 6 },
-  sub: { fontSize: 13, fontFamily: font.sans.regular, color: colors.textMuted, textAlign: "center", lineHeight: 19.5, marginBottom: 20 },
-  btnWrap: { width: "100%", gap: 8 },
-  dangerBtn: { backgroundColor: colors.error, borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden" },
-  dangerBtnText: { fontSize: 14, fontFamily: font.sans.bold, fontWeight: "700", color: colors.white },
-  cancelBtn: { backgroundColor: colors.surfaceContainer, borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden" },
-  cancelBtnText: { fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "600", color: colors.textSecondary },
+  root:          { flex: 1, backgroundColor: "transparent" },
+  sheetBg:       { borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl },
+  content:       { paddingHorizontal: layout.screenPaddingH, alignItems: "center" },
+  iconWrap:      { width: 56, height: 56, borderRadius: 18, alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  icon:          { fontSize: 24 },
+  title:         { fontSize: 17, fontFamily: font.sans.bold, fontWeight: "700", textAlign: "center", letterSpacing: -0.34, marginBottom: 6 },
+  sub:           { fontSize: 13, fontFamily: font.sans.regular, textAlign: "center", lineHeight: 19.5, marginBottom: 20 },
+  btnWrap:       { width: "100%", gap: 8 },
+  dangerBtn:     { borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden" },
+  dangerBtnText: { fontSize: 14, fontFamily: font.sans.bold, fontWeight: "700", color: "white" },
+  cancelBtn:     { borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden" },
+  cancelBtnText: { fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "600" },
 });

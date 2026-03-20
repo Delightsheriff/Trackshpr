@@ -2,7 +2,8 @@
  * Global toast overlay — rendered in the tabs layout above all content.
  * Reads from useToastStore. DS §11.3.
  */
-import { colors, font, radius } from "@/src/constants/tokens";
+import { font, radius } from "@/src/constants/tokens";
+import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { useEffect } from "react";
 import { StyleSheet, Text } from "react-native";
@@ -14,14 +15,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const TYPE_CONFIG = {
-  success: { bg: colors.successBg, color: colors.success, prefix: "✅" },
-  error: { bg: colors.errorBg, color: colors.error, prefix: "❌" },
-  info: { bg: colors.infoBg, color: colors.info, prefix: "📦" },
-};
-
 export default function ToastOverlay() {
   const { toast, hide } = useToastStore();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-80);
   const opacity = useSharedValue(0);
@@ -46,6 +42,13 @@ export default function ToastOverlay() {
   }));
 
   if (!toast) return null;
+
+  const TYPE_CONFIG = {
+    success: { bg: colors.successBg, color: colors.success, prefix: "✅" },
+    error:   { bg: colors.errorBg,   color: colors.error,   prefix: "❌" },
+    info:    { bg: colors.infoBg,    color: colors.info,    prefix: "📦" },
+  };
+
   const cfg = TYPE_CONFIG[toast.type];
 
   return (

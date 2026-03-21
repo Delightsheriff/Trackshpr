@@ -1,8 +1,30 @@
 /**
- * Profile-related API calls: logo upload and profile upsert.
+ * Profile-related API calls: logo upload, profile load, and profile upsert.
  */
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "./supabase";
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export interface ProfilePayload {
+  id: string;
+  business_name: string;
+  phone: string;
+  city?: string | null;
+  brand_name?: string | null;
+  logo_url?: string | null;
+  onboarding_complete?: boolean;
+}
+
+export interface Profile {
+  id: string;
+  business_name: string | null;
+  phone: string | null;
+  city: string | null;
+  brand_name: string | null;
+  logo_url: string | null;
+  onboarding_complete: boolean;
+}
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 
@@ -42,16 +64,22 @@ export async function uploadLogo(
   return { publicUrl: data.publicUrl };
 }
 
-// ── Profile upsert ────────────────────────────────────────────────────────────
+// ── Profile fetch ─────────────────────────────────────────────────────────────
 
-export interface ProfilePayload {
-  id: string;
-  business_name: string;
-  phone: string;
-  city?: string | null;
-  brand_name?: string | null;
-  logo_url?: string | null;
+export async function fetchProfile(
+  userId: string,
+): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data as Profile;
 }
+
+// ── Profile upsert ────────────────────────────────────────────────────────────
 
 export async function saveProfile(
   payload: ProfilePayload,
@@ -61,7 +89,7 @@ export async function saveProfile(
     city: payload.city ?? null,
     brand_name: payload.brand_name ?? null,
     logo_url: payload.logo_url ?? null,
-    onboarding_complete: true,
+    onboarding_complete: payload.onboarding_complete ?? true,
   });
 
   return error ? { error: error.message } : {};

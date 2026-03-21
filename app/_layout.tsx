@@ -2,7 +2,7 @@
  * Root layout — entry point for all routes.
  *
  * Responsibilities:
- *  1. Show branded splash screen while auth state is being determined
+ *  1. Show splash screen while auth state is being determined
  *  2. Redirect to correct screen based on auth state (useAuthGuard)
  *  3. Set up Supabase auth listener for session changes
  *  4. Render global UI (ToastOverlay, StatusBar)
@@ -57,6 +57,24 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, [router]);
 
+  // ── Deferred redirect — useEffect avoids setState during render ────────────
+  useEffect(() => {
+    if (authState.loading) return;
+    switch (authState.destination) {
+      case "onboarding":
+        router.replace("/onboarding");
+        break;
+      case "sign-in":
+        router.replace("/(auth)/sign-in");
+        break;
+      case "profile-setup":
+        router.replace("/(auth)/profile-setup");
+        break;
+      case "app":
+        break;
+    }
+  }, [authState, router]);
+
   // ── Render splash while auth state is being determined ─────────────────────
   if (authState.loading) {
     return (
@@ -64,21 +82,6 @@ export default function RootLayout() {
         <SplashScreen />
       </GestureHandlerRootView>
     );
-  }
-
-  // ── Initial redirect based on resolved auth state ─────────────────────────
-  switch (authState.destination) {
-    case "onboarding":
-      router.replace("/onboarding");
-      break;
-    case "sign-in":
-      router.replace("/(auth)/sign-in");
-      break;
-    case "profile-setup":
-      router.replace("/(auth)/profile-setup");
-      break;
-    case "app":
-      break;
   }
 
   // ── Shell (renders behind redirect) ──────────────────────────────────────

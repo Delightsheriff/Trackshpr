@@ -189,7 +189,7 @@ export default function SlideOne({ isActive }: SlideProps) {
         sv.value = 0;
       });
     }
-  }, [isActive]);
+  }, [b0, b1, b2, b3, b4, bContent, bStamp, isActive]);
 
   const a0 = useAnimatedStyle(() => ({
     opacity: b0.value,
@@ -403,8 +403,8 @@ export default function SlideOne({ isActive }: SlideProps) {
             { color: onboardingColors.subDark, lineHeight: 22 },
           ]}
         >
-          "Where is my order?" is the most expensive message in social commerce.
-          Trackshpr ends it.
+          &quot;Where is my order?&quot; is the most expensive message in social
+          commerce. Trackshpr ends it.
         </Text>
       </Animated.View>
     </View>

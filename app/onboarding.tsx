@@ -10,9 +10,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -20,6 +19,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SPRING = { damping: 28, stiffness: 280, mass: 0.85 };
 const SLIDE_COUNT = 3;
@@ -32,6 +32,11 @@ export default function OnboardingScreen() {
 
   const indexSV = useSharedValue(0);
   const translateX = useSharedValue(0);
+
+  // TODO: Remove this later — for testing onboarding flow only
+  useEffect(() => {
+    AsyncStorage.removeItem(ONBOARDING_SEEN_KEY);
+  }, []);
 
   const snapTo = useCallback(
     (index: number) => {

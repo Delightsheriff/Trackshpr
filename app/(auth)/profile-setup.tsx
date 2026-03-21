@@ -9,13 +9,14 @@ import {
   gradients,
   radius,
 } from "@/src/constants/tokens";
-import { pickLogoUri, saveProfile, uploadLogo } from "@/src/lib/profiles";
+import { fetchProfile, pickLogoUri, saveProfile, uploadLogo } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
 import LogoUploader from "@/src/components/auth/logo-uploader";
+import { useToastStore } from "@/src/stores/toastStore";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -31,6 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
+  const { show: showToast } = useToastStore();
 
   // Form state
   const [businessName, setBusinessName] = useState("");
@@ -51,8 +53,29 @@ export default function ProfileSetupScreen() {
   const isFilled = businessName.trim().length > 0;
   const firstName = businessName.trim().split(" ")[0];
 
-  // ── Logo ──
-  const handlePickLogo = async () => {
+  // ── Load existing profile on mount ──────────────────────────────────────────
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const profile = await fetchProfile(user.id);
+      if (!profile) return;
+
+      setBusinessName(profile.business_name ?? "");
+      setPhone(profile.phone ?? "");
+      setCity(profile.city ?? "");
+      setDescription(profile.brand_name ?? "");
+      if (profile.logo_url) {
+        setLogoLocalUri(profile.logo_url);
+        setLogoPublicUrl(profile.logo_url);
+      }
+    }
+    loadProfile();
+  }, []);
+
+  // ── Logo ───────────────────────────────────────────────────────────────────
+  const handlePickLogo = useCallback(async () => {
     const uri = await pickLogoUri();
     if (!uri) return;
 
@@ -60,31 +83,31 @@ export default function ProfileSetupScreen() {
     setLogoPublicUrl(null);
     setUploading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
 
-    const { publicUrl } = await uploadLogo(user.id, uri);
+    const { publicUrl, error } = await uploadLogo(user.id, uri);
+    if (error) {
+      showToast("Logo upload failed. Try again.", "error");
+    }
     setLogoPublicUrl(publicUrl);
     setUploading(false);
-  };
+  }, [showToast]);
 
-  // ── Save ──
-  const handleSave = async () => {
+  // ── Save ───────────────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
     const nameOk = businessName.trim().length > 0;
     const phoneOk = phone.trim().length > 0;
 
     if (!nameOk || !phoneOk) {
       setHasError(true);
+      showToast("Business name and WhatsApp number are required", "error");
       return;
     }
 
     setSaving(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated.");
 
       const { error } = await saveProfile({
@@ -94,18 +117,21 @@ export default function ProfileSetupScreen() {
         city: city.trim() || null,
         brand_name: description.trim() || null,
         logo_url: logoPublicUrl ?? null,
+        onboarding_complete: true,
       });
 
       if (error) throw new Error(error);
+      showToast("Profile saved! Let's go.", "success");
       router.replace("/(tabs)");
     } catch {
-      // Toast would go here
+      showToast("Could not save profile. Please try again.", "error");
     } finally {
       setSaving(false);
     }
-  };
+  }, [businessName, phone, city, description, logoPublicUrl, showToast]);
 
-  const handleSkip = () => router.replace("/(tabs)");
+  // ── Skip — does NOT update onboarding_complete ───────────────────────────────
+  const handleSkip = useCallback(() => router.replace("/(tabs)"), []);
 
   // Ring border: use borderWidth/borderColor instead of boxShadow spread for Android
   const requiredGroupBorder = hasError
@@ -377,7 +403,7 @@ function FieldRow({
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: {
@@ -492,15 +518,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     overflow: "hidden",
-    // iOS shadow
     shadowColor: "rgba(48,41,80,1)",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    // Android shadow
     elevation: 2,
   },
-  // Default: transparent 2px border so layout stays stable when ring appears
   fieldGroupDefault: {
     borderWidth: 2,
     borderColor: "transparent",
@@ -515,7 +538,7 @@ const styles = StyleSheet.create({
   rowDivider: {
     height: 1,
     backgroundColor: colors.surfaceContainer,
-    marginLeft: 62, // icon width + padding + gap
+    marginLeft: 62,
   },
   rowIcon: {
     width: 36,
@@ -601,17 +624,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // CTA — Android-safe shadow: elevation on outer wrapper, overflow:hidden on Pressable
+  // CTA — Android-safe shadow
   saveBtnShadow: {
     marginHorizontal: 18,
     marginTop: 4,
     borderRadius: 100,
-    // iOS shadow
     shadowColor: "rgba(70,71,211,1)",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 24,
-    // Android — must live here (not on Pressable) to get rounded shadow
     elevation: 8,
     backgroundColor: colors.primary,
   },

@@ -1,14 +1,18 @@
 /**
  * Home / Dashboard tab (DS §8.1, §8.4).
- * TODO: replace DUMMY_* with real Supabase queries.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
+import { fetchProfile } from "@/src/lib/profiles";
+import { supabase } from "@/src/lib/supabase";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
+import { Feather } from "@expo/vector-icons";
 
 // ── Dummy data — TODO: replace with real Supabase query ──────────────────────
 const DUMMY_STATS = { total: 18, delivered: 11, inTransit: 5, failed: 2 };
@@ -86,10 +90,52 @@ function OrderCard({ item, customer, area, status, time }: {
   );
 }
 
+// ── Profile incomplete banner ──────────────────────────────────────────────────
+function IncompleteProfileBanner() {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={() => router.push("/(auth)/profile-setup")}
+      style={[styles.profileBanner, { backgroundColor: colors.warningBg }]}
+    >
+      <View style={[styles.bannerIcon, { backgroundColor: "rgba(245,166,35,0.2)" }]}>
+        <Text style={{ fontSize: 16 }}>🏪</Text>
+      </View>
+      <View style={styles.bannerText}>
+        <Text style={[styles.bannerTitle, { color: colors.warning }]}>
+          Complete your profile
+        </Text>
+        <Text style={[styles.bannerSub, { color: colors.textSecondary }]}>
+          Add your business name so customers{'\n'}recognise you on tracking pages
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={colors.warning} />
+    </Pressable>
+  );
+}
+
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    async function checkProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingProfile(false); return; }
+
+      const profile = await fetchProfile(user.id);
+      setProfileIncomplete(!profile?.onboarding_complete);
+      setLoadingProfile(false);
+    }
+    checkProfile();
+  }, [isFocused]);
 
   const statCardShadow = isDark
     ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
@@ -109,6 +155,11 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Profile incomplete banner ─────────────────────────────── */}
+        {!loadingProfile && profileIncomplete && (
+          <IncompleteProfileBanner />
+        )}
+
         {/* ── Header ───────────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
@@ -454,5 +505,40 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.2,
     textTransform: "uppercase",
+  },
+
+  // Profile incomplete banner (DS §11.4)
+  profileBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.xl,
+    padding: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+    marginBottom: layout.listGap,
+  },
+  bannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  bannerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.13,
+    marginBottom: 2,
+  },
+  bannerSub: {
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    lineHeight: 15,
   },
 });

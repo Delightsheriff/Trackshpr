@@ -10,7 +10,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -32,11 +32,6 @@ export default function OnboardingScreen() {
 
   const indexSV = useSharedValue(0);
   const translateX = useSharedValue(0);
-
-  // TODO: Remove this later — for testing onboarding flow only
-  useEffect(() => {
-    AsyncStorage.removeItem(ONBOARDING_SEEN_KEY);
-  }, []);
 
   const snapTo = useCallback(
     (index: number) => {
@@ -60,7 +55,7 @@ export default function OnboardingScreen() {
     } catch {
       // Non-critical — navigate regardless
     }
-    router.replace("/(tabs)");
+    router.replace("/(auth)/sign-in");
   }, []);
 
   const panGesture = Gesture.Pan()

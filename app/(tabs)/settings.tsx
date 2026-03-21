@@ -6,8 +6,7 @@
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { router } from "expo-router";
-import { useTheme } from "@/src/stores/themeStore";
-import { useThemeStore } from "@/src/stores/themeStore";
+import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";

@@ -8,7 +8,7 @@
  *  - Entrance: staggered fadeUp animation (matches HTML keyframe)
  */
 import SignInHero from "@/src/components/auth/sign-in-hero";
-import GoogleIcon from "@/src/components/shared/google-icon";
+import GoogleIcon from "@/src/components/auth/google-icon";
 import { colors, font, radius, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
 import { supabase } from "@/src/lib/supabase";

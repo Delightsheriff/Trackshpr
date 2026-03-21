@@ -1,20 +1,89 @@
+/**
+ * Root layout — entry point for all routes.
+ *
+ * Responsibilities:
+ *  1. Show branded splash screen while auth state is being determined
+ *  2. Redirect to correct screen based on auth state (useAuthGuard)
+ *  3. Set up Supabase auth listener for session changes
+ *  4. Render global UI (ToastOverlay, StatusBar)
+ *
+ * Design system: DS §9.1, §9.2
+ */
+import SplashScreen from "@/src/components/splash";
 import ToastOverlay from "@/src/components/shared/ToastOverlay";
+import { useAuthGuard } from "@/src/hooks/useAuthGuard";
 import { useThemeStore } from "@/src/stores/themeStore";
-import { Stack } from "expo-router";
+import { supabase } from "@/src/lib/supabase";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useEffect } from "react";
 import "react-native-reanimated";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import "../global.css";
 
 export default function RootLayout() {
+  const router = useRouter();
+  const authState = useAuthGuard();
   const colors = useThemeStore((s) => s.colors);
   const isDark  = useThemeStore((s) => s.isDark);
 
+  // ── Auth state change listener ────────────────────────────────────────────
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_OUT") {
+          router.replace("/(auth)/sign-in");
+          return;
+        }
+
+        if (event === "SIGNED_IN" && session) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_complete")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+          if (!profile?.onboarding_complete) {
+            router.replace("/(auth)/profile-setup");
+          } else {
+            router.replace("/(tabs)");
+          }
+        }
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  // ── Render splash while auth state is being determined ─────────────────────
+  if (authState.loading) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SplashScreen />
+      </GestureHandlerRootView>
+    );
+  }
+
+  // ── Initial redirect based on resolved auth state ─────────────────────────
+  switch (authState.destination) {
+    case "onboarding":
+      router.replace("/onboarding");
+      break;
+    case "sign-in":
+      router.replace("/(auth)/sign-in");
+      break;
+    case "profile-setup":
+      router.replace("/(auth)/profile-setup");
+      break;
+    case "app":
+      break;
+  }
+
+  // ── Shell (renders behind redirect) ──────────────────────────────────────
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
-      {/* ThemeProvider bg — eliminates flash of wrong background on cold start */}
       <View style={{ flex: 1, backgroundColor: colors.surface }}>
         <Stack>
           <Stack.Screen name="index"      options={{ headerShown: false }} />

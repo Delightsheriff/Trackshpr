@@ -113,7 +113,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.textMuted }]}>{greeting()}</Text>
-            <Text style={[styles.businessName, { color: colors.textPrimary }]}>Zara's Closet</Text>
+            <Text style={[styles.businessName, { color: colors.textPrimary }]}>Zara&apos;s Closet</Text>
           </View>
           <View style={styles.avatarWrap}>
             <LinearGradient
@@ -139,7 +139,7 @@ export default function HomeScreen() {
             <View style={styles.heroOrb1} />
             <View style={styles.heroOrb2} />
             <View style={styles.heroLeft}>
-              <Text style={styles.heroLabel}>Today's Deliveries</Text>
+              <Text style={styles.heroLabel}>Today&apos;s Deliveries</Text>
               <Text style={styles.heroNum}>{DUMMY_STATS.total}</Text>
               <Text style={styles.heroSub}>↑ 3 more than yesterday</Text>
             </View>

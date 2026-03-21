@@ -13,6 +13,10 @@ export interface ProfilePayload {
   city?: string | null;
   brand_name?: string | null;
   logo_url?: string | null;
+  secondary_phone?: string | null;
+  pickup_address?: string | null;
+  instagram_handle?: string | null;
+  tiktok_handle?: string | null;
   onboarding_complete?: boolean;
 }
 
@@ -23,6 +27,10 @@ export interface Profile {
   city: string | null;
   brand_name: string | null;
   logo_url: string | null;
+  secondary_phone: string | null;
+  pickup_address: string | null;
+  instagram_handle: string | null;
+  tiktok_handle: string | null;
   onboarding_complete: boolean;
 }
 
@@ -76,7 +84,13 @@ export async function fetchProfile(
     .single();
 
   if (error || !data) return null;
-  return data as Profile;
+  return {
+    ...(data as unknown as Profile),
+    secondary_phone: (data as Record<string, unknown>).secondary_phone as string | null ?? null,
+    pickup_address: (data as Record<string, unknown>).pickup_address as string | null ?? null,
+    instagram_handle: (data as Record<string, unknown>).instagram_handle as string | null ?? null,
+    tiktok_handle: (data as Record<string, unknown>).tiktok_handle as string | null ?? null,
+  };
 }
 
 // ── Profile upsert ────────────────────────────────────────────────────────────
@@ -89,6 +103,10 @@ export async function saveProfile(
     city: payload.city ?? null,
     brand_name: payload.brand_name ?? null,
     logo_url: payload.logo_url ?? null,
+    secondary_phone: payload.secondary_phone ?? null,
+    pickup_address: payload.pickup_address ?? null,
+    instagram_handle: payload.instagram_handle ?? null,
+    tiktok_handle: payload.tiktok_handle ?? null,
     onboarding_complete: payload.onboarding_complete ?? true,
   });
 

@@ -6,7 +6,15 @@
       "Bash(ls \"C:\\\\Users\\\\delig\\\\Downloads\"/*.html)",
       "Read(//mnt/c/Users/delig/**)",
       "Bash(cd:*)",
-      "Bash(npx expo:*)"
+      "Bash(npx expo:*)",
+      "Bash(npm install:*)",
+      "Bash(ls \"C:\\\\Users\\\\delig\\\\Documents\\\\Trackshpr\\\\app\\\\\\(modals\\)\"\" && ls \"C:UsersdeligDocumentsTrackshprsrccomponents\"\")",
+      "Bash(ls \"C:/Users/delig/Documents/Trackshpr/app/\\(modals\\)/\")",
+      "Bash(ls \"C:/Users/delig/Documents/Trackshpr/app/\\(settings\\)/\")",
+      "Bash(cat \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(ls \"C:/Users/delig/Documents/Trackshpr/app/\\(screens\\)\")",
+      "Bash(ls \"C:\\\\Users\\\\delig\\\\Documents\\\\Trackshpr\\\\app/\\(screens\\)\")",
+      "Bash(ls:*)"
     ]
   }
 }

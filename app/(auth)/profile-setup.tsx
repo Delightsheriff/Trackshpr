@@ -1,7 +1,7 @@
 /**
  * Profile setup screen — light mode always (DS §9.2).
- * One-time setup: business_name, phone, city, description, logo.
- * API calls live in src/lib/profiles.ts; sub-components in src/components/auth/.
+ * One-time setup: business details, contact, socials, pickup info.
+ * API calls in src/lib/profiles.ts.
  */
 import {
   colors,
@@ -30,74 +30,202 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// ── Form state ─────────────────────────────────────────────────────────────────
+
+interface FormState {
+  businessName: string;
+  phone: string;
+  secondaryPhone: string;
+  city: string;
+  description: string;
+  pickupAddress: string;
+  instagramHandle: string;
+  tiktokHandle: string;
+  logoLocalUri: string | null;
+  logoPublicUrl: string | null;
+}
+
+const EMPTY: FormState = {
+  businessName: "",
+  phone: "",
+  secondaryPhone: "",
+  city: "",
+  description: "",
+  pickupAddress: "",
+  instagramHandle: "",
+  tiktokHandle: "",
+  logoLocalUri: null,
+  logoPublicUrl: null,
+};
+
+// ── Field components ────────────────────────────────────────────────────────────
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <Text style={styles.sectionLabel}>{label}</Text>
+  );
+}
+
+function FieldGroup({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={styles.fieldGroup}>
+      {children}
+    </View>
+  );
+}
+
+function FieldRow({
+  icon,
+  iconBg,
+  label,
+  required,
+  hasError,
+  children,
+}: {
+  icon: string;
+  iconBg: string;
+  label: string;
+  required?: boolean;
+  hasError?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.inputRow}>
+      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
+        <Text style={styles.rowIconEmoji}>{icon}</Text>
+      </View>
+      <View style={styles.inputInner}>
+        <View style={styles.labelRow}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              hasError && required && { color: colors.error },
+            ]}
+          >
+            {label}
+            {required && <Text style={styles.requiredAsterisk}> *</Text>}
+          </Text>
+        </View>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function TextField({
+  value,
+  onChange,
+  placeholder,
+  keyboardType = "default",
+  prefix,
+  multiline,
+  onFocus,
+  onBlur,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  keyboardType?: "default" | "phone-pad";
+  prefix?: string;
+  multiline?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.textFieldWrap}>
+      {prefix && <Text style={styles.fieldPrefix}>{prefix}</Text>}
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => { setFocused(true); onFocus?.(); }}
+        onBlur={() => { setFocused(false); onBlur?.(); }}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        style={[
+          styles.textInput,
+          focused && { borderWidth: 2, borderColor: colors.primary, borderRadius: radius.lg },
+          multiline && { height: 60, textAlignVertical: "top" as const },
+        ]}
+        returnKeyType={multiline ? "default" : "next"}
+      />
+    </View>
+  );
+}
+
+function RowDivider() {
+  return <View style={styles.rowDivider} />;
+}
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
+
 export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
   const { show: showToast } = useToastStore();
 
-  // Form state
-  const [businessName, setBusinessName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [city, setCity] = useState("");
-  const [description, setDescription] = useState("");
-
-  // Logo state
-  const [logoLocalUri, setLogoLocalUri] = useState<string | null>(null);
-  const [logoPublicUrl, setLogoPublicUrl] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY);
   const [uploading, setUploading] = useState(false);
-
-  // UI state
   const [saving, setSaving] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [requiredFocused, setRequiredFocused] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const isFilled = businessName.trim().length > 0;
-  const firstName = businessName.trim().split(" ")[0];
+  const isFilled = form.businessName.trim().length > 0;
+  const firstName = form.businessName.trim().split(" ")[0];
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   // ── Load existing profile on mount ──────────────────────────────────────────
   useEffect(() => {
     async function loadProfile() {
+      setLoadingProfile(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setLoadingProfile(false); return; }
 
       const profile = await fetchProfile(user.id);
-      if (!profile) return;
-
-      setBusinessName(profile.business_name ?? "");
-      setPhone(profile.phone ?? "");
-      setCity(profile.city ?? "");
-      setDescription(profile.brand_name ?? "");
-      if (profile.logo_url) {
-        setLogoLocalUri(profile.logo_url);
-        setLogoPublicUrl(profile.logo_url);
+      if (profile) {
+        setForm({
+          businessName: profile.business_name ?? "",
+          phone: profile.phone ?? "",
+          secondaryPhone: profile.secondary_phone ?? "",
+          city: profile.city ?? "",
+          description: profile.brand_name ?? "",
+          pickupAddress: profile.pickup_address ?? "",
+          instagramHandle: profile.instagram_handle ?? "",
+          tiktokHandle: profile.tiktok_handle ?? "",
+          logoLocalUri: profile.logo_url,
+          logoPublicUrl: profile.logo_url,
+        });
       }
+      setLoadingProfile(false);
     }
     loadProfile();
   }, []);
 
-  // ── Logo ───────────────────────────────────────────────────────────────────
+  // ── Logo ────────────────────────────────────────────────────────────────────
   const handlePickLogo = useCallback(async () => {
     const uri = await pickLogoUri();
     if (!uri) return;
 
-    setLogoLocalUri(uri);
-    setLogoPublicUrl(null);
+    setForm((prev) => ({ ...prev, logoLocalUri: uri, logoPublicUrl: null }));
     setUploading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
 
     const { publicUrl, error } = await uploadLogo(user.id, uri);
-    if (error) {
-      showToast("Logo upload failed. Try again.", "error");
-    }
-    setLogoPublicUrl(publicUrl);
+    if (error) showToast("Logo upload failed. Try again.", "error");
+    setForm((prev) => ({ ...prev, logoPublicUrl: publicUrl ?? prev.logoPublicUrl }));
     setUploading(false);
   }, [showToast]);
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
-    const nameOk = businessName.trim().length > 0;
-    const phoneOk = phone.trim().length > 0;
+    const nameOk = form.businessName.trim().length > 0;
+    const phoneOk = form.phone.trim().length > 0;
 
     if (!nameOk || !phoneOk) {
       setHasError(true);
@@ -112,11 +240,15 @@ export default function ProfileSetupScreen() {
 
       const { error } = await saveProfile({
         id: user.id,
-        business_name: businessName.trim(),
-        phone: phone.trim(),
-        city: city.trim() || null,
-        brand_name: description.trim() || null,
-        logo_url: logoPublicUrl ?? null,
+        business_name: form.businessName.trim(),
+        phone: form.phone.trim(),
+        secondary_phone: form.secondaryPhone.trim() || null,
+        city: form.city.trim() || null,
+        brand_name: form.description.trim() || null,
+        logo_url: form.logoPublicUrl ?? null,
+        pickup_address: form.pickupAddress.trim() || null,
+        instagram_handle: form.instagramHandle.trim() || null,
+        tiktok_handle: form.tiktokHandle.trim() || null,
         onboarding_complete: true,
       });
 
@@ -128,17 +260,27 @@ export default function ProfileSetupScreen() {
     } finally {
       setSaving(false);
     }
-  }, [businessName, phone, city, description, logoPublicUrl, showToast]);
+  }, [form, showToast]);
 
-  // ── Skip — does NOT update onboarding_complete ───────────────────────────────
+  // ── Skip ─────────────────────────────────────────────────────────────────────
   const handleSkip = useCallback(() => router.replace("/(tabs)"), []);
 
-  // Ring border: use borderWidth/borderColor instead of boxShadow spread for Android
-  const requiredGroupBorder = hasError
+  const requiredBorder = hasError
     ? { borderWidth: 2, borderColor: colors.error }
     : requiredFocused
       ? { borderWidth: 2, borderColor: colors.primary }
-      : { borderWidth: 2, borderColor: "transparent" };
+      : { borderWidth: 0 };
+
+  if (loadingProfile) {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -156,7 +298,7 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header band — extends into status bar ─────────────────── */}
+          {/* ── Header ───────────────────────────────────────────────── */}
           <LinearGradient
             colors={["#4647D3", "#5354e8", "#6366f1"]}
             start={{ x: 0, y: 0 }}
@@ -179,12 +321,11 @@ export default function ProfileSetupScreen() {
             </View>
           </LinearGradient>
 
-          {/* ── Form ─────────────────────────────────────────────────── */}
           <View style={styles.formBody}>
-            {/* Avatar sits inside the form, centred above the business name group */}
+            {/* ── Logo + avatar ─────────────────────────────────────── */}
             <View style={styles.avatarRow}>
               <LogoUploader
-                uri={logoLocalUri}
+                uri={form.logoLocalUri}
                 uploading={uploading}
                 onPress={handlePickLogo}
               />
@@ -199,55 +340,50 @@ export default function ProfileSetupScreen() {
               </View>
             )}
 
-            {/* Required fields */}
-            <View style={[styles.fieldGroup, requiredGroupBorder]}>
-              <FieldRow
-                icon="🏪"
-                iconBg={hasError ? colors.errorBg : colors.primarySoft}
-                label="Business name"
-                required
-                hasError={hasError}
-              >
-                <TextInput
-                  value={businessName}
-                  onChangeText={(v) => {
-                    setBusinessName(v);
-                    if (hasError) setHasError(false);
-                  }}
-                  onFocus={() => setRequiredFocused(true)}
-                  onBlur={() => setRequiredFocused(false)}
-                  placeholder="e.g. Zara's Closet"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.textInput}
-                  returnKeyType="next"
-                />
-              </FieldRow>
-
-              <View style={styles.rowDivider} />
-
-              <FieldRow
-                icon="📱"
-                iconBg={hasError ? colors.errorBg : colors.warningBg}
-                label="WhatsApp number"
-                required
-                hasError={hasError}
-              >
-                <TextInput
-                  value={phone}
-                  onChangeText={(v) => {
-                    setPhone(v);
-                    if (hasError) setHasError(false);
-                  }}
-                  onFocus={() => setRequiredFocused(true)}
-                  onBlur={() => setRequiredFocused(false)}
-                  placeholder="0800 000 0000"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="phone-pad"
-                  style={styles.textInput}
-                  returnKeyType="next"
-                />
-              </FieldRow>
-            </View>
+            {/* ── Required: Business info ────────────────────────────── */}
+            <SectionLabel label="Business info" />
+            <FieldGroup>
+              <View style={[styles.requiredGroup, requiredBorder]}>
+                <FieldRow
+                  icon="🏪"
+                  iconBg={hasError ? colors.errorBg : colors.primarySoft}
+                  label="Business name"
+                  required
+                  hasError={hasError}
+                >
+                  <TextField
+                    value={form.businessName}
+                    onChange={(v) => {
+                      set("businessName", v);
+                      if (hasError) setHasError(false);
+                    }}
+                    onFocus={() => setRequiredFocused(true)}
+                    onBlur={() => setRequiredFocused(false)}
+                    placeholder="e.g. Zara's Closet"
+                  />
+                </FieldRow>
+                <RowDivider />
+                <FieldRow
+                  icon="📱"
+                  iconBg={hasError ? colors.errorBg : colors.warningBg}
+                  label="WhatsApp number"
+                  required
+                  hasError={hasError}
+                >
+                  <TextField
+                    value={form.phone}
+                    onChange={(v) => {
+                      set("phone", v);
+                      if (hasError) setHasError(false);
+                    }}
+                    onFocus={() => setRequiredFocused(true)}
+                    onBlur={() => setRequiredFocused(false)}
+                    placeholder="0800 000 0000"
+                    keyboardType="phone-pad"
+                  />
+                </FieldRow>
+              </View>
+            </FieldGroup>
 
             {hasError && (
               <View style={styles.errorRow}>
@@ -258,42 +394,92 @@ export default function ProfileSetupScreen() {
               </View>
             )}
 
-            {/* Optional fields */}
-            <View style={[styles.fieldGroup, styles.fieldGroupDefault]}>
+            {/* ── Optional: Contact & Location ─────────────────────────── */}
+            <SectionLabel label="Contact & Location" />
+            <FieldGroup>
+              <FieldRow
+                icon="📞"
+                iconBg={colors.surfaceContainer}
+                label="Secondary phone"
+              >
+                <TextField
+                  value={form.secondaryPhone}
+                  onChange={(v) => set("secondaryPhone", v)}
+                  placeholder="Optional — second line"
+                  keyboardType="phone-pad"
+                />
+              </FieldRow>
+              <RowDivider />
               <FieldRow
                 icon="📍"
                 iconBg={colors.infoBg}
                 label="City"
-                optional
               >
-                <TextInput
-                  value={city}
-                  onChangeText={setCity}
+                <TextField
+                  value={form.city}
+                  onChange={(v) => set("city", v)}
                   placeholder="e.g. Lagos"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.textInput}
-                  returnKeyType="next"
                 />
               </FieldRow>
+              <RowDivider />
+              <FieldRow
+                icon="🏠"
+                iconBg={colors.successBg}
+                label="Pickup address"
+              >
+                <TextField
+                  value={form.pickupAddress}
+                  onChange={(v) => set("pickupAddress", v)}
+                  placeholder="Where riders collect packages from"
+                  multiline
+                />
+              </FieldRow>
+            </FieldGroup>
 
-              <View style={styles.rowDivider} />
-
+            {/* ── Optional: About ─────────────────────────────────────── */}
+            <SectionLabel label="About" />
+            <FieldGroup>
               <FieldRow
                 icon="✏️"
-                iconBg={colors.successBg}
+                iconBg={colors.primarySoft}
                 label="Short description"
-                optional
               >
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
+                <TextField
+                  value={form.description}
+                  onChange={(v) => set("description", v)}
                   placeholder="What do you sell?"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.textInput}
-                  returnKeyType="done"
+                  multiline
                 />
               </FieldRow>
-            </View>
+            </FieldGroup>
+
+            {/* ── Optional: Social ────────────────────────────────────── */}
+            <SectionLabel label="Social handles" />
+            <FieldGroup>
+              <FieldRow
+                icon="📸"
+                iconBg={colors.surfaceContainer}
+                label="Instagram"
+              >
+                <TextField
+                  value={form.instagramHandle}
+                  onChange={(v) => set("instagramHandle", v)}
+                  placeholder="@yourbusiness"
+                />
+              </FieldRow>
+              <RowDivider />
+              <FieldRow
+                icon="🎵"
+                iconBg={colors.surfaceContainer}
+                label="TikTok"
+              >
+                <TextField
+                  value={form.tiktokHandle}
+                  onChange={(v) => set("tiktokHandle", v)}
+                  placeholder="@yourbusiness"
+                />
+              </FieldRow>
+            </FieldGroup>
 
             {!isFilled && (
               <View style={styles.infoNote}>
@@ -311,7 +497,7 @@ export default function ProfileSetupScreen() {
             )}
           </View>
 
-          {/* ── CTA — Android-safe shadow pattern ────────────────────── */}
+          {/* ── CTA ──────────────────────────────────────────────────── */}
           <View style={styles.saveBtnShadow}>
             <Pressable
               onPress={handleSave}
@@ -336,13 +522,10 @@ export default function ProfileSetupScreen() {
             </Pressable>
           </View>
 
-          {/* ── Skip ─────────────────────────────────────────────────── */}
+          {/* ── Skip ────────────────────────────────────────────────── */}
           <Pressable
             onPress={handleSkip}
-            style={[
-              styles.skipWrap,
-              isFilled && { opacity: 0 },
-            ]}
+            style={[styles.skipWrap, isFilled && { opacity: 0 }]}
             disabled={isFilled}
           >
             <Text style={styles.skipText}>
@@ -356,53 +539,6 @@ export default function ProfileSetupScreen() {
   );
 }
 
-// ── FieldRow ──────────────────────────────────────────────────────────────────
-
-function FieldRow({
-  icon,
-  iconBg,
-  label,
-  required,
-  optional,
-  hasError,
-  children,
-}: {
-  icon: string;
-  iconBg: string;
-  label: string;
-  required?: boolean;
-  optional?: boolean;
-  hasError?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.inputRow}>
-      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
-        <Text style={styles.rowIconEmoji}>{icon}</Text>
-      </View>
-      <View style={styles.inputInner}>
-        <View style={styles.labelRow}>
-          <Text
-            style={[
-              styles.fieldLabel,
-              hasError && required && { color: colors.error },
-            ]}
-          >
-            {label}
-            {required && <Text style={styles.requiredAsterisk}> *</Text>}
-          </Text>
-        </View>
-        {children}
-      </View>
-      {optional && (
-        <View style={styles.optionalTag}>
-          <Text style={styles.optionalTagText}>Optional</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -410,11 +546,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
   },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scroll: {
     flexGrow: 1,
   },
 
-  // Header — height grows with safe area so gradient covers status bar
+  // Header
   header: {
     minHeight: 120,
     overflow: "hidden",
@@ -484,19 +625,21 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // Avatar — centred in form body, above the required fields group
-  avatarRow: {
-    alignItems: "center",
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-
   // Form
   formBody: {
     paddingHorizontal: 18,
+    paddingTop: 8,
     paddingBottom: 20,
-    gap: 10,
+    gap: 6,
   },
+
+  // Logo
+  avatarRow: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+
+  // Welcome chip
   welcomeChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -505,6 +648,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
+    marginBottom: 6,
   },
   welcomeChipIcon: { fontSize: 18 },
   welcomeChipText: {
@@ -514,6 +658,21 @@ const styles = StyleSheet.create({
     color: colors.success,
     flex: 1,
   },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: colors.textMuted,
+    marginTop: 10,
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+
+  // Field group
   fieldGroup: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
@@ -524,14 +683,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  fieldGroupDefault: {
-    borderWidth: 2,
-    borderColor: "transparent",
+
+  // Required group
+  requiredGroup: {
+    overflow: "hidden",
+    borderRadius: radius.xl,
   },
+
+  // Input row
   inputRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 13,
+    alignItems: "flex-start",
+    paddingVertical: 12,
     paddingHorizontal: 14,
     gap: 12,
   },
@@ -551,8 +714,6 @@ const styles = StyleSheet.create({
   rowIconEmoji: { fontSize: 16 },
   inputInner: { flex: 1 },
   labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: 3,
   },
   fieldLabel: {
@@ -569,35 +730,36 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.error,
   },
+
+  // Text field
+  textFieldWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  fieldPrefix: {
+    fontSize: 14,
+    fontFamily: font.sans.semiBold,
+    color: colors.textSecondary,
+    marginRight: 4,
+  },
   textInput: {
+    flex: 1,
     fontSize: 14,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
     color: colors.textPrimary,
     padding: 0,
     margin: 0,
-  },
-  optionalTag: {
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: radius.full,
     paddingVertical: 2,
-    paddingHorizontal: 7,
-    flexShrink: 0,
   },
-  optionalTagText: {
-    fontSize: 9,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
-    letterSpacing: 0.36,
-    textTransform: "uppercase",
-    color: colors.textMuted,
-  },
+
+  // Error
   errorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 4,
-    marginTop: -4,
+    marginTop: 2,
   },
   errorIcon: { fontSize: 12 },
   errorText: {
@@ -606,6 +768,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: colors.error,
   },
+
+  // Info note
   infoNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -614,6 +778,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 11,
     paddingHorizontal: 14,
+    marginTop: 6,
   },
   infoNoteIcon: { fontSize: 16, flexShrink: 0 },
   infoNoteText: {
@@ -624,10 +789,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // CTA — Android-safe shadow
+  // CTA
   saveBtnShadow: {
     marginHorizontal: 18,
-    marginTop: 4,
+    marginTop: 8,
     borderRadius: 100,
     shadowColor: "rgba(70,71,211,1)",
     shadowOffset: { width: 0, height: 8 },

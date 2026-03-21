@@ -139,22 +139,29 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(async () => {
     setLoading(true);
 
+    console.log("[SignIn] Starting sign-in flow...");
     const result = await signInWithGoogle();
+    console.log("[SignIn] signInWithGoogle result:", JSON.stringify(result));
 
     if (!result.ok) {
       if ("cancelled" in result) {
+        console.log("[SignIn] User cancelled.");
         setLoading(false);
         return;
       }
+      console.log("[SignIn] Sign-in error:", result.error);
       showToast(result.error);
       setLoading(false);
       return;
     }
 
     try {
+      console.log("[SignIn] Fetching user session...");
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      console.log("[SignIn] User:", user ? user.id : "null");
+
       if (!user) throw new Error("No user");
 
       const { data: profile } = await supabase
@@ -163,10 +170,13 @@ export default function SignInScreen() {
         .eq("id", user.id)
         .maybeSingle();
 
-      router.replace(
-        profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup",
-      );
-    } catch {
+      console.log("[SignIn] Profile:", profile);
+
+      const destination = profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup";
+      console.log("[SignIn] Redirecting to:", destination);
+      router.replace(destination);
+    } catch (err) {
+      console.log("[SignIn] Catch error:", err);
       showToast("Couldn't complete sign-in. Please try again.");
       setLoading(false);
     }

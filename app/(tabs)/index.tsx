@@ -3,8 +3,8 @@
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
-import { fetchProfile } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
+import { fetchProfile } from "@/src/lib/profiles";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -120,7 +120,6 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
 
   const [profileIncomplete, setProfileIncomplete] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -128,11 +127,14 @@ export default function HomeScreen() {
 
     async function checkProfile() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoadingProfile(false); return; }
+      if (!user) return;
 
-      const profile = await fetchProfile(user.id);
-      setProfileIncomplete(!profile?.onboarding_complete);
-      setLoadingProfile(false);
+      try {
+        const profile = await fetchProfile(user.id);
+        setProfileIncomplete(!profile?.onboarding_complete);
+      } catch {
+        setProfileIncomplete(false);
+      }
     }
     checkProfile();
   }, [isFocused]);
@@ -156,7 +158,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Profile incomplete banner ─────────────────────────────── */}
-        {!loadingProfile && profileIncomplete && (
+        {profileIncomplete && (
           <IncompleteProfileBanner />
         )}
 
@@ -540,5 +542,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.regular,
     lineHeight: 15,
+  },
+
+  emptyText: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    textAlign: "center",
+    paddingVertical: 24,
   },
 });

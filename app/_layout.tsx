@@ -2,16 +2,17 @@
  * Root layout — entry point for all routes.
  *
  * Responsibilities:
- *  1. Show splash screen while auth state is being determined
- *  2. Redirect to correct screen based on auth state (useAuthGuard)
- *  3. Set up Supabase auth listener for session changes
- *  4. Render global UI (ToastOverlay, StatusBar)
+ *  1. Wrap app in TanStack QueryClientProvider
+ *  2. Show splash screen while auth state is being determined
+ *  3. Redirect to correct screen based on auth state (useAuthSession)
+ *  4. Set up Supabase auth listener for session changes
+ *  5. Render global UI (ToastOverlay, StatusBar)
  *
  * Design system: DS §9.1, §9.2
  */
 import ToastOverlay from "@/src/components/shared/ToastOverlay";
 import SplashScreen from "@/src/components/splash";
-import { useAuthGuard } from "@/src/hooks/useAuthGuard";
+import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { supabase } from "@/src/lib/supabase";
 import { useThemeStore } from "@/src/stores/themeStore";
 import { Stack, useRouter } from "expo-router";
@@ -19,23 +20,29 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "react-native-reanimated";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import "../global.css";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 10,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default function RootLayout() {
   const router = useRouter();
-  const authState = useAuthGuard();
+  const authState = useAuthSession();
+
+  // All hooks must be called unconditionally — Rules of Hooks
   const colors = useThemeStore((s) => s.colors);
   const isDark = useThemeStore((s) => s.isDark);
-
-  useEffect(() => {
-    // Clear entire AsyncStorage for testing
-    AsyncStorage.clear().catch(() => {
-      // Ignore errors
-    });
-  }, []);
 
   // ── Auth state change listener ────────────────────────────────────────────
   useEffect(() => {
@@ -48,6 +55,7 @@ export default function RootLayout() {
       }
 
       if (event === "SIGNED_IN" && session) {
+        queryClient.invalidateQueries({ queryKey: ["profile", session.user.id] });
         const { data: profile } = await supabase
           .from("profiles")
           .select("onboarding_complete")
@@ -92,89 +100,89 @@ export default function RootLayout() {
     );
   }
 
-  // ── Shell (renders behind redirect) ──────────────────────────────────────
+  // ── Shell ─────────────────────────────────────────────────────────────────
   return (
-    <GestureHandlerRootView
-      style={{ flex: 1, backgroundColor: colors.surface }}
-    >
-      <View style={{ flex: 1, backgroundColor: colors.surface }}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="onboarding"
-            options={{ headerShown: false, animation: "none" }}
-          />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          {/* Full-screen modals */}
-          <Stack.Screen
-            name="(modals)/new-delivery"
-            options={{ headerShown: false, presentation: "modal" }}
-          />
-          <Stack.Screen
-            name="(modals)/select-customer"
-            options={{ headerShown: false, presentation: "modal" }}
-          />
-          <Stack.Screen
-            name="(modals)/select-rider"
-            options={{ headerShown: false, presentation: "modal" }}
-          />
-          {/* Settings screens */}
-          <Stack.Screen
-            name="(settings)/business-details"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="(settings)/brand-customization"
-            options={{ headerShown: false }}
-          />
-          {/* Detail / analytics screens */}
-          <Stack.Screen
-            name="(screens)/order-detail"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="(screens)/rider-detail"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="(screens)/analytics"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="(screens)/fleet-map"
-            options={{ headerShown: false }}
-          />
-          {/* Magic link web views */}
-          <Stack.Screen
-            name="(screens)/rider-link"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="(screens)/track-link"
-            options={{ headerShown: false }}
-          />
-          {/* Bottom-sheet modals */}
-          <Stack.Screen
-            name="(modals)/add-rider"
-            options={{ headerShown: false, presentation: "transparentModal" }}
-          />
-          <Stack.Screen
-            name="(modals)/delete-rider"
-            options={{ headerShown: false, presentation: "transparentModal" }}
-          />
-          <Stack.Screen
-            name="(modals)/add-customer"
-            options={{ headerShown: false, presentation: "transparentModal" }}
-          />
-          <Stack.Screen
-            name="(modals)/delete-customer"
-            options={{ headerShown: false, presentation: "transparentModal" }}
-          />
-        </Stack>
-        <ToastOverlay />
-        <StatusBar style={isDark ? "light" : "dark"} />
-      </View>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
+        <View style={{ flex: 1, backgroundColor: colors.surface }}>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="onboarding"
+              options={{ headerShown: false, animation: "none" }}
+            />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            {/* Full-screen modals */}
+            <Stack.Screen
+              name="(modals)/new-delivery"
+              options={{ headerShown: false, presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="(modals)/select-customer"
+              options={{ headerShown: false, presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="(modals)/select-rider"
+              options={{ headerShown: false, presentation: "modal" }}
+            />
+            {/* Settings screens */}
+            <Stack.Screen
+              name="(settings)/business-details"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(settings)/brand-customization"
+              options={{ headerShown: false }}
+            />
+            {/* Detail / analytics screens */}
+            <Stack.Screen
+              name="(screens)/order-detail"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(screens)/rider-detail"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(screens)/analytics"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(screens)/fleet-map"
+              options={{ headerShown: false }}
+            />
+            {/* Magic link web views */}
+            <Stack.Screen
+              name="(screens)/rider-link"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="(screens)/track-link"
+              options={{ headerShown: false }}
+            />
+            {/* Bottom-sheet modals */}
+            <Stack.Screen
+              name="(modals)/add-rider"
+              options={{ headerShown: false, presentation: "transparentModal" }}
+            />
+            <Stack.Screen
+              name="(modals)/delete-rider"
+              options={{ headerShown: false, presentation: "transparentModal" }}
+            />
+            <Stack.Screen
+              name="(modals)/add-customer"
+              options={{ headerShown: false, presentation: "transparentModal" }}
+            />
+            <Stack.Screen
+              name="(modals)/delete-customer"
+              options={{ headerShown: false, presentation: "transparentModal" }}
+            />
+          </Stack>
+          <ToastOverlay />
+          <StatusBar style={isDark ? "light" : "dark"} />
+        </View>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }

@@ -1,7 +1,6 @@
 /**
  * Profile setup screen — light mode always (DS §9.2).
  * One-time setup: business details, contact, socials, pickup info.
- * API calls in src/lib/profiles.ts.
  */
 import {
   colors,
@@ -9,7 +8,8 @@ import {
   gradients,
   radius,
 } from "@/src/constants/tokens";
-import { fetchProfile, pickLogoUri, saveProfile, uploadLogo } from "@/src/lib/profiles";
+import { useProfile, useSaveProfile, useUploadLogo } from "@/src/hooks";
+import { pickLogoUri } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
 import LogoUploader from "@/src/components/auth/logo-uploader";
 import { useToastStore } from "@/src/stores/toastStore";
@@ -167,10 +167,35 @@ export default function ProfileSetupScreen() {
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [requiredFocused, setRequiredFocused] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
+
+  const { data: profileData, isLoading: profileLoading } = useProfile(userId);
+  const saveMutation = useSaveProfile();
+  const uploadMutation = useUploadLogo();
+
+  useEffect(() => {
+    if (!profileData) return;
+    setForm({
+      businessName: profileData.business_name ?? "",
+      phone: profileData.phone ?? "",
+      secondaryPhone: profileData.secondary_phone ?? "",
+      city: profileData.city ?? "",
+      description: profileData.brand_name ?? "",
+      pickupAddress: profileData.pickup_address ?? "",
+      instagramHandle: profileData.instagram_handle ?? "",
+      tiktokHandle: profileData.tiktok_handle ?? "",
+      logoLocalUri: profileData.logo_url,
+      logoPublicUrl: profileData.logo_url,
+    });
+  }, [profileData]);
 
   const isFilled = form.businessName.trim().length > 0;
   const firstName = form.businessName.trim().split(" ")[0];
@@ -178,52 +203,22 @@ export default function ProfileSetupScreen() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // ── Load existing profile on mount ──────────────────────────────────────────
-  useEffect(() => {
-    async function loadProfile() {
-      setLoadingProfile(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoadingProfile(false); return; }
-
-      const profile = await fetchProfile(user.id);
-      if (profile) {
-        setForm({
-          businessName: profile.business_name ?? "",
-          phone: profile.phone ?? "",
-          secondaryPhone: profile.secondary_phone ?? "",
-          city: profile.city ?? "",
-          description: profile.brand_name ?? "",
-          pickupAddress: profile.pickup_address ?? "",
-          instagramHandle: profile.instagram_handle ?? "",
-          tiktokHandle: profile.tiktok_handle ?? "",
-          logoLocalUri: profile.logo_url,
-          logoPublicUrl: profile.logo_url,
-        });
-      }
-      setLoadingProfile(false);
-    }
-    loadProfile();
-  }, []);
-
   // ── Logo ────────────────────────────────────────────────────────────────────
   const handlePickLogo = useCallback(async () => {
     const uri = await pickLogoUri();
-    if (!uri) return;
+    if (!uri || !userId) return;
 
     setForm((prev) => ({ ...prev, logoLocalUri: uri, logoPublicUrl: null }));
     setUploading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setUploading(false); return; }
-
-    const { publicUrl, error } = await uploadLogo(user.id, uri);
-    if (error) showToast("Logo upload failed. Try again.", "error");
-    setForm((prev) => ({ ...prev, logoPublicUrl: publicUrl ?? prev.logoPublicUrl }));
+    const result = await uploadMutation.mutateAsync({ userId, uri });
+    if (result.error) showToast("Logo upload failed. Try again.", "error");
+    setForm((prev) => ({ ...prev, logoPublicUrl: result.publicUrl ?? prev.logoPublicUrl }));
     setUploading(false);
-  }, [showToast]);
+  }, [userId, uploadMutation, showToast]);
 
   // ── Save ────────────────────────────────────────────────────────────────────
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     const nameOk = form.businessName.trim().length > 0;
     const phoneOk = form.phone.trim().length > 0;
 
@@ -233,13 +228,14 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated.");
+    if (!userId) {
+      showToast("Session error. Please sign in again.", "error");
+      return;
+    }
 
-      const { error } = await saveProfile({
-        id: user.id,
+    saveMutation.mutate(
+      {
+        id: userId,
         business_name: form.businessName.trim(),
         phone: form.phone.trim(),
         secondary_phone: form.secondaryPhone.trim() || null,
@@ -250,17 +246,18 @@ export default function ProfileSetupScreen() {
         instagram_handle: form.instagramHandle.trim() || null,
         tiktok_handle: form.tiktokHandle.trim() || null,
         onboarding_complete: true,
-      });
-
-      if (error) throw new Error(error);
-      showToast("Profile saved! Let's go.", "success");
-      router.replace("/(tabs)");
-    } catch {
-      showToast("Could not save profile. Please try again.", "error");
-    } finally {
-      setSaving(false);
-    }
-  }, [form, showToast]);
+      },
+      {
+        onSuccess: () => {
+          showToast("Profile saved! Let's go.", "success");
+          router.replace("/(tabs)");
+        },
+        onError: () => {
+          showToast("Could not save profile. Please try again.", "error");
+        },
+      },
+    );
+  }, [form, userId, saveMutation, showToast]);
 
   // ── Skip ─────────────────────────────────────────────────────────────────────
   const handleSkip = useCallback(() => router.replace("/(tabs)"), []);
@@ -271,7 +268,7 @@ export default function ProfileSetupScreen() {
       ? { borderWidth: 2, borderColor: colors.primary }
       : { borderWidth: 0 };
 
-  if (loadingProfile) {
+  if (profileLoading) {
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
@@ -501,7 +498,7 @@ export default function ProfileSetupScreen() {
           <View style={styles.saveBtnShadow}>
             <Pressable
               onPress={handleSave}
-              disabled={saving}
+              disabled={saveMutation.isPending}
               android_ripple={{ color: "rgba(255,255,255,0.20)", borderless: false }}
               style={styles.saveBtnPressable}
             >
@@ -511,7 +508,7 @@ export default function ProfileSetupScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.saveBtnGradient}
               >
-                {saving ? (
+                {saveMutation.isPending ? (
                   <ActivityIndicator color={colors.white} size="small" />
                 ) : (
                   <Text style={styles.saveBtnText}>

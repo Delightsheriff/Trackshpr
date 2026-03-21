@@ -35,19 +35,26 @@ export async function signInWithGoogle(): Promise<AuthResult> {
   console.log("[Auth] Opening browser with URL:", data.url);
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-  console.log("[Auth] Browser result type:", result.type, "URL:", "url" in result ? result.url : "N/A");
+  console.log("[Auth] Browser result type:", result.type);
 
   if (result.type !== "success") {
     console.log("[Auth] Browser auth cancelled or failed.");
     return { ok: false, cancelled: true };
   }
 
-  // Tokens arrive in the URL hash fragment
   const authResult = result as { type: "success"; url: string };
-  console.log("[Auth] Parsing tokens from URL...");
-  const params = new URLSearchParams(new URL(authResult.url).hash.slice(1));
-  const accessToken = params.get("access_token");
-  const refreshToken = params.get("refresh_token");
+  console.log("[Auth] Auth result URL:", authResult.url);
+
+  // Parse tokens — check query params first, then hash fragment
+  const url = new URL(authResult.url);
+  const hashParams = new URLSearchParams(url.hash.slice(1));
+
+  const accessToken =
+    url.searchParams.get("access_token") ??
+    hashParams.get("access_token");
+  const refreshToken =
+    url.searchParams.get("refresh_token") ??
+    hashParams.get("refresh_token");
 
   console.log("[Auth] Access token found:", !!accessToken, "Refresh token found:", !!refreshToken);
 

@@ -4,7 +4,7 @@
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
 import { supabase } from "@/src/lib/supabase";
-import { fetchProfile } from "@/src/lib/profiles";
+import { fetchProfile } from "@/src/lib/supabaseQueries";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";

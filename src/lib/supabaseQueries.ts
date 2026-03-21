@@ -1,69 +1,78 @@
 /**
  * Raw Supabase fetch functions — no hooks, just async data access.
  * All functions throw on error so TanStack Query can retry.
- * Import types from here or from the generated database.ts when available.
+ * Types mirror the actual Supabase schema exactly.
  */
 import { supabase } from "./supabase";
 import {
   startOfDay,
   subDays,
   subMonths,
-  parseISO,
 } from "date-fns";
 
-// ── Shared types ───────────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────
 
-export type OrderStatus = "pending" | "in_transit" | "delivered" | "failed";
+export type OrderStatus = "pending" | "picked_up" | "in_transit" | "delivered" | "failed";
+
+export interface Profile {
+  id: string;
+  business_name: string;
+  phone: string;
+  city: string | null;
+  logo_url: string | null;
+  brand_name: string | null;
+  brand_color: string | null;
+  secondary_phone: string | null;
+  pickup_address: string | null;
+  instagram_handle: string | null;
+  tiktok_handle: string | null;
+  onboarding_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Rider {
   id: string;
+  seller_id: string;
   name: string;
   phone: string;
-  delivered: number;
-  failed: number;
+  notes: string | null;
+  total_deliveries: number;
+  created_at: string;
 }
 
 export interface Customer {
   id: string;
-  name: string;
-  phone: string;
+  seller_id: string;
+  label: string | null;
+  customer_name: string;
+  customer_phone: string;
   address: string;
   city: string | null;
+  created_at: string;
 }
 
 export interface Order {
   id: string;
   seller_id: string;
   rider_id: string | null;
-  customer_id: string | null;
-  item: string;
-  customer_name: string | null;
-  customer_phone: string | null;
-  customer_address: string | null;
-  customer_area: string | null;
+  rider_token: string;
+  customer_token: string;
+  customer_name: string;
+  customer_phone: string;
+  delivery_address: string;
+  item_description: string;
+  notes: string | null;
   status: OrderStatus;
-  delivery_fee: string | null;
+  seller_photo_url: string | null;
+  proof_photo_url: string | null;
+  nudge_sent: boolean;
   created_at: string;
   updated_at: string;
+  delivered_at: string | null;
 }
 
-export interface Profile {
-  id: string;
-  business_name: string | null;
-  phone: string | null;
-  city: string | null;
-  brand_name: string | null;
-  logo_url: string | null;
-  secondary_phone: string | null;
-  pickup_address: string | null;
-  instagram_handle: string | null;
-  tiktok_handle: string | null;
-  onboarding_complete: boolean;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-// ── Profile ───────────────────────────────────────────────────────────────────
+// ── Profile ─────────────────────────────────────────────────────────────────
 
 export async function fetchProfile(userId: string): Promise<Profile> {
   const { data, error } = await supabase
@@ -76,7 +85,7 @@ export async function fetchProfile(userId: string): Promise<Profile> {
   return data as unknown as Profile;
 }
 
-// ── Orders ─────────────────────────────────────────────────────────────────────
+// ── Orders ─────────────────────────────────────────────────────────────────
 
 export async function fetchOrders(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
@@ -100,7 +109,7 @@ export async function fetchOrder(orderId: string): Promise<Order> {
   return data as unknown as Order;
 }
 
-// ── Riders ─────────────────────────────────────────────────────────────────────
+// ── Riders ─────────────────────────────────────────────────────────────────
 
 export async function fetchRiders(sellerId: string): Promise<Rider[]> {
   const { data, error } = await supabase
@@ -124,20 +133,20 @@ export async function fetchRider(riderId: string): Promise<Rider> {
   return data as unknown as Rider;
 }
 
-// ── Customers ─────────────────────────────────────────────────────────────────
+// ── Customers (address_book) ───────────────────────────────────────────────
 
 export async function fetchCustomers(sellerId: string): Promise<Customer[]> {
   const { data, error } = await supabase
-    .from("customers")
+    .from("address_book")
     .select("*")
     .eq("seller_id", sellerId)
-    .order("name");
+    .order("customer_name");
 
   if (error) throw new Error("Failed to fetch customers");
   return (data ?? []) as Customer[];
 }
 
-// ── Analytics ─────────────────────────────────────────────────────────────────
+// ── Analytics ────────────────────────────────────────────────────────────────
 
 export async function fetchAnalytics(
   sellerId: string,

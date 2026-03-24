@@ -10,6 +10,7 @@ import {
   layout,
   radius,
 } from "@/src/constants/tokens";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -89,7 +90,7 @@ function getProgressFill(status: Status): number {
 function getStatusHeadline(status: Status): string {
   if (status === "pending") return "Getting your order ready";
   if (status === "picked_up") return "Rider has your order";
-  if (status === "in_transit") return "Your order is moving 🚴";
+  if (status === "in_transit") return "Your order is moving";
   return "";
 }
 
@@ -322,7 +323,12 @@ function EventRow({ event, isLast, index, total }: EventRowProps) {
         <Text style={ss.eventLabel}>{event.label}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={ss.eventTime}>{event.time}</Text>
-          {event.gps ? <Text style={ss.eventGps}>📍 {event.gps}</Text> : null}
+          {event.gps ? (
+            <View style={ss.eventGpsRow}>
+              <Feather name="map-pin" size={10} color={colors.textMuted} />
+              <Text style={ss.eventGps}>{event.gps}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -413,7 +419,7 @@ export default function TrackLinkScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={{ fontSize: 16 }}>📦</Text>
+            <Feather name="package" size={16} color={colors.white} />
           </LinearGradient>
           <View>
             <Text style={ss.headerBrand}>Trackshpr</Text>
@@ -438,7 +444,7 @@ export default function TrackLinkScreen() {
           /* ── Delivered Celebration Layout ──────────────────────────────── */
           <View style={ss.celebrationWrap}>
             <View style={ss.celebrationIconCircle}>
-              <Text style={{ fontSize: 28 }}>✅</Text>
+              <Feather name="check-circle" size={28} color={colors.success} />
             </View>
             <Text style={ss.celebrationTitle}>Order Delivered!</Text>
             <Text style={ss.celebrationSub}>
@@ -466,7 +472,12 @@ export default function TrackLinkScreen() {
 
             {/* Delivering to address */}
             <View style={ss.heroAddressRow}>
-              <Text style={ss.pinEmoji}>📍</Text>
+              <Feather
+                name="map-pin"
+                size={12}
+                color={colors.textMuted}
+                style={ss.pinIcon}
+              />
               <Text style={ss.heroAddress} numberOfLines={2}>
                 Delivering to {order.address}
               </Text>
@@ -519,7 +530,7 @@ export default function TrackLinkScreen() {
             onPress={() => Linking.openURL(`tel:${order.sellerPhone}`)}
             accessibilityLabel={`Call ${order.sellerName}`}
           >
-            <Text style={{ fontSize: 20 }}>📞</Text>
+            <Feather name="phone" size={18} color={colors.success} />
           </Pressable>
         </View>
 
@@ -557,7 +568,12 @@ export default function TrackLinkScreen() {
           <Text style={ss.viralPowered}>Powered by Trackshpr</Text>
           <Pressable style={ss.viralCta} onPress={() => {}}>
             <Text style={ss.viralCtaText}>Track your own deliveries →</Text>
-            <Text style={{ fontSize: 16, marginLeft: 4 }}>📦</Text>
+            <Feather
+              name="package"
+              size={14}
+              color={colors.primary}
+              style={{ marginLeft: 4 }}
+            />
           </Pressable>
         </View>
       </ScrollView>
@@ -647,8 +663,7 @@ const ss = StyleSheet.create({
     alignItems: "flex-start",
     gap: 4,
   },
-  pinEmoji: {
-    fontSize: 12,
+  pinIcon: {
     marginTop: 1,
   },
   heroAddress: {
@@ -871,6 +886,11 @@ const ss = StyleSheet.create({
     fontSize: 10,
     fontFamily: font.sans.regular,
     color: colors.textMuted,
+  },
+  eventGpsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
 
   // Celebration (delivered) layout

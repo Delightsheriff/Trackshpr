@@ -4,7 +4,7 @@
  * DS §8.1, §8.4, §8.8 — Feather icons, DM Sans / DM Mono fonts.
  * TODO: replace DUMMY_ORDERS with real Supabase query by id.
  */
-import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { font, layout, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,7 +12,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -138,13 +137,18 @@ function ProgressSteps({
 }: {
   steps: Step[];
   lineColor: string;
-  lineWidth: string; // e.g. "66%" | "100%" | "0%"
+  lineWidth: `${number}%`;
 }) {
   const { colors } = useTheme();
   return (
     <View style={styles.progressContainer}>
       {/* Background track */}
-      <View style={[styles.progressTrackBg, { backgroundColor: colors.surfaceContainer }]} />
+      <View
+        style={[
+          styles.progressTrackBg,
+          { backgroundColor: colors.surfaceContainer },
+        ]}
+      />
       {/* Filled track */}
       <View
         style={[
@@ -161,10 +165,19 @@ function ProgressSteps({
               style={[
                 styles.progressDot,
                 isDone
-                  ? { backgroundColor: colors.success, borderColor: colors.success }
+                  ? {
+                      backgroundColor: colors.success,
+                      borderColor: colors.success,
+                    }
                   : isActive
-                  ? { backgroundColor: colors.primarySoft, borderColor: colors.primary }
-                  : { backgroundColor: colors.surfaceCard, borderColor: colors.surfaceContainer },
+                    ? {
+                        backgroundColor: colors.primarySoft,
+                        borderColor: colors.primary,
+                      }
+                    : {
+                        backgroundColor: colors.surfaceCard,
+                        borderColor: colors.surfaceContainer,
+                      },
               ]}
             >
               <Text
@@ -173,8 +186,8 @@ function ProgressSteps({
                   isDone
                     ? { color: colors.white }
                     : isActive
-                    ? { color: colors.primary }
-                    : { color: colors.textMuted },
+                      ? { color: colors.primary }
+                      : { color: colors.textMuted },
                 ]}
               >
                 {isDone ? "✓" : step.icon}
@@ -184,10 +197,21 @@ function ProgressSteps({
               style={[
                 styles.progressLabel,
                 isDone
-                  ? { color: colors.success, fontFamily: font.sans.bold, fontWeight: "600" }
+                  ? {
+                      color: colors.success,
+                      fontFamily: font.sans.bold,
+                      fontWeight: "600",
+                    }
                   : isActive
-                  ? { color: colors.primary, fontFamily: font.sans.bold, fontWeight: "600" }
-                  : { color: colors.textMuted, fontFamily: font.sans.regular },
+                    ? {
+                        color: colors.primary,
+                        fontFamily: font.sans.bold,
+                        fontWeight: "600",
+                      }
+                    : {
+                        color: colors.textMuted,
+                        fontFamily: font.sans.regular,
+                      },
               ]}
             >
               {step.label}
@@ -217,7 +241,9 @@ function DetailRow({
   return (
     <>
       <View style={styles.detailRow}>
-        <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
+          {label}
+        </Text>
         <Text
           style={[
             mono ? styles.detailValueMono : styles.detailValue,
@@ -228,7 +254,14 @@ function DetailRow({
           {value}
         </Text>
       </View>
-      {separator && <View style={[styles.detailSep, { backgroundColor: colors.surfaceContainer }]} />}
+      {separator && (
+        <View
+          style={[
+            styles.detailSep,
+            { backgroundColor: colors.surfaceContainer },
+          ]}
+        />
+      )}
     </>
   );
 }
@@ -266,24 +299,25 @@ function TimelineItem({
           style={[
             styles.tlDot,
             isDone
-              ? { backgroundColor: colors.successBg, borderColor: colors.success }
+              ? {
+                  backgroundColor: colors.successBg,
+                  borderColor: colors.success,
+                }
               : isError
-              ? { backgroundColor: colors.errorBg, borderColor: colors.error }
-              : { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+                ? { backgroundColor: colors.errorBg, borderColor: colors.error }
+                : {
+                    backgroundColor: colors.primarySoft,
+                    borderColor: colors.primary,
+                  },
           ]}
         >
-          <Text
-            style={[
-              styles.tlDotText,
-              isDone
-                ? { color: colors.success }
-                : isError
-                ? { color: colors.error }
-                : { color: colors.primary },
-            ]}
-          >
-            {isDone ? "✓" : isError ? "!" : "🚴"}
-          </Text>
+          {isDone ? (
+            <Feather name="check" size={11} color={colors.success} />
+          ) : isError ? (
+            <Feather name="x" size={11} color={colors.error} />
+          ) : (
+            <Feather name="truck" size={11} color={colors.primary} />
+          )}
         </View>
         {hasLine && (
           <View
@@ -335,13 +369,13 @@ function TimelineItem({
 
 // ── Action Button ─────────────────────────────────────────────────────────────
 function ActionBtn({
-  emoji,
+  icon,
   label,
   bg,
   fg,
   onPress,
 }: {
-  emoji: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   bg: string;
   fg: string;
@@ -353,7 +387,7 @@ function ActionBtn({
       onPress={onPress}
       android_ripple={{ color: fg, borderless: false }}
     >
-      <Text style={styles.actionBtnEmoji}>{emoji}</Text>
+      <Feather name={icon} size={16} color={fg} />
       <Text style={[styles.actionBtnLabel, { color: fg }]}>{label}</Text>
     </Pressable>
   );
@@ -365,9 +399,18 @@ function MapSection({ riderName }: { riderName: string }) {
   // Try to import MapView — if not available, show fallback
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { default: MapView, Marker, PROVIDER_DEFAULT } = require("react-native-maps");
+    const {
+      default: MapView,
+      Marker,
+      PROVIDER_DEFAULT,
+    } = require("react-native-maps");
     return (
-      <View style={[styles.mapContainer, { backgroundColor: colors.surfaceContainer }]}>
+      <View
+        style={[
+          styles.mapContainer,
+          { backgroundColor: colors.surfaceContainer },
+        ]}
+      >
         <MapView
           style={styles.mapView}
           provider={PROVIDER_DEFAULT}
@@ -380,18 +423,33 @@ function MapSection({ riderName }: { riderName: string }) {
         >
           <Marker
             coordinate={{ latitude: 6.455, longitude: 3.3841 }}
-            title={`🚴 ${riderName}`}
+            title={`Rider: ${riderName}`}
           />
         </MapView>
-        <View style={[styles.mapLabel, { backgroundColor: colors.surfaceCard }]}>
-          <Text style={[styles.mapLabelText, { color: colors.textMuted }]}>Last known location</Text>
+        <View
+          style={[styles.mapLabel, { backgroundColor: colors.surfaceCard }]}
+        >
+          <Text style={[styles.mapLabelText, { color: colors.textMuted }]}>
+            Last known location
+          </Text>
         </View>
       </View>
     );
   } catch {
     return (
-      <View style={[styles.mapContainer, styles.mapFallback, { backgroundColor: colors.surfaceContainer }]}>
-        <Text style={[styles.mapFallbackText, { color: colors.textMuted }]}>📍 Map loading...</Text>
+      <View
+        style={[
+          styles.mapContainer,
+          styles.mapFallback,
+          { backgroundColor: colors.surfaceContainer },
+        ]}
+      >
+        <View style={styles.mapFallbackRow}>
+          <Feather name="map-pin" size={12} color={colors.textMuted} />
+          <Text style={[styles.mapFallbackText, { color: colors.textMuted }]}>
+            Map loading...
+          </Text>
+        </View>
       </View>
     );
   }
@@ -402,45 +460,56 @@ export default function OrderDetailScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const order: Order =
-    DUMMY_ORDERS.find((o) => o.id === id) ?? DUMMY_ORDERS[0];
+  const order: Order = DUMMY_ORDERS.find((o) => o.id === id) ?? DUMMY_ORDERS[0];
 
   const isTransit = order.status === "in_transit";
   const isDelivered = order.status === "delivered";
   const isFailed = order.status === "failed";
 
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
   // ── Status hero config ───────────────────────────────────────────────────
   const heroBg = isTransit
     ? colors.surfaceCard
     : isDelivered
-    ? colors.successBg
-    : colors.errorBg;
+      ? colors.successBg
+      : colors.errorBg;
 
   // ── Progress steps config ────────────────────────────────────────────────
   const progressSteps: Step[] = isTransit
     ? [
         { label: "Confirmed", state: "done", icon: "1" },
         { label: "Picked Up", state: "done", icon: "2" },
-        { label: "Transit", state: "active", icon: "🚴" },
+        { label: "Transit", state: "active", icon: "3" },
         { label: "Delivered", state: "pending", icon: "4" },
       ]
     : isDelivered
-    ? [
-        { label: "Confirmed", state: "done", icon: "1" },
-        { label: "Picked Up", state: "done", icon: "2" },
-        { label: "Transit", state: "done", icon: "3" },
-        { label: "Delivered", state: "done", icon: "4" },
-      ]
-    : [
-        { label: "Confirmed", state: "done", icon: "1" },
-        { label: "Picked Up", state: "done", icon: "2" },
-        { label: "Failed", state: "active", icon: "!" },
-        { label: "Delivered", state: "pending", icon: "4" },
-      ];
+      ? [
+          { label: "Confirmed", state: "done", icon: "1" },
+          { label: "Picked Up", state: "done", icon: "2" },
+          { label: "Transit", state: "done", icon: "3" },
+          { label: "Delivered", state: "done", icon: "4" },
+        ]
+      : [
+          { label: "Confirmed", state: "done", icon: "1" },
+          { label: "Picked Up", state: "done", icon: "2" },
+          { label: "Failed", state: "active", icon: "!" },
+          { label: "Delivered", state: "pending", icon: "4" },
+        ];
 
   const progressLineColor = isDelivered ? colors.success : colors.primary;
   const progressLineWidth = isTransit ? "66%" : isDelivered ? "100%" : "44%";
@@ -449,36 +518,68 @@ export default function OrderDetailScreen() {
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 12,
+          paddingBottom: 40,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Inline Header ───────────────────────────────────────────── */}
         <View style={styles.header}>
           <Pressable
-            style={[styles.headerBtn, { backgroundColor: colors.surfaceCard }, cardShadow]}
+            style={[
+              styles.headerBtn,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
             onPress={() => router.back()}
             hitSlop={8}
           >
             <Feather name="arrow-left" size={18} color={colors.textPrimary} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Order #{order.orderId}</Text>
-          <Pressable style={[styles.headerBtn, { backgroundColor: colors.surfaceCard }, cardShadow]} hitSlop={8}>
-            <Text style={[styles.headerMore, { color: colors.textPrimary }]}>⋯</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Order #{order.orderId}
+          </Text>
+          <Pressable
+            style={[
+              styles.headerBtn,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+            hitSlop={8}
+          >
+            <Text style={[styles.headerMore, { color: colors.textPrimary }]}>
+              ⋯
+            </Text>
           </Pressable>
         </View>
 
         {/* ── Status Hero Card ─────────────────────────────────────────── */}
-        <View style={[styles.heroCard, { backgroundColor: heroBg }, cardShadow]}>
+        <View
+          style={[styles.heroCard, { backgroundColor: heroBg }, cardShadow]}
+        >
           {/* Status row */}
           <View style={styles.heroStatusRow}>
             {isTransit && (
-              <StatusPill label="In Transit" fg={colors.info} bg={colors.infoBg} />
+              <StatusPill
+                label="In Transit"
+                fg={colors.info}
+                bg={colors.infoBg}
+              />
             )}
             {isDelivered && (
-              <StatusPill label="Delivered" fg={colors.success} bg={colors.successBg} />
+              <StatusPill
+                label="Delivered"
+                fg={colors.success}
+                bg={colors.successBg}
+              />
             )}
             {isFailed && (
-              <StatusPill label="Failed" fg={colors.error} bg={colors.errorBg} />
+              <StatusPill
+                label="Failed"
+                fg={colors.error}
+                bg={colors.errorBg}
+              />
             )}
             <Text
               style={[
@@ -486,8 +587,8 @@ export default function OrderDetailScreen() {
                 isDelivered
                   ? { color: colors.success }
                   : isFailed
-                  ? { color: colors.error }
-                  : { color: colors.textMuted },
+                    ? { color: colors.error }
+                    : { color: colors.textMuted },
               ]}
             >
               {order.elapsedLabel}
@@ -495,10 +596,14 @@ export default function OrderDetailScreen() {
           </View>
 
           {/* Item name */}
-          <Text style={[styles.heroItemName, { color: colors.textPrimary }]}>{order.item}</Text>
+          <Text style={[styles.heroItemName, { color: colors.textPrimary }]}>
+            {order.item}
+          </Text>
 
           {/* Address */}
-          <Text style={[styles.heroAddress, { color: colors.textMuted }]}>📍 {order.address}</Text>
+          <Text style={[styles.heroAddress, { color: colors.textMuted }]}>
+            {order.address}
+          </Text>
 
           {/* Progress steps */}
           <ProgressSteps
@@ -509,12 +614,24 @@ export default function OrderDetailScreen() {
 
           {/* Failed: failure reason box */}
           {isFailed && order.failureReason && (
-            <View style={[styles.failureBox, { backgroundColor: colors.errorBg }]}>
-              <Text style={styles.failureEmoji}>⚠️</Text>
+            <View
+              style={[styles.failureBox, { backgroundColor: colors.errorBg }]}
+            >
+              <Feather
+                name="alert-triangle"
+                size={14}
+                color={colors.error}
+                style={styles.failureIcon}
+              />
               <View style={styles.failureBody}>
-                <Text style={[styles.failureTitle, { color: colors.error }]}>{order.failureReason}</Text>
-                <Text style={[styles.failureSub, { color: colors.textSecondary }]}>
-                  Rider reported customer unreachable. Package returned to sender.
+                <Text style={[styles.failureTitle, { color: colors.error }]}>
+                  {order.failureReason}
+                </Text>
+                <Text
+                  style={[styles.failureSub, { color: colors.textSecondary }]}
+                >
+                  Rider reported customer unreachable. Package returned to
+                  sender.
                 </Text>
               </View>
             </View>
@@ -523,10 +640,18 @@ export default function OrderDetailScreen() {
 
         {/* ── Failed: Retry CTA ────────────────────────────────────────── */}
         {isFailed && (
-          <View style={[styles.retryShadowWrap, { backgroundColor: colors.warning, shadowColor: colors.warning }]}>
+          <View
+            style={[
+              styles.retryShadowWrap,
+              { backgroundColor: colors.warning, shadowColor: colors.warning },
+            ]}
+          >
             <Pressable
               style={styles.retryPressable}
-              android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+              android_ripple={{
+                color: "rgba(255,255,255,0.2)",
+                borderless: false,
+              }}
             >
               <LinearGradient
                 colors={[colors.warning, "#E09112"]}
@@ -534,7 +659,12 @@ export default function OrderDetailScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.retryGradient}
               >
-                <Text style={[styles.retryText, { color: colors.white }]}>🔄 Retry Delivery</Text>
+                <View style={styles.retryContent}>
+                  <Feather name="rotate-cw" size={14} color={colors.white} />
+                  <Text style={[styles.retryText, { color: colors.white }]}>
+                    Retry Delivery
+                  </Text>
+                </View>
               </LinearGradient>
             </Pressable>
           </View>
@@ -545,7 +675,7 @@ export default function OrderDetailScreen() {
           {isTransit && (
             <>
               <ActionBtn
-                emoji="🔗"
+                icon="link"
                 label="Copy rider link"
                 bg={colors.primarySoft}
                 fg={colors.primary}
@@ -554,23 +684,25 @@ export default function OrderDetailScreen() {
                 }
               />
               <ActionBtn
-                emoji="📤"
+                icon="send"
                 label="Share tracking"
                 bg={colors.infoBg}
                 fg={colors.info}
                 onPress={() =>
-                  Share.share({ message: "https://trk.sh/track/" + order.customerToken })
+                  Share.share({
+                    message: "https://trk.sh/track/" + order.customerToken,
+                  })
                 }
               />
               <ActionBtn
-                emoji="📞"
+                icon="phone"
                 label="Call rider"
                 bg={colors.successBg}
                 fg={colors.success}
                 onPress={() => callPhone(order.riderPhone)}
               />
               <ActionBtn
-                emoji="📞"
+                icon="phone"
                 label="Call customer"
                 bg={colors.warningBg}
                 fg={colors.warning}
@@ -581,7 +713,7 @@ export default function OrderDetailScreen() {
           {isDelivered && (
             <>
               <ActionBtn
-                emoji="🧾"
+                icon="file-text"
                 label="Share receipt"
                 bg={colors.infoBg}
                 fg={colors.info}
@@ -590,14 +722,14 @@ export default function OrderDetailScreen() {
                 }
               />
               <ActionBtn
-                emoji="🔁"
+                icon="refresh-cw"
                 label="Retry order"
                 bg={colors.primarySoft}
                 fg={colors.primary}
                 onPress={() => {}}
               />
               <ActionBtn
-                emoji="📞"
+                icon="phone"
                 label="Call customer"
                 bg={colors.successBg}
                 fg={colors.success}
@@ -608,21 +740,21 @@ export default function OrderDetailScreen() {
           {isFailed && (
             <>
               <ActionBtn
-                emoji="📞"
+                icon="phone"
                 label="Call customer"
                 bg={colors.successBg}
                 fg={colors.success}
                 onPress={() => callPhone(order.customerPhone)}
               />
               <ActionBtn
-                emoji="📞"
+                icon="phone"
                 label="Call rider"
                 bg={colors.successBg}
                 fg={colors.success}
                 onPress={() => callPhone(order.riderPhone)}
               />
               <ActionBtn
-                emoji="🔗"
+                icon="link"
                 label="Rider link"
                 bg={colors.primarySoft}
                 fg={colors.primary}
@@ -642,7 +774,13 @@ export default function OrderDetailScreen() {
         )}
 
         {/* ── Order Details Card ───────────────────────────────────────── */}
-        <View style={[styles.detailsCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+        <View
+          style={[
+            styles.detailsCard,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+          ]}
+        >
           {isTransit && (
             <>
               <DetailRow label="Customer" value={order.customer} separator />
@@ -668,7 +806,11 @@ export default function OrderDetailScreen() {
                 label="Amount to collect"
                 value={formatAmount(order.amount)}
                 mono
-                valueStyle={{ color: colors.success, fontSize: 16, fontFamily: font.mono.medium }}
+                valueStyle={{
+                  color: colors.success,
+                  fontSize: 16,
+                  fontFamily: font.mono.medium,
+                }}
               />
             </>
           )}
@@ -721,50 +863,103 @@ export default function OrderDetailScreen() {
         {/* ── Magic Links (in_transit + failed) ───────────────────────── */}
         {(isTransit || isFailed) && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Magic Links</Text>
-            <View style={[styles.magicCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              Magic Links
+            </Text>
+            <View
+              style={[
+                styles.magicCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
               {/* Rider row */}
               <View style={styles.magicRow}>
-                <View style={[styles.magicIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Text>🚴</Text>
+                <View
+                  style={[
+                    styles.magicIcon,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
+                >
+                  <Feather name="truck" size={14} color={colors.primary} />
                 </View>
                 <View style={styles.magicBody}>
-                  <Text style={[styles.magicRowLabel, { color: colors.textPrimary }]}>Rider link</Text>
-                  <Text style={[styles.magicUrl, { color: colors.textMuted }]} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.magicRowLabel,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    Rider link
+                  </Text>
+                  <Text
+                    style={[styles.magicUrl, { color: colors.textMuted }]}
+                    numberOfLines={1}
+                  >
                     trk.sh/rider/{order.riderToken}
                   </Text>
                 </View>
                 <Pressable
-                  style={[styles.copyBtn, { backgroundColor: colors.primarySoft }]}
+                  style={[
+                    styles.copyBtn,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
                   onPress={() =>
                     copyLink("https://trk.sh/rider/" + order.riderToken)
                   }
                 >
-                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>Copy</Text>
+                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>
+                    Copy
+                  </Text>
                 </Pressable>
               </View>
 
               {/* Separator */}
-              <View style={[styles.detailSep, { backgroundColor: colors.surfaceContainer }]} />
+              <View
+                style={[
+                  styles.detailSep,
+                  { backgroundColor: colors.surfaceContainer },
+                ]}
+              />
 
               {/* Customer row */}
               <View style={styles.magicRow}>
-                <View style={[styles.magicIcon, { backgroundColor: colors.successBg }]}>
-                  <Text>👤</Text>
+                <View
+                  style={[
+                    styles.magicIcon,
+                    { backgroundColor: colors.successBg },
+                  ]}
+                >
+                  <Feather name="user" size={14} color={colors.success} />
                 </View>
                 <View style={styles.magicBody}>
-                  <Text style={[styles.magicRowLabel, { color: colors.textPrimary }]}>Customer tracking link</Text>
-                  <Text style={[styles.magicUrl, { color: colors.textMuted }]} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.magicRowLabel,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    Customer tracking link
+                  </Text>
+                  <Text
+                    style={[styles.magicUrl, { color: colors.textMuted }]}
+                    numberOfLines={1}
+                  >
                     trk.sh/track/{order.customerToken}
                   </Text>
                 </View>
                 <Pressable
-                  style={[styles.copyBtn, { backgroundColor: colors.primarySoft }]}
+                  style={[
+                    styles.copyBtn,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
                   onPress={() =>
                     copyLink("https://trk.sh/track/" + order.customerToken)
                   }
                 >
-                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>Copy</Text>
+                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>
+                    Copy
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -774,20 +969,43 @@ export default function OrderDetailScreen() {
         {/* ── Photo Strip (in_transit only) ───────────────────────────── */}
         {isTransit && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Item Photos</Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              Item Photos
+            </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.photoStrip}
             >
-              <View style={[styles.photoThumb, { backgroundColor: colors.surfaceContainer }]}>
-                <Text style={styles.photoEmoji}>📦</Text>
+              <View
+                style={[
+                  styles.photoThumb,
+                  { backgroundColor: colors.surfaceContainer },
+                ]}
+              >
+                <Feather name="package" size={22} color={colors.textMuted} />
               </View>
-              <View style={[styles.photoThumb, { backgroundColor: colors.surfaceContainer }]}>
-                <Text style={styles.photoEmoji}>👗</Text>
+              <View
+                style={[
+                  styles.photoThumb,
+                  { backgroundColor: colors.surfaceContainer },
+                ]}
+              >
+                <Feather
+                  name="shopping-bag"
+                  size={22}
+                  color={colors.textMuted}
+                />
               </View>
-              <View style={[styles.photoThumbAdd, { backgroundColor: colors.primarySoft }]}>
-                <Text style={[styles.photoAdd, { color: colors.primary }]}>+</Text>
+              <View
+                style={[
+                  styles.photoThumbAdd,
+                  { backgroundColor: colors.primarySoft },
+                ]}
+              >
+                <Text style={[styles.photoAdd, { color: colors.primary }]}>
+                  +
+                </Text>
               </View>
             </ScrollView>
           </>
@@ -805,7 +1023,7 @@ export default function OrderDetailScreen() {
                 event="Order created"
                 meta="Today · 10:58 AM"
                 tagType="photo"
-                tagLabel="📸 Item photo saved"
+                tagLabel="Item photo saved"
                 hasLine
                 lineColor={colors.successBg}
               />
@@ -814,7 +1032,7 @@ export default function OrderDetailScreen() {
                 event="Rider picked up"
                 meta="Today · 11:34 AM"
                 tagType="gps"
-                tagLabel="📍 GPS: Yaba, Lagos"
+                tagLabel="GPS: Yaba, Lagos"
                 hasLine
                 lineColor={colors.surfaceContainer}
               />
@@ -840,7 +1058,7 @@ export default function OrderDetailScreen() {
                 event="Rider picked up"
                 meta="Today · 11:02 AM"
                 tagType="gps"
-                tagLabel="📍 GPS: Yaba, Lagos"
+                tagLabel="GPS: Yaba, Lagos"
                 hasLine
                 lineColor={colors.successBg}
               />
@@ -853,10 +1071,10 @@ export default function OrderDetailScreen() {
               />
               <TimelineItem
                 state="done"
-                event="Delivered ✓"
+                event="Delivered"
                 meta="Today · 12:26 PM"
                 tagType="gps"
-                tagLabel="📍 GPS: Surulere"
+                tagLabel="GPS: Surulere"
                 hasLine={false}
               />
             </>
@@ -961,7 +1179,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 10,
   },
-  failureEmoji: { fontSize: 14, marginTop: 1 },
+  failureIcon: { marginTop: 1 },
   failureBody: { flex: 1 },
   failureTitle: {
     fontSize: 12,
@@ -1049,6 +1267,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
   },
+  retryContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
 
   // Action buttons row
   actionRow: {
@@ -1066,7 +1289,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  actionBtnEmoji: { fontSize: 18 },
   actionBtnLabel: {
     fontSize: 12,
     fontFamily: font.sans.bold,
@@ -1091,6 +1313,11 @@ const styles = StyleSheet.create({
   mapFallbackText: {
     fontSize: 14,
     fontFamily: font.sans.regular,
+  },
+  mapFallbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   mapLabel: {
     position: "absolute",
@@ -1212,7 +1439,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  photoEmoji: { fontSize: 26 },
   photoThumbAdd: {
     width: 72,
     height: 72,

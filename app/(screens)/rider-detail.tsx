@@ -51,11 +51,46 @@ const DUMMY_RIDERS: Rider[] = [
     failed: 2,
     notes: "Available Mon–Sat. Covers Island and Mainland. Fast and reliable.",
     deliveries: [
-      { id: "d1", item: "Adire Maxi Dress × 2", customer: "Amara Obi", area: "Lekki", status: "delivered", time: "Today" },
-      { id: "d2", item: "Kente Wrap Skirt", customer: "Ngozi Obi", area: "VI", status: "delivered", time: "Yesterday" },
-      { id: "d3", item: "Beaded Necklace Set", customer: "Chisom Eze", area: "Surulere", status: "failed", time: "Mon" },
-      { id: "d4", item: "Ankara Tote Bag", customer: "Tunde Bello", area: "Yaba", status: "delivered", time: "Mon" },
-      { id: "d5", item: "Silk Scarf (Red)", customer: "Bisi Adeyemi", area: "Ikeja", status: "delivered", time: "Sun" },
+      {
+        id: "d1",
+        item: "Adire Maxi Dress × 2",
+        customer: "Amara Obi",
+        area: "Lekki",
+        status: "delivered",
+        time: "Today",
+      },
+      {
+        id: "d2",
+        item: "Kente Wrap Skirt",
+        customer: "Ngozi Obi",
+        area: "VI",
+        status: "delivered",
+        time: "Yesterday",
+      },
+      {
+        id: "d3",
+        item: "Beaded Necklace Set",
+        customer: "Chisom Eze",
+        area: "Surulere",
+        status: "failed",
+        time: "Mon",
+      },
+      {
+        id: "d4",
+        item: "Ankara Tote Bag",
+        customer: "Tunde Bello",
+        area: "Yaba",
+        status: "delivered",
+        time: "Mon",
+      },
+      {
+        id: "d5",
+        item: "Silk Scarf (Red)",
+        customer: "Bisi Adeyemi",
+        area: "Ikeja",
+        status: "delivered",
+        time: "Sun",
+      },
     ],
   },
   {
@@ -66,9 +101,30 @@ const DUMMY_RIDERS: Rider[] = [
     failed: 1,
     notes: "",
     deliveries: [
-      { id: "d6", item: "Beaded Necklace Set", customer: "Chisom Eze", area: "Surulere", status: "delivered", time: "Today" },
-      { id: "d7", item: "Silver Bangles", customer: "Amara Obi", area: "Lekki", status: "delivered", time: "Yesterday" },
-      { id: "d8", item: "Tie-Dye Set", customer: "Tunde Bello", area: "Yaba", status: "failed", time: "Fri" },
+      {
+        id: "d6",
+        item: "Beaded Necklace Set",
+        customer: "Chisom Eze",
+        area: "Surulere",
+        status: "delivered",
+        time: "Today",
+      },
+      {
+        id: "d7",
+        item: "Silver Bangles",
+        customer: "Amara Obi",
+        area: "Lekki",
+        status: "delivered",
+        time: "Yesterday",
+      },
+      {
+        id: "d8",
+        item: "Tie-Dye Set",
+        customer: "Tunde Bello",
+        area: "Yaba",
+        status: "failed",
+        time: "Fri",
+      },
     ],
   },
   {
@@ -79,9 +135,30 @@ const DUMMY_RIDERS: Rider[] = [
     failed: 3,
     notes: "Covers Mainland only. May be slow during peak hours.",
     deliveries: [
-      { id: "d9", item: "Ankara Tote Bag", customer: "Tunde Bello", area: "Yaba", status: "in_transit", time: "Now" },
-      { id: "d10", item: "Dashiki Set", customer: "Ngozi Obi", area: "Surulere", status: "delivered", time: "Yesterday" },
-      { id: "d11", item: "Cord Bracelet", customer: "Chisom Eze", area: "Surulere", status: "failed", time: "Thu" },
+      {
+        id: "d9",
+        item: "Ankara Tote Bag",
+        customer: "Tunde Bello",
+        area: "Yaba",
+        status: "in_transit",
+        time: "Now",
+      },
+      {
+        id: "d10",
+        item: "Dashiki Set",
+        customer: "Ngozi Obi",
+        area: "Surulere",
+        status: "delivered",
+        time: "Yesterday",
+      },
+      {
+        id: "d11",
+        item: "Cord Bracelet",
+        customer: "Chisom Eze",
+        area: "Surulere",
+        status: "failed",
+        time: "Thu",
+      },
     ],
   },
 ];
@@ -114,12 +191,32 @@ function StatCard({
 }) {
   const { colors, isDark } = useTheme();
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
   return (
-    <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+    <View
+      style={[
+        styles.statCard,
+        { backgroundColor: colors.surfaceCard },
+        cardShadow,
+      ]}
+    >
       <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -128,29 +225,70 @@ function StatCard({
 function DeliveryCard({ delivery }: { delivery: DeliveryItem }) {
   const { colors, isDark } = useTheme();
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
   const DELIVERY_STATUS_MAP: Record<
     DeliveryStatus,
-    { label: string; fg: string; bg: string; emoji: string }
+    {
+      label: string;
+      fg: string;
+      bg: string;
+      icon: React.ComponentProps<typeof Feather>["name"];
+    }
   > = {
-    delivered: { label: "Done", fg: colors.success, bg: colors.successBg, emoji: "✅" },
-    failed: { label: "Failed", fg: colors.error, bg: colors.errorBg, emoji: "❌" },
-    in_transit: { label: "Transit", fg: colors.info, bg: colors.infoBg, emoji: "📦" },
+    delivered: {
+      label: "Done",
+      fg: colors.success,
+      bg: colors.successBg,
+      icon: "check-circle",
+    },
+    failed: {
+      label: "Failed",
+      fg: colors.error,
+      bg: colors.errorBg,
+      icon: "x-circle",
+    },
+    in_transit: {
+      label: "Transit",
+      fg: colors.info,
+      bg: colors.infoBg,
+      icon: "truck",
+    },
   };
 
   const cfg = DELIVERY_STATUS_MAP[delivery.status];
   return (
-    <View style={[styles.deliveryCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+    <View
+      style={[
+        styles.deliveryCard,
+        { backgroundColor: colors.surfaceCard },
+        cardShadow,
+      ]}
+    >
       {/* Icon */}
       <View style={[styles.deliveryIcon, { backgroundColor: cfg.bg }]}>
-        <Text style={styles.deliveryEmoji}>{cfg.emoji}</Text>
+        <Feather name={cfg.icon} size={15} color={cfg.fg} />
       </View>
 
       {/* Body */}
       <View style={styles.deliveryBody}>
-        <Text style={[styles.deliveryItem, { color: colors.textPrimary }]} numberOfLines={1}>
+        <Text
+          style={[styles.deliveryItem, { color: colors.textPrimary }]}
+          numberOfLines={1}
+        >
           {delivery.item}
         </Text>
         <Text style={[styles.deliveryMeta, { color: colors.textMuted }]}>
@@ -164,7 +302,9 @@ function DeliveryCard({ delivery }: { delivery: DeliveryItem }) {
           <View style={[styles.pillDot, { backgroundColor: cfg.fg }]} />
           <Text style={[styles.pillText, { color: cfg.fg }]}>{cfg.label}</Text>
         </View>
-        <Text style={[styles.deliveryTime, { color: colors.textMuted }]}>{delivery.time}</Text>
+        <Text style={[styles.deliveryTime, { color: colors.textMuted }]}>
+          {delivery.time}
+        </Text>
       </View>
     </View>
   );
@@ -188,8 +328,20 @@ export default function RiderDetailScreen() {
   const initials = getInitials(rider.name);
 
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
   function handleCall() {
     Linking.openURL("tel:" + rider.phone.replace(/\s/g, ""));
@@ -197,7 +349,7 @@ export default function RiderDetailScreen() {
 
   function handleWhatsApp() {
     Linking.openURL(
-      "https://wa.me/234" + rider.phone.replace(/\s/g, "").replace(/^0/, "")
+      "https://wa.me/234" + rider.phone.replace(/\s/g, "").replace(/^0/, ""),
     );
   }
 
@@ -237,26 +389,43 @@ export default function RiderDetailScreen() {
 
           {/* Avatar */}
           <View style={styles.heroAvatar}>
-            <Text style={[styles.heroAvatarText, { color: colors.white }]}>{initials}</Text>
+            <Text style={[styles.heroAvatarText, { color: colors.white }]}>
+              {initials}
+            </Text>
           </View>
 
           {/* Name + phone */}
-          <Text style={[styles.heroName, { color: colors.white }]}>{rider.name}</Text>
+          <Text style={[styles.heroName, { color: colors.white }]}>
+            {rider.name}
+          </Text>
           <Text style={styles.heroPhone}>{rider.phone}</Text>
 
           {/* Action buttons */}
           <View style={styles.heroActions}>
             <Pressable style={styles.heroActionBtn} onPress={handleCall}>
-              <Text style={[styles.heroActionText, { color: colors.white }]}>📞 Call</Text>
+              <View style={styles.heroActionContent}>
+                <Feather name="phone" size={12} color={colors.white} />
+                <Text style={[styles.heroActionText, { color: colors.white }]}>
+                  Call
+                </Text>
+              </View>
             </Pressable>
             <Pressable style={styles.heroActionBtn} onPress={handleWhatsApp}>
-              <Text style={[styles.heroActionText, { color: colors.white }]}>💬 WhatsApp</Text>
+              <View style={styles.heroActionContent}>
+                <Feather name="message-circle" size={12} color={colors.white} />
+                <Text style={[styles.heroActionText, { color: colors.white }]}>
+                  WhatsApp
+                </Text>
+              </View>
             </Pressable>
             <Pressable
               style={[styles.heroActionBtn, styles.heroActionDanger]}
               onPress={handleRemove}
             >
-              <Text style={styles.heroActionDangerText}>🗑️ Remove</Text>
+              <View style={styles.heroActionContent}>
+                <Feather name="trash-2" size={12} color="#FCA5A5" />
+                <Text style={styles.heroActionDangerText}>Remove</Text>
+              </View>
             </Pressable>
           </View>
         </LinearGradient>
@@ -282,15 +451,27 @@ export default function RiderDetailScreen() {
 
         {/* ── Notes Card ──────────────────────────────────────────────── */}
         {!!rider.notes && (
-          <View style={[styles.notesCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Text style={[styles.notesLabel, { color: colors.textMuted }]}>NOTES</Text>
-            <Text style={[styles.notesText, { color: colors.textPrimary }]}>{rider.notes}</Text>
+          <View
+            style={[
+              styles.notesCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <Text style={[styles.notesLabel, { color: colors.textMuted }]}>
+              NOTES
+            </Text>
+            <Text style={[styles.notesText, { color: colors.textPrimary }]}>
+              {rider.notes}
+            </Text>
           </View>
         )}
 
         {/* ── Recent Deliveries ────────────────────────────────────────── */}
         <View style={styles.deliveriesSection}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Recent Deliveries</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            Recent Deliveries
+          </Text>
           <View style={styles.deliveriesList}>
             {rider.deliveries.map((d) => (
               <DeliveryCard key={d.id} delivery={d} />
@@ -411,6 +592,11 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
   },
+  heroActionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   heroActionDanger: {
     backgroundColor: "rgba(220,38,38,0.2)",
   },
@@ -507,7 +693,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  deliveryEmoji: { fontSize: 16 },
   deliveryBody: { flex: 1, minWidth: 0 },
   deliveryItem: {
     fontSize: 13,

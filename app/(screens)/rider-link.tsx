@@ -3,9 +3,16 @@
  * Always light mode. DS tokens only — no theme store.
  * TODO: fetch from Supabase using token
  */
-import { colors, font, gradients, layout, radius } from "@/src/constants/tokens";
-import * as Location from "expo-location";
+import {
+  colors,
+  font,
+  gradients,
+  layout,
+  radius,
+} from "@/src/constants/tokens";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
@@ -18,7 +25,6 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -47,9 +53,7 @@ const ORDER = {
   amount: 35000,
   status: "pending" as Status,
   sellerName: "Zara's Closet",
-  events: [
-    { label: "Order created", time: "10:58 AM", type: "created" },
-  ],
+  events: [{ label: "Order created", time: "10:58 AM", type: "created" }],
 };
 
 // ── Progress step config ───────────────────────────────────────────────────────
@@ -58,30 +62,30 @@ const STEPS = ["Confirmed", "Picked Up", "Transit", "Delivered"];
 // ── Report options ─────────────────────────────────────────────────────────────
 const REPORT_OPTIONS = [
   {
-    icon: "📍",
+    icon: "map-pin",
     title: "Wrong address",
     subtitle: "Address doesn't match or is incorrect",
     iconBg: colors.warningBg,
   },
   {
-    icon: "📵",
+    icon: "phone-off",
     title: "Customer not available",
     subtitle: "Customer not picking up or not home",
     iconBg: colors.errorBg,
   },
   {
-    icon: "🚦",
+    icon: "alert-triangle",
     title: "Traffic delay",
     subtitle: "Will be late due to traffic",
     iconBg: colors.infoBg,
   },
   {
-    icon: "💬",
+    icon: "message-circle",
     title: "Other issue",
     subtitle: "Something else is wrong",
     iconBg: colors.surfaceContainer,
   },
-];
+] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatAmount(n: number): string {
@@ -90,7 +94,7 @@ function formatAmount(n: number): string {
 
 function getStepState(
   stepIndex: number,
-  status: Status
+  status: Status,
 ): "done" | "now" | "pending" {
   if (status === "pending") {
     if (stepIndex === 0) return "done";
@@ -151,7 +155,9 @@ export default function RiderLinkScreen() {
   const [reportOpen, setReportOpen] = useState(false);
 
   // GPS pings — no re-render needed
-  const locationPings = useRef<{ lat: number; lng: number; time: string }[]>([]);
+  const locationPings = useRef<{ lat: number; lng: number; time: string }[]>(
+    [],
+  );
 
   // Blinking dot for in_transit status pill
   const blinkOpacity = useSharedValue(1);
@@ -164,10 +170,10 @@ export default function RiderLinkScreen() {
       blinkOpacity.value = withRepeat(
         withSequence(
           withTiming(0.3, { duration: 750 }),
-          withTiming(1, { duration: 750 })
+          withTiming(1, { duration: 750 }),
         ),
         -1,
-        false
+        false,
       );
     } else {
       blinkOpacity.value = 1;
@@ -195,7 +201,8 @@ export default function RiderLinkScreen() {
     setCtaBusy(true);
     try {
       // GPS ping
-      const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+      const { status: locStatus } =
+        await Location.requestForegroundPermissionsAsync();
       if (locStatus === "granted") {
         const loc = await Location.getCurrentPositionAsync({});
         locationPings.current.push({
@@ -231,8 +238,8 @@ export default function RiderLinkScreen() {
 
   // Progress line fill: fraction 0–1 of the inner track width
   function getLineFillRatio(): number {
-    if (status === "pending") return 1 / 3;       // 1 step done
-    if (status === "in_transit") return 2 / 3;    // 2 steps done
+    if (status === "pending") return 1 / 3; // 1 step done
+    if (status === "in_transit") return 2 / 3; // 2 steps done
     if (status === "delivered") return 1;
     return 0;
   }
@@ -249,7 +256,7 @@ export default function RiderLinkScreen() {
           end={{ x: 1, y: 1 }}
           style={ss.headerIcon}
         >
-          <Text style={ss.headerIconEmoji}>📦</Text>
+          <Feather name="package" size={16} color={colors.white} />
         </LinearGradient>
         <View style={ss.headerTextCol}>
           <Text style={ss.headerBrand}>Trackshpr</Text>
@@ -272,14 +279,33 @@ export default function RiderLinkScreen() {
           <View style={ss.heroTopRow}>
             {/* Status pill */}
             {status === "pending" && (
-              <View style={[ss.pill, { backgroundColor: colors.warningBg, borderColor: colors.warning }]}>
+              <View
+                style={[
+                  ss.pill,
+                  {
+                    backgroundColor: colors.warningBg,
+                    borderColor: colors.warning,
+                  },
+                ]}
+              >
                 <Text style={[ss.pillText, { color: colors.warning }]}>
                   {getStatusLabel(status)}
                 </Text>
               </View>
             )}
             {status === "in_transit" && (
-              <View style={[ss.pill, { backgroundColor: colors.primarySoft, borderColor: colors.primary, flexDirection: "row", alignItems: "center", gap: 5 }]}>
+              <View
+                style={[
+                  ss.pill,
+                  {
+                    backgroundColor: colors.primarySoft,
+                    borderColor: colors.primary,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
+                  },
+                ]}
+              >
                 <Animated.View style={[ss.blinkDot, blinkStyle]} />
                 <Text style={[ss.pillText, { color: colors.primary }]}>
                   {getStatusLabel(status)}
@@ -287,14 +313,30 @@ export default function RiderLinkScreen() {
               </View>
             )}
             {status === "delivered" && (
-              <View style={[ss.pill, { backgroundColor: colors.successBg, borderColor: colors.success }]}>
+              <View
+                style={[
+                  ss.pill,
+                  {
+                    backgroundColor: colors.successBg,
+                    borderColor: colors.success,
+                  },
+                ]}
+              >
                 <Text style={[ss.pillText, { color: colors.success }]}>
                   {getStatusLabel(status)}
                 </Text>
               </View>
             )}
             {status === "failed" && (
-              <View style={[ss.pill, { backgroundColor: colors.errorBg, borderColor: colors.error }]}>
+              <View
+                style={[
+                  ss.pill,
+                  {
+                    backgroundColor: colors.errorBg,
+                    borderColor: colors.error,
+                  },
+                ]}
+              >
                 <Text style={[ss.pillText, { color: colors.error }]}>
                   {getStatusLabel(status)}
                 </Text>
@@ -309,7 +351,12 @@ export default function RiderLinkScreen() {
 
           {/* Address */}
           <View style={ss.addressRow}>
-            <Text style={ss.pinEmoji}>📍</Text>
+            <Feather
+              name="map-pin"
+              size={12}
+              color={colors.textMuted}
+              style={ss.pinIcon}
+            />
             <Text style={ss.addressText} numberOfLines={2}>
               {ORDER.address}
             </Text>
@@ -353,12 +400,16 @@ export default function RiderLinkScreen() {
                         <Text style={ss.stepCheckText}>✓</Text>
                       )}
                       {state === "now" && (
-                        <Text style={[ss.stepNumText, { color: colors.primary }]}>
+                        <Text
+                          style={[ss.stepNumText, { color: colors.primary }]}
+                        >
                           {i + 1}
                         </Text>
                       )}
                       {state === "pending" && (
-                        <Text style={[ss.stepNumText, { color: colors.textMuted }]}>
+                        <Text
+                          style={[ss.stepNumText, { color: colors.textMuted }]}
+                        >
                           {i + 1}
                         </Text>
                       )}
@@ -399,7 +450,10 @@ export default function RiderLinkScreen() {
           <Text style={ss.timelineTitle}>Delivery timeline</Text>
           {events.map((ev, i) => {
             const isLast = i === events.length - 1;
-            const isDone = ev.type === "created" || ev.type === "picked_up" || ev.type === "delivered";
+            const isDone =
+              ev.type === "created" ||
+              ev.type === "picked_up" ||
+              ev.type === "delivered";
             const isActive = isLast && !isDone;
 
             return (
@@ -409,17 +463,23 @@ export default function RiderLinkScreen() {
                   <View
                     style={[
                       ss.eventDot,
-                      isDone && { backgroundColor: colors.successBg, borderColor: colors.success },
-                      isActive && { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-                      !isDone && !isActive && { backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainer },
+                      isDone && {
+                        backgroundColor: colors.successBg,
+                        borderColor: colors.success,
+                      },
+                      isActive && {
+                        backgroundColor: colors.primarySoft,
+                        borderColor: colors.primary,
+                      },
+                      !isDone &&
+                        !isActive && {
+                          backgroundColor: colors.surfaceContainer,
+                          borderColor: colors.surfaceContainer,
+                        },
                     ]}
                   >
-                    {isDone && (
-                      <Text style={ss.eventDotCheck}>✓</Text>
-                    )}
-                    {isActive && (
-                      <View style={ss.eventDotInner} />
-                    )}
+                    {isDone && <Text style={ss.eventDotCheck}>✓</Text>}
+                    {isActive && <View style={ss.eventDotInner} />}
                   </View>
                   {!isLast && <View style={ss.eventConnector} />}
                 </View>
@@ -439,7 +499,7 @@ export default function RiderLinkScreen() {
             <Text style={ss.viralPowered}>Powered by Trackshpr</Text>
             <Text style={ss.viralCta}>Track your own deliveries →</Text>
           </View>
-          <Text style={ss.viralEmoji}>📦</Text>
+          <Feather name="package" size={18} color={colors.primary} />
         </View>
       </ScrollView>
 
@@ -449,7 +509,9 @@ export default function RiderLinkScreen() {
           <Pressable
             onPress={handleCta}
             disabled={ctaBusy}
-            style={({ pressed }) => [{ opacity: pressed || ctaBusy ? 0.72 : 1 }]}
+            style={({ pressed }) => [
+              { opacity: pressed || ctaBusy ? 0.72 : 1 },
+            ]}
           >
             <LinearGradient
               colors={
@@ -463,8 +525,8 @@ export default function RiderLinkScreen() {
             >
               <Text style={ss.ctaText}>
                 {status === "pending"
-                  ? "🛍️  I've Picked Up the Item"
-                  : "✅  Delivery Complete"}
+                  ? "I've Picked Up the Item"
+                  : "Delivery Complete"}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -488,7 +550,11 @@ export default function RiderLinkScreen() {
         <View style={ss.modalRoot}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeReport} />
           <Animated.View
-            style={[ss.sheet, sheetStyle, { paddingBottom: insets.bottom + 16 }]}
+            style={[
+              ss.sheet,
+              sheetStyle,
+              { paddingBottom: insets.bottom + 16 },
+            ]}
           >
             {/* Handle */}
             <View style={ss.sheetHandle} />
@@ -501,14 +567,26 @@ export default function RiderLinkScreen() {
               {REPORT_OPTIONS.map((opt, i) => (
                 <Pressable
                   key={i}
-                  style={({ pressed }) => [ss.reportOption, { opacity: pressed ? 0.7 : 1 }]}
+                  style={({ pressed }) => [
+                    ss.reportOption,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
                   onPress={() => {
                     // TODO: submit report to Supabase
                     closeReport();
                   }}
                 >
-                  <View style={[ss.reportIconContainer, { backgroundColor: opt.iconBg }]}>
-                    <Text style={ss.reportEmoji}>{opt.icon}</Text>
+                  <View
+                    style={[
+                      ss.reportIconContainer,
+                      { backgroundColor: opt.iconBg },
+                    ]}
+                  >
+                    <Feather
+                      name={opt.icon}
+                      size={16}
+                      color={colors.textPrimary}
+                    />
                   </View>
                   <View style={ss.reportOptionBody}>
                     <Text style={ss.reportOptionTitle}>{opt.title}</Text>
@@ -520,7 +598,10 @@ export default function RiderLinkScreen() {
 
             {/* Cancel */}
             <Pressable
-              style={({ pressed }) => [ss.cancelBtn, { opacity: pressed ? 0.7 : 1 }]}
+              style={({ pressed }) => [
+                ss.cancelBtn,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
               onPress={closeReport}
             >
               <Text style={ss.cancelBtnText}>Cancel</Text>
@@ -556,9 +637,6 @@ const ss = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-  },
-  headerIconEmoji: {
-    fontSize: 17,
   },
   headerTextCol: {
     gap: 1,
@@ -634,8 +712,7 @@ const ss = StyleSheet.create({
     alignItems: "flex-start",
     gap: 3,
   },
-  pinEmoji: {
-    fontSize: 12,
+  pinIcon: {
     marginTop: 1,
   },
   addressText: {
@@ -838,9 +915,6 @@ const ss = StyleSheet.create({
     color: colors.primary,
     letterSpacing: -0.12,
   },
-  viralEmoji: {
-    fontSize: 20,
-  },
 
   // CTA section
   ctaSection: {
@@ -926,9 +1000,6 @@ const ss = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-  },
-  reportEmoji: {
-    fontSize: 18,
   },
   reportOptionBody: {
     flex: 1,

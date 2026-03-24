@@ -2,8 +2,9 @@
  * Floating glassmorphic delivery card shown in the sign-in hero.
  * Matches the HTML reference exactly — blink animation owned internally.
  */
-import { LinearGradient } from "expo-linear-gradient";
+import { font, radius } from "@/src/constants/tokens";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -13,13 +14,12 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { font, radius } from "@/src/constants/tokens";
 
 // ── Progress labels — first 3 active, last inactive (matches HTML .active) ──
 const LABELS: { text: string; active: boolean }[] = [
   { text: "Confirmed", active: true },
   { text: "Picked Up", active: true },
-  { text: "Transit",   active: true },
+  { text: "Transit", active: true },
   { text: "Delivered", active: false },
 ];
 
@@ -29,7 +29,7 @@ export default function DeliveryCard() {
   useEffect(() => {
     blink.value = withRepeat(
       withSequence(
-        withTiming(1,   { duration: 750 }),
+        withTiming(1, { duration: 750 }),
         withTiming(0.3, { duration: 750 }),
       ),
       -1,
@@ -77,7 +77,11 @@ export default function DeliveryCard() {
             key={text}
             style={[
               styles.progressLabel,
-              { color: active ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.35)" },
+              {
+                color: active
+                  ? "rgba(255,255,255,0.70)"
+                  : "rgba(255,255,255,0.35)",
+              },
             ]}
           >
             {text}

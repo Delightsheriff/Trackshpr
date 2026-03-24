@@ -141,7 +141,11 @@ function TimelineDot({ item }: { item: TimelineItem }) {
       ]}
     >
       {item.status === "done" ? (
-        <Feather name={item.icon} size={11} color={onboardingColors.tlLabelDone} />
+        <Feather
+          name={item.icon}
+          size={11}
+          color={onboardingColors.tlLabelDone}
+        />
       ) : (
         <View
           style={{

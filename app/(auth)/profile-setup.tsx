@@ -260,7 +260,16 @@ export default function ProfileSetupScreen() {
   }, [form, userId, saveMutation, showToast]);
 
   // ── Skip ─────────────────────────────────────────────────────────────────────
-  const handleSkip = useCallback(() => router.replace("/(tabs)"), []);
+  const handleSkip = useCallback(async () => {
+    if (!userId) return;
+    
+    await supabase.from("profiles").upsert({
+      id: userId,
+      onboarding_complete: false,
+    });
+    
+    router.replace("/(tabs)");
+  }, [userId]);
 
   const requiredBorder = hasError
     ? { borderWidth: 2, borderColor: colors.error }

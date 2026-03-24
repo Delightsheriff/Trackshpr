@@ -10,18 +10,19 @@ import { Tabs, router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Visual order: Home · Orders · [FAB] · Riders · Settings
+type TabRoute = "index" | "orders" | "riders" | "settings";
+
 const VISUAL_TABS: {
-  routeIdx: number; // index in state.routes (-1 = FAB / no real route)
+  routeName: TabRoute | "fab";
   emoji: string;
   label: string;
   isFab?: boolean;
 }[] = [
-  { routeIdx: 0, emoji: "🏠", label: "Home" },
-  { routeIdx: 1, emoji: "📦", label: "Orders" },
-  { routeIdx: -1, emoji: "➕", label: "",   isFab: true },
-  { routeIdx: 2, emoji: "🚴", label: "Riders" },
-  { routeIdx: 3, emoji: "⚙️", label: "Settings" },
+  { routeName: "index", emoji: "🏠", label: "Home" },
+  { routeName: "orders", emoji: "📦", label: "Orders" },
+  { routeName: "fab", emoji: "➕", label: "", isFab: true },
+  { routeName: "riders", emoji: "🚴", label: "Riders" },
+  { routeName: "settings", emoji: "⚙️", label: "Settings" },
 ];
 
 function CustomTabBar({
@@ -51,9 +52,9 @@ function CustomTabBar({
       ]}
     >
       {VISUAL_TABS.map((tab) => {
-        if (tab.isFab) {
-          return (
-            <View key="fab" style={styles.fabWrap}>
+          if (tab.isFab) {
+            return (
+              <View key={tab.label} style={styles.fabWrap}>
               {/* Outer wrapper carries elevation so Android renders rounded shadow */}
               <View style={styles.fabShadow}>
                 <Pressable
@@ -75,13 +76,13 @@ function CustomTabBar({
           );
         }
 
-        const isActive  = state.index === tab.routeIdx;
-        const routeName = state.routes[tab.routeIdx]?.name;
+        const routeIndex = state.routes.findIndex(r => r.name === tab.routeName);
+        const isActive = routeIndex === state.index;
 
         return (
           <Pressable
             key={tab.label}
-            onPress={() => routeName && navigation.navigate(routeName)}
+            onPress={() => tab.routeName !== "fab" && navigation.navigate(tab.routeName)}
             style={styles.tabItem}
             android_ripple={{ color: colors.primarySoft, borderless: true }}
           >

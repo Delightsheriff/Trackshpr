@@ -1,26 +1,14 @@
-/**
- * Root layout — entry point for all routes.
- *
- * Responsibilities:
- *  1. Wrap app in TanStack QueryClientProvider
- *  2. Show splash screen while auth state is being determined
- *  3. Redirect to correct screen based on auth state (useAuthSession)
- *  4. Set up Supabase auth listener for session changes
- *  5. Render global UI (ToastOverlay, StatusBar)
- *
- * Design system: DS §9.1, §9.2
- */
 import ToastOverlay from "@/src/components/shared/ToastOverlay";
 import SplashScreen from "@/src/components/splash";
-import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { supabase } from "@/src/lib/supabase";
 import { useThemeStore } from "@/src/stores/themeStore";
-import { Stack, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "react-native-reanimated";
 
 import "../global.css";
@@ -36,74 +24,151 @@ const queryClient = new QueryClient({
   },
 });
 
+export { queryClient };
+
+const ONBOARDING_SEEN_KEY = "onboarding_seen";
+
+type Destination =
+  | "/onboarding"
+  | "/(auth)/sign-in"
+  | "/(auth)/profile-setup"
+  | "/(tabs)";
+
+const AUTH_ROUTES: Destination[] = [
+  "/onboarding",
+  "/(auth)/sign-in",
+  "/(auth)/profile-setup",
+];
+
+const isAuthRoute = (path: string): boolean => AUTH_ROUTES.includes(path as Destination);
+
+async function getOnboardingSeen(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
+    return value === "true";
+  } catch {
+    return false;
+  }
+}
+
+export async function setOnboardingSeen(seen: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, seen ? "true" : "false");
+  } catch {}
+}
+
+async function getDestinationForSession(
+  session: { user: { id: string } } | null,
+): Promise<Destination> {
+  if (!session) {
+    const seen = await getOnboardingSeen();
+    return seen ? "/(auth)/sign-in" : "/onboarding";
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, onboarding_complete")
+    .eq("id", session.user.id)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    return "/(auth)/profile-setup";
+  }
+
+  return "/(tabs)";
+}
+
 export default function RootLayout() {
   const router = useRouter();
-  const authState = useAuthSession();
-
-  // All hooks must be called unconditionally — Rules of Hooks
+  const pathname = usePathname();
   const colors = useThemeStore((s) => s.colors);
   const isDark = useThemeStore((s) => s.isDark);
 
-  // ── Auth state change listener ────────────────────────────────────────────
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT") {
-        router.replace("/(auth)/sign-in");
+  const [authReady, setAuthReady] = useState(false);
+  const [initialDestination, setInitialDestination] = useState<Destination | null>(null);
+  const hasInitiallyRedirected = useRef(false);
+
+  const redirect = useCallback(
+    (destination: Destination) => {
+      if (pathname === destination) return;
+      if (pathname === "/" && destination !== "/onboarding") {
+        router.replace(destination);
         return;
       }
+      router.replace(destination);
+    },
+    [pathname, router],
+  );
 
-      if (event === "SIGNED_IN" && session) {
-        queryClient.invalidateQueries({ queryKey: ["profile", session.user.id] });
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_complete")
-          .eq("id", session.user.id)
-          .maybeSingle();
+  useEffect(() => {
+    let mounted = true;
 
-        if (!profile?.onboarding_complete) {
-          router.replace("/(auth)/profile-setup");
-        } else {
-          router.replace("/(tabs)");
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        const destination = await getDestinationForSession(session);
+        setInitialDestination(destination);
+      } catch {
+        if (!mounted) return;
+        setInitialDestination("/(auth)/sign-in");
+      } finally {
+        if (mounted) {
+          setAuthReady(true);
         }
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
-  }, [router]);
+    initAuth();
 
-  // ── Deferred redirect — useEffect avoids setState during render ────────────
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useEffect(() => {
-    if (authState.loading) return;
-    switch (authState.destination) {
-      case "onboarding":
-        router.replace("/onboarding");
-        break;
-      case "sign-in":
-        router.replace("/(auth)/sign-in");
-        break;
-      case "profile-setup":
-        router.replace("/(auth)/profile-setup");
-        break;
-      case "app":
-        break;
-    }
-  }, [authState, router]);
+    if (!authReady || !initialDestination) return;
+    if (hasInitiallyRedirected.current) return;
+    
+    hasInitiallyRedirected.current = true;
+    redirect(initialDestination);
+  }, [authReady, initialDestination, redirect]);
 
-  // ── Render splash while auth state is being determined ─────────────────────
-  if (authState.loading) {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SplashScreen />
-      </GestureHandlerRootView>
-    );
+  useEffect(() => {
+    if (!authReady) return;
+    if (!hasInitiallyRedirected.current) return;
+    if (pathname === "/") return;
+
+    const isTabRoute = pathname.startsWith("/(tabs)");
+    if (isTabRoute && pathname !== "/(tabs)") return;
+
+    const isAuthPath = isAuthRoute(pathname);
+    if (isAuthPath) return;
+
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const destination = await getDestinationForSession(session);
+      
+      if (destination !== "/(tabs)" && pathname !== destination) {
+        redirect(destination);
+      }
+    };
+
+    const timeout = setTimeout(checkAuth, 100);
+    return () => clearTimeout(timeout);
+  }, [pathname, authReady, redirect]);
+
+  if (!authReady || !initialDestination) {
+    return <SplashScreen />;
   }
 
-  // ── Shell ─────────────────────────────────────────────────────────────────
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
+      <GestureHandlerRootView
+        style={{ flex: 1, backgroundColor: colors.surface }}
+      >
         <View style={{ flex: 1, backgroundColor: colors.surface }}>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -113,7 +178,6 @@ export default function RootLayout() {
             />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* Full-screen modals */}
             <Stack.Screen
               name="(modals)/new-delivery"
               options={{ headerShown: false, presentation: "modal" }}
@@ -126,7 +190,6 @@ export default function RootLayout() {
               name="(modals)/select-rider"
               options={{ headerShown: false, presentation: "modal" }}
             />
-            {/* Settings screens */}
             <Stack.Screen
               name="(settings)/business-details"
               options={{ headerShown: false }}
@@ -135,7 +198,6 @@ export default function RootLayout() {
               name="(settings)/brand-customization"
               options={{ headerShown: false }}
             />
-            {/* Detail / analytics screens */}
             <Stack.Screen
               name="(screens)/order-detail"
               options={{ headerShown: false }}
@@ -152,7 +214,6 @@ export default function RootLayout() {
               name="(screens)/fleet-map"
               options={{ headerShown: false }}
             />
-            {/* Magic link web views */}
             <Stack.Screen
               name="(screens)/rider-link"
               options={{ headerShown: false }}
@@ -161,7 +222,6 @@ export default function RootLayout() {
               name="(screens)/track-link"
               options={{ headerShown: false }}
             />
-            {/* Bottom-sheet modals */}
             <Stack.Screen
               name="(modals)/add-rider"
               options={{ headerShown: false, presentation: "transparentModal" }}

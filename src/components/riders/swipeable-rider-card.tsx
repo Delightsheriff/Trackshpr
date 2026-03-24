@@ -1,9 +1,9 @@
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
-import { Rider } from "@/src/stores/dataStore";
+import type { Rider } from "@/src/lib/supabaseQueries";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -31,7 +31,6 @@ export function SwipeableRiderCard({
 }) {
   const { colors, isDark } = useTheme();
 
-  // Avatar color cycling — computed inside component so they use live tokens
   const avatarColors = [
     { bg: colors.primarySoft, fg: colors.primary },
     { bg: colors.successBg, fg: colors.success },
@@ -59,13 +58,16 @@ export function SwipeableRiderCard({
   const avatarColor = avatarColors[colorIdx % avatarColors.length];
 
   const handleDelete = () => {
-    // snap back first, then open delete sheet
     translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
     isSwiped.value = false;
     router.push({
       pathname: "/(modals)/delete-rider",
       params: { id: rider.id, name: rider.name },
     });
+  };
+
+  const handleCall = () => {
+    Linking.openURL("tel:" + rider.phone.replace(/\s/g, ""));
   };
 
   const panGesture = Gesture.Pan()
@@ -160,21 +162,6 @@ export function SwipeableRiderCard({
                   {rider.total_deliveries} delivered
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.statBadge,
-                  { backgroundColor: colors.surfaceContainer },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statBadgeText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  0 failed
-                </Text>
-              </View>
             </View>
           </View>
 
@@ -183,6 +170,7 @@ export function SwipeableRiderCard({
             <Pressable
               style={[styles.actionBtn, { backgroundColor: colors.successBg }]}
               android_ripple={{ color: colors.success, borderless: false }}
+              onPress={handleCall}
             >
               <Feather name="phone" size={16} color={colors.success} />
             </Pressable>
@@ -192,6 +180,12 @@ export function SwipeableRiderCard({
                 { backgroundColor: colors.surfaceContainer },
               ]}
               android_ripple={{ color: colors.textMuted, borderless: false }}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/rider-detail",
+                  params: { id: rider.id },
+                })
+              }
             >
               <Feather
                 name="more-horizontal"

@@ -14,7 +14,9 @@
       "Bash(cat \"app/\\(tabs\\)/index.tsx\")",
       "Bash(ls \"C:/Users/delig/Documents/Trackshpr/app/\\(screens\\)\")",
       "Bash(ls \"C:\\\\Users\\\\delig\\\\Documents\\\\Trackshpr\\\\app/\\(screens\\)\")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

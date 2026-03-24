@@ -1,16 +1,14 @@
 /**
- * Riders tab — swipeable rider list, add button (DS §8.8).
- * TODO: replace DUMMY_RIDERS with real Supabase query.
- * TODO: wire Add Rider / Delete sheet to real API.
+ * Riders tab — real data via TanStack Query (DS §8.8).
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { useRiders, useSession } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -19,35 +17,48 @@ import {
   TextInput,
   View,
 } from "react-native";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// Riders come from dataStore — shared with add-rider / delete-rider modals.
-
 import { SwipeableRiderCard } from "@/src/components/riders/swipeable-rider-card";
+
+// ── Skeleton card ──────────────────────────────────────────────────────────────
+function RiderSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
+  return (
+    <View style={[sk.card, { backgroundColor: colors.surfaceCard }]}>
+      <View style={[sk.avatar, { backgroundColor: colors.surfaceContainer }]} />
+      <View style={sk.body}>
+        <View style={[sk.line, { backgroundColor: colors.surfaceContainer, width: "55%" }]} />
+        <View style={[sk.line, { backgroundColor: colors.surfaceContainer, width: "35%", marginTop: 6 }]} />
+        <View style={[sk.badge, { backgroundColor: colors.surfaceContainer, marginTop: 8 }]} />
+      </View>
+    </View>
+  );
+}
+
+const sk = StyleSheet.create({
+  card: { flexDirection: "row", alignItems: "center", borderRadius: radius.xl, padding: layout.cardPadding, gap: 12, marginBottom: layout.listGap },
+  avatar: { width: 44, height: 44, borderRadius: radius.full, flexShrink: 0 },
+  body: { flex: 1 },
+  line: { height: 12, borderRadius: 6 },
+  badge: { height: 18, width: 80, borderRadius: radius.full },
+});
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function RidersScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { show: showToast } = useToastStore();
   const [query, setQuery] = useState("");
-  const riders = useDataStore((s) => s.riders);
+
+  const { userId } = useSession();
+  const { data: riders = [], isLoading, isError } = useRiders(userId);
+
+  useEffect(() => {
+    if (isError) showToast("Could not load riders. Pull to refresh.", "error");
+  }, [isError, showToast]);
 
   const searchBarShadow = isDark
-    ? {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 4,
-      }
-    : {
-        shadowColor: "rgba(48,41,80,1)",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 1,
-      };
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
 
   const filtered = riders.filter(
     (r) => !query || r.name.toLowerCase().includes(query.toLowerCase()),
@@ -55,7 +66,6 @@ export default function RidersScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -70,7 +80,7 @@ export default function RidersScreen() {
             Riders
           </Text>
           <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
-            {riders.length} saved · Swipe to delete
+            {isLoading ? "Loading…" : `${riders.length} saved · Swipe to delete`}
           </Text>
         </View>
 
@@ -98,8 +108,14 @@ export default function RidersScreen() {
           )}
         </View>
 
-        {/* ── Rider list ────────────────────────────────────────────────── */}
-        {filtered.length === 0 ? (
+        {/* ── Content ───────────────────────────────────────────────────── */}
+        {isLoading ? (
+          <>
+            <RiderSkeleton colors={colors} />
+            <RiderSkeleton colors={colors} />
+            <RiderSkeleton colors={colors} />
+          </>
+        ) : filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather
               name="user"
@@ -108,12 +124,12 @@ export default function RidersScreen() {
               style={styles.emptyIcon}
             />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              No riders found
+              {query ? "No riders found" : "No riders yet"}
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
               {query
                 ? "Try a different name."
-                : "Save your frequent riders to assign them faster."}
+                : "Add your first rider to start assigning deliveries."}
             </Text>
           </View>
         ) : (
@@ -129,10 +145,7 @@ export default function RidersScreen() {
           <Pressable
             onPress={() => router.push("/(modals)/add-rider")}
             style={styles.addBtnPressable}
-            android_ripple={{
-              color: "rgba(255,255,255,0.2)",
-              borderless: false,
-            }}
+            android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
           >
             <LinearGradient
               colors={gradients.primary}
@@ -189,9 +202,6 @@ const styles = StyleSheet.create({
     margin: 0,
   },
 
-
-
-  // Add rider button
   addBtnShadow: {
     borderRadius: radius.full,
     marginTop: 6,
@@ -219,7 +229,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Empty state
   emptyState: {
     alignItems: "center",
     paddingVertical: 48,

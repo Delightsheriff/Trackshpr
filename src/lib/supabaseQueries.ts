@@ -133,6 +133,27 @@ export async function fetchRider(riderId: string): Promise<Rider> {
   return data as unknown as Rider;
 }
 
+export async function insertRider(payload: {
+  seller_id: string;
+  name: string;
+  phone: string;
+  notes?: string | null;
+}): Promise<Rider> {
+  const { data, error } = await supabase
+    .from("riders")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error("Failed to add rider");
+  return data as unknown as Rider;
+}
+
+export async function deleteRider(riderId: string): Promise<void> {
+  const { error } = await supabase.from("riders").delete().eq("id", riderId);
+  if (error) throw new Error("Failed to delete rider");
+}
+
 // ── Customers (address_book) ───────────────────────────────────────────────
 
 export async function fetchCustomers(sellerId: string): Promise<Customer[]> {

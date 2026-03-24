@@ -1,15 +1,16 @@
 /**
- * Rider Detail screen — gradient hero, stats grid, notes, recent deliveries.
+ * Rider Detail screen — real data via TanStack Query.
  * DS §8.1, §8.4 — Feather icons, DM Sans / DM Mono fonts.
- * TODO: replace DUMMY_RIDERS with real Supabase query by id.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
+import { useRider } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -19,151 +20,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-type DeliveryStatus = "delivered" | "failed" | "in_transit";
-
-type DeliveryItem = {
-  id: string;
-  item: string;
-  customer: string;
-  area: string;
-  status: DeliveryStatus;
-  time: string;
-};
-
-type Rider = {
-  id: string;
-  name: string;
-  phone: string;
-  delivered: number;
-  failed: number;
-  notes: string;
-  deliveries: DeliveryItem[];
-};
-
-// ── Dummy data — TODO: replace with real Supabase query ──────────────────────
-const DUMMY_RIDERS: Rider[] = [
-  {
-    id: "1",
-    name: "Kunle Adeyemi",
-    phone: "0803 456 7890",
-    delivered: 42,
-    failed: 2,
-    notes: "Available Mon–Sat. Covers Island and Mainland. Fast and reliable.",
-    deliveries: [
-      {
-        id: "d1",
-        item: "Adire Maxi Dress × 2",
-        customer: "Amara Obi",
-        area: "Lekki",
-        status: "delivered",
-        time: "Today",
-      },
-      {
-        id: "d2",
-        item: "Kente Wrap Skirt",
-        customer: "Ngozi Obi",
-        area: "VI",
-        status: "delivered",
-        time: "Yesterday",
-      },
-      {
-        id: "d3",
-        item: "Beaded Necklace Set",
-        customer: "Chisom Eze",
-        area: "Surulere",
-        status: "failed",
-        time: "Mon",
-      },
-      {
-        id: "d4",
-        item: "Ankara Tote Bag",
-        customer: "Tunde Bello",
-        area: "Yaba",
-        status: "delivered",
-        time: "Mon",
-      },
-      {
-        id: "d5",
-        item: "Silk Scarf (Red)",
-        customer: "Bisi Adeyemi",
-        area: "Ikeja",
-        status: "delivered",
-        time: "Sun",
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Emeka Musa",
-    phone: "0812 345 6789",
-    delivered: 28,
-    failed: 1,
-    notes: "",
-    deliveries: [
-      {
-        id: "d6",
-        item: "Beaded Necklace Set",
-        customer: "Chisom Eze",
-        area: "Surulere",
-        status: "delivered",
-        time: "Today",
-      },
-      {
-        id: "d7",
-        item: "Silver Bangles",
-        customer: "Amara Obi",
-        area: "Lekki",
-        status: "delivered",
-        time: "Yesterday",
-      },
-      {
-        id: "d8",
-        item: "Tie-Dye Set",
-        customer: "Tunde Bello",
-        area: "Yaba",
-        status: "failed",
-        time: "Fri",
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "Taiwo James",
-    phone: "0701 234 5678",
-    delivered: 15,
-    failed: 3,
-    notes: "Covers Mainland only. May be slow during peak hours.",
-    deliveries: [
-      {
-        id: "d9",
-        item: "Ankara Tote Bag",
-        customer: "Tunde Bello",
-        area: "Yaba",
-        status: "in_transit",
-        time: "Now",
-      },
-      {
-        id: "d10",
-        item: "Dashiki Set",
-        customer: "Ngozi Obi",
-        area: "Surulere",
-        status: "delivered",
-        time: "Yesterday",
-      },
-      {
-        id: "d11",
-        item: "Cord Bracelet",
-        customer: "Chisom Eze",
-        area: "Surulere",
-        status: "failed",
-        time: "Thu",
-      },
-    ],
-  },
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
   return name
     .split(" ")
@@ -173,10 +30,13 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-function getSuccessRate(delivered: number, failed: number): number {
-  const total = delivered + failed;
-  if (total === 0) return 0;
-  return Math.round((delivered / total) * 100);
+// UUID-safe color hash
+function hashIdx(id: string, length: number): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % length;
 }
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
@@ -184,128 +44,23 @@ function StatCard({
   value,
   label,
   valueColor,
+  colors,
+  isDark,
 }: {
   value: string;
   label: string;
   valueColor: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+  isDark: boolean;
 }) {
-  const { colors, isDark } = useTheme();
   const cardShadow = isDark
-    ? {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 4,
-      }
-    : {
-        shadowColor: "rgba(48,41,80,1)",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      };
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+
   return (
-    <View
-      style={[
-        styles.statCard,
-        { backgroundColor: colors.surfaceCard },
-        cardShadow,
-      ]}
-    >
+    <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
       <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ── Delivery History Card ─────────────────────────────────────────────────────
-function DeliveryCard({ delivery }: { delivery: DeliveryItem }) {
-  const { colors, isDark } = useTheme();
-  const cardShadow = isDark
-    ? {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 4,
-      }
-    : {
-        shadowColor: "rgba(48,41,80,1)",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      };
-
-  const DELIVERY_STATUS_MAP: Record<
-    DeliveryStatus,
-    {
-      label: string;
-      fg: string;
-      bg: string;
-      icon: React.ComponentProps<typeof Feather>["name"];
-    }
-  > = {
-    delivered: {
-      label: "Done",
-      fg: colors.success,
-      bg: colors.successBg,
-      icon: "check-circle",
-    },
-    failed: {
-      label: "Failed",
-      fg: colors.error,
-      bg: colors.errorBg,
-      icon: "x-circle",
-    },
-    in_transit: {
-      label: "Transit",
-      fg: colors.info,
-      bg: colors.infoBg,
-      icon: "truck",
-    },
-  };
-
-  const cfg = DELIVERY_STATUS_MAP[delivery.status];
-  return (
-    <View
-      style={[
-        styles.deliveryCard,
-        { backgroundColor: colors.surfaceCard },
-        cardShadow,
-      ]}
-    >
-      {/* Icon */}
-      <View style={[styles.deliveryIcon, { backgroundColor: cfg.bg }]}>
-        <Feather name={cfg.icon} size={15} color={cfg.fg} />
-      </View>
-
-      {/* Body */}
-      <View style={styles.deliveryBody}>
-        <Text
-          style={[styles.deliveryItem, { color: colors.textPrimary }]}
-          numberOfLines={1}
-        >
-          {delivery.item}
-        </Text>
-        <Text style={[styles.deliveryMeta, { color: colors.textMuted }]}>
-          {delivery.customer} · {delivery.area}
-        </Text>
-      </View>
-
-      {/* Right */}
-      <View style={styles.deliveryRight}>
-        <View style={[styles.deliveryPill, { backgroundColor: cfg.bg }]}>
-          <View style={[styles.pillDot, { backgroundColor: cfg.fg }]} />
-          <Text style={[styles.pillText, { color: cfg.fg }]}>{cfg.label}</Text>
-        </View>
-        <Text style={[styles.deliveryTime, { color: colors.textMuted }]}>
-          {delivery.time}
-        </Text>
-      </View>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
 }
@@ -315,7 +70,8 @@ export default function RiderDetailScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const rider: Rider = DUMMY_RIDERS.find((r) => r.id === id) ?? DUMMY_RIDERS[0];
+
+  const { data: rider, isLoading, isError } = useRider(id);
 
   const AVATAR_COLORS = [
     { bg: colors.primarySoft, fg: colors.primary },
@@ -323,42 +79,58 @@ export default function RiderDetailScreen() {
     { bg: colors.warningBg, fg: colors.warning },
   ];
 
-  const avatarColor = AVATAR_COLORS[parseInt(rider.id) % AVATAR_COLORS.length];
-  const successRate = getSuccessRate(rider.delivered, rider.failed);
-  const initials = getInitials(rider.name);
-
-  const cardShadow = isDark
-    ? {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 4,
-      }
-    : {
-        shadowColor: "rgba(48,41,80,1)",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      };
-
   function handleCall() {
+    if (!rider) return;
     Linking.openURL("tel:" + rider.phone.replace(/\s/g, ""));
   }
 
   function handleWhatsApp() {
+    if (!rider) return;
     Linking.openURL(
       "https://wa.me/234" + rider.phone.replace(/\s/g, "").replace(/^0/, ""),
     );
   }
 
   function handleRemove() {
+    if (!rider) return;
     router.push({
       pathname: "/(modals)/delete-rider",
       params: { id: rider.id, name: rider.name },
     });
   }
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <View style={[styles.root, styles.center, { backgroundColor: colors.surface }]}>
+        <StatusBar style="light" />
+        <ActivityIndicator color={colors.primary} size="large" />
+      </View>
+    );
+  }
+
+  // ── Error / not found ────────────────────────────────────────────────────────
+  if (isError || !rider) {
+    return (
+      <View style={[styles.root, styles.center, { backgroundColor: colors.surface }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <Feather name="user-x" size={36} color={colors.textMuted} />
+        <Text style={[styles.errorText, { color: colors.textMuted }]}>
+          Rider not found
+        </Text>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={[styles.backBtnText, { color: colors.primary }]}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const avatarColor = AVATAR_COLORS[hashIdx(rider.id, AVATAR_COLORS.length)];
+  const initials = getInitials(rider.name);
+
+  const cardShadow = isDark
+    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -371,7 +143,6 @@ export default function RiderDetailScreen() {
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 16 }]}
         >
-          {/* Decorative orbs */}
           <View style={styles.orb1} />
           <View style={styles.orb2} />
 
@@ -388,8 +159,8 @@ export default function RiderDetailScreen() {
           </View>
 
           {/* Avatar */}
-          <View style={styles.heroAvatar}>
-            <Text style={[styles.heroAvatarText, { color: colors.white }]}>
+          <View style={[styles.heroAvatar, { backgroundColor: avatarColor.bg }]}>
+            <Text style={[styles.heroAvatarText, { color: avatarColor.fg }]}>
               {initials}
             </Text>
           </View>
@@ -405,17 +176,13 @@ export default function RiderDetailScreen() {
             <Pressable style={styles.heroActionBtn} onPress={handleCall}>
               <View style={styles.heroActionContent}>
                 <Feather name="phone" size={12} color={colors.white} />
-                <Text style={[styles.heroActionText, { color: colors.white }]}>
-                  Call
-                </Text>
+                <Text style={[styles.heroActionText, { color: colors.white }]}>Call</Text>
               </View>
             </Pressable>
             <Pressable style={styles.heroActionBtn} onPress={handleWhatsApp}>
               <View style={styles.heroActionContent}>
                 <Feather name="message-circle" size={12} color={colors.white} />
-                <Text style={[styles.heroActionText, { color: colors.white }]}>
-                  WhatsApp
-                </Text>
+                <Text style={[styles.heroActionText, { color: colors.white }]}>WhatsApp</Text>
               </View>
             </Pressable>
             <Pressable
@@ -433,51 +200,52 @@ export default function RiderDetailScreen() {
         {/* ── Stats Grid ──────────────────────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard
-            value={String(rider.delivered)}
+            value={String(rider.total_deliveries)}
             label="DELIVERED"
             valueColor={colors.success}
+            colors={colors}
+            isDark={isDark}
           />
           <StatCard
-            value={String(rider.failed)}
+            value="—"
             label="FAILED"
-            valueColor={colors.error}
+            valueColor={colors.textMuted}
+            colors={colors}
+            isDark={isDark}
           />
           <StatCard
-            value={`${successRate}%`}
+            value={rider.total_deliveries > 0 ? "100%" : "—"}
             label="SUCCESS"
             valueColor={colors.primary}
+            colors={colors}
+            isDark={isDark}
           />
         </View>
 
         {/* ── Notes Card ──────────────────────────────────────────────── */}
         {!!rider.notes && (
-          <View
-            style={[
-              styles.notesCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
-            ]}
-          >
-            <Text style={[styles.notesLabel, { color: colors.textMuted }]}>
-              NOTES
-            </Text>
+          <View style={[styles.notesCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+            <Text style={[styles.notesLabel, { color: colors.textMuted }]}>NOTES</Text>
             <Text style={[styles.notesText, { color: colors.textPrimary }]}>
               {rider.notes}
             </Text>
           </View>
         )}
 
-        {/* ── Recent Deliveries ────────────────────────────────────────── */}
+        {/* ── Recent Deliveries — placeholder until orders are live ───── */}
         <View style={styles.deliveriesSection}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
             Recent Deliveries
           </Text>
-          <View style={styles.deliveriesList}>
-            {rider.deliveries.map((d) => (
-              <DeliveryCard key={d.id} delivery={d} />
-            ))}
+          <View style={[styles.emptyDeliveries, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+            <Feather name="package" size={24} color={colors.textMuted} style={{ marginBottom: 8 }} />
+            <Text style={[styles.emptyDeliveriesText, { color: colors.textMuted }]}>
+              Delivery history coming soon
+            </Text>
           </View>
         </View>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
@@ -486,251 +254,48 @@ export default function RiderDetailScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center", gap: 12 },
+  errorText: { fontSize: 15, fontFamily: font.sans.semiBold },
+  backBtn: { paddingVertical: 8, paddingHorizontal: 16 },
+  backBtnText: { fontSize: 14, fontFamily: font.sans.semiBold },
 
-  // Hero
   hero: {
     paddingHorizontal: 20,
     paddingBottom: 32,
     overflow: "hidden",
     position: "relative",
   },
-  orb1: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    top: -40,
-    right: -20,
-  },
-  orb2: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    bottom: -20,
-    left: 30,
-  },
+  orb1: { position: "absolute", width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(255,255,255,0.07)", top: -40, right: -20 },
+  orb2: { position: "absolute", width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(255,255,255,0.04)", bottom: -20, left: 30 },
 
-  // Hero back row
-  heroBackRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
-    zIndex: 2,
-  },
-  heroBackBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroBackLabel: {
-    fontSize: 15,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.8)",
-  },
+  heroBackRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20, zIndex: 2 },
+  heroBackBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  heroBackLabel: { fontSize: 15, fontFamily: font.sans.semiBold, fontWeight: "600", color: "rgba(255,255,255,0.8)" },
 
-  // Hero avatar
-  heroAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.full,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    zIndex: 2,
-    alignSelf: "flex-start",
-  },
-  heroAvatarText: {
-    fontSize: 22,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
+  heroAvatar: { width: 64, height: 64, borderRadius: radius.full, borderWidth: 2, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", marginBottom: 12, zIndex: 2, alignSelf: "flex-start" },
+  heroAvatarText: { fontSize: 22, fontFamily: font.sans.bold, fontWeight: "700" },
 
-  // Hero name / phone
-  heroName: {
-    fontSize: 20,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: -0.4,
-    zIndex: 2,
-    marginBottom: 3,
-  },
-  heroPhone: {
-    fontSize: 13,
-    fontFamily: font.mono.regular,
-    color: "rgba(255,255,255,0.6)",
-    zIndex: 2,
-  },
+  heroName: { fontSize: 20, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: -0.4, zIndex: 2, marginBottom: 3 },
+  heroPhone: { fontSize: 13, fontFamily: font.mono.regular, color: "rgba(255,255,255,0.6)", zIndex: 2 },
 
-  // Hero action buttons
-  heroActions: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 16,
-    zIndex: 2,
-  },
-  heroActionBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.full,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroActionText: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
-  heroActionContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  heroActionDanger: {
-    backgroundColor: "rgba(220,38,38,0.2)",
-  },
-  heroActionDangerText: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    color: "#FCA5A5",
-  },
+  heroActions: { flexDirection: "row", gap: 8, marginTop: 16, zIndex: 2 },
+  heroActionBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.full, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  heroActionContent: { flexDirection: "row", alignItems: "center", gap: 6 },
+  heroActionText: { fontSize: 12, fontFamily: font.sans.bold, fontWeight: "700" },
+  heroActionDanger: { backgroundColor: "rgba(220,38,38,0.2)" },
+  heroActionDangerText: { fontSize: 12, fontFamily: font.sans.bold, fontWeight: "700", color: "#FCA5A5" },
 
-  // Stats row
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop: 16,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 22,
-    fontFamily: font.mono.medium,
-    fontWeight: "500",
-    letterSpacing: -0.44,
-  },
-  statLabel: {
-    fontSize: 9,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.05,
-    textTransform: "uppercase",
-    marginTop: 3,
-  },
+  statsRow: { flexDirection: "row", gap: 8, paddingHorizontal: layout.screenPaddingH, paddingTop: 16 },
+  statCard: { flex: 1, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: "center" },
+  statValue: { fontSize: 22, fontFamily: font.mono.medium, fontWeight: "500", letterSpacing: -0.44 },
+  statLabel: { fontSize: 9, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.05, textTransform: "uppercase", marginTop: 3 },
 
-  // Notes card
-  notesCard: {
-    marginTop: 14,
-    marginHorizontal: layout.screenPaddingH,
-    borderRadius: radius.xl,
-    padding: 14,
-    paddingHorizontal: 16,
-  },
-  notesLabel: {
-    fontSize: 10,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.1,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  notesText: {
-    fontSize: 13,
-    fontFamily: font.sans.regular,
-    lineHeight: 19.5,
-  },
+  notesCard: { marginTop: 14, marginHorizontal: layout.screenPaddingH, borderRadius: radius.xl, padding: 14, paddingHorizontal: 16 },
+  notesLabel: { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.1, textTransform: "uppercase", marginBottom: 8 },
+  notesText: { fontSize: 13, fontFamily: font.sans.regular, lineHeight: 19.5 },
 
-  // Recent deliveries
-  deliveriesSection: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop: 14,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.1,
-    textTransform: "uppercase",
-  },
-  deliveriesList: {
-    gap: layout.listGap,
-    marginTop: 10,
-    marginBottom: 20,
-  },
-
-  // Delivery card
-  deliveryCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: radius.xl,
-    padding: 12,
-    paddingHorizontal: 14,
-    gap: 12,
-  },
-  deliveryIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  deliveryBody: { flex: 1, minWidth: 0 },
-  deliveryItem: {
-    fontSize: 13,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  deliveryMeta: {
-    fontSize: 11,
-    fontFamily: font.sans.regular,
-  },
-  deliveryRight: {
-    alignItems: "flex-end",
-    gap: 4,
-    flexShrink: 0,
-  },
-  deliveryPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 3,
-    paddingHorizontal: 9,
-    borderRadius: radius.full,
-    gap: 4,
-  },
-  pillDot: {
-    width: 5,
-    height: 5,
-    borderRadius: radius.full,
-  },
-  pillText: {
-    fontSize: 10,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-    textTransform: "uppercase",
-  },
-  deliveryTime: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
-  },
+  deliveriesSection: { paddingHorizontal: layout.screenPaddingH, paddingTop: 14 },
+  sectionLabel: { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.1, textTransform: "uppercase", marginBottom: 10 },
+  emptyDeliveries: { borderRadius: radius.xl, padding: 24, alignItems: "center", justifyContent: "center" },
+  emptyDeliveriesText: { fontSize: 13, fontFamily: font.sans.regular },
 });

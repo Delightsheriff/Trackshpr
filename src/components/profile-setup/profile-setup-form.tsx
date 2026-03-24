@@ -17,7 +17,6 @@ interface ProfileSetupFormProps {
   onUploadLogo: (uri: string) => Promise<{ error?: any; publicUrl?: string | null }>;
   onSave: (data: ProfileSetupFormData) => void;
   isSaving: boolean;
-  onSkip: () => void;
 }
 
 export function ProfileSetupForm({
@@ -27,7 +26,6 @@ export function ProfileSetupForm({
   onUploadLogo,
   onSave,
   isSaving,
-  onSkip,
 }: ProfileSetupFormProps) {
   const {
     control,
@@ -344,16 +342,6 @@ export function ProfileSetupForm({
         </Pressable>
       </View>
 
-      {/* ── Skip ────────────────────────────────────────────────── */}
-      <Pressable
-        onPress={onSkip}
-        style={[styles.skipWrap, isFilled && { opacity: 0 }]}
-        disabled={isFilled}
-      >
-        <Text style={styles.skipText}>
-          Fill in later? <Text style={styles.skipLink}>Skip for now</Text>
-        </Text>
-      </Pressable>
     </View>
   );
 }
@@ -450,20 +438,5 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     color: colors.white,
-  },
-  skipWrap: {
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingBottom: 16,
-  },
-  skipText: {
-    fontSize: 13,
-    fontFamily: font.sans.regular,
-    color: colors.textMuted,
-  },
-  skipLink: {
-    color: colors.textSecondary,
-    textDecorationLine: "underline",
-    textDecorationStyle: "dotted",
   },
 });

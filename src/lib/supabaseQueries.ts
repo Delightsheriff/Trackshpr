@@ -74,15 +74,15 @@ export interface Order {
 
 // ── Profile ─────────────────────────────────────────────────────────────────
 
-export async function fetchProfile(userId: string): Promise<Profile> {
+export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) throw new Error("Profile not found");
-  return data as unknown as Profile;
+  if (error) throw new Error("Failed to fetch profile");
+  return data as Profile | null;
 }
 
 // ── Orders ─────────────────────────────────────────────────────────────────

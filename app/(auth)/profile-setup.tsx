@@ -33,8 +33,8 @@ export default function ProfileSetupScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUserId(session.user.id);
     });
   }, []);
 
@@ -77,18 +77,6 @@ export default function ProfileSetupScreen() {
     },
     [userId, saveMutation, showToast]
   );
-
-  // ── Skip ─────────────────────────────────────────────────────────────────────
-  const handleSkip = useCallback(async () => {
-    if (!userId) return;
-
-    await supabase
-      .from("profiles")
-      .update({ onboarding_complete: false })
-      .eq("id", userId);
-
-    router.replace("/(tabs)");
-  }, [userId]);
 
   const handleUploadLogo = useCallback(
     async (uri: string) => {
@@ -153,7 +141,6 @@ export default function ProfileSetupScreen() {
             onUploadLogo={handleUploadLogo}
             onSave={handleSave}
             isSaving={saveMutation.isPending}
-            onSkip={handleSkip}
           />
         </ScrollView>
       </KeyboardAvoidingView>

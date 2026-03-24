@@ -63,7 +63,7 @@ export function useProfileComplete(userId: string | null) {
     queryKey: queryKeys.profile(userId ?? ""),
     queryFn: () => fetchProfile(userId!),
     enabled: !!userId,
-    select: (profile: Profile) => !!profile.onboarding_complete,
+    select: (profile: Profile | null) => !!profile?.onboarding_complete,
     staleTime: 1000 * 60 * 5,
   });
 }

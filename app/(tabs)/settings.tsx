@@ -183,6 +183,7 @@ export default function SettingsScreen() {
         elevation: 2,
       };
 
+  console.log("[Settings] profile:", { logo_url: profile?.logo_url, updated_at: profile?.updated_at });
   const businessName = profile?.business_name ?? "My Business";
   const initials = businessName
     .split(" ")
@@ -229,6 +230,8 @@ export default function SettingsScreen() {
                   }}
                   style={[styles.profileAvatar, styles.profileAvatarImg, { borderColor: colors.surfaceCard }]}
                   cachePolicy="none"
+                  onLoad={() => console.log("[Settings] avatar loaded ✓")}
+                  onError={(e) => console.log("[Settings] avatar error:", e)}
                 />
               ) : (
                 <LinearGradient

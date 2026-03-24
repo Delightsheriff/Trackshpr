@@ -169,6 +169,10 @@ export default function BusinessDetailsScreen() {
   // Pre-fill from profile once loaded
   useEffect(() => {
     if (profile) {
+      console.log("[BusinessDetails] profile loaded:", {
+        logo_url: profile.logo_url,
+        updated_at: profile.updated_at,
+      });
       setBusinessName(profile.business_name ?? "");
       setPhone(profile.phone ?? "");
       setCity(profile.city ?? "");
@@ -245,18 +249,25 @@ export default function BusinessDetailsScreen() {
 
     let finalLogoUrl: string | null = logoUri?.startsWith("https://") ? logoUri : (profile?.logo_url ?? null);
 
+    console.log("[BusinessDetails] handleSave — logoUri:", logoUri);
+    console.log("[BusinessDetails] handleSave — initial finalLogoUrl:", finalLogoUrl);
+
     // Upload new local image if picked
     if (logoUri && !logoUri.startsWith("https://")) {
       try {
         const result = await uploadLogoMutation.mutateAsync({ userId, uri: logoUri });
+        console.log("[BusinessDetails] upload result:", result);
         finalLogoUrl = result.publicUrl;
-      } catch {
+      } catch (e) {
+        console.log("[BusinessDetails] upload error:", e);
         showToast("Logo upload failed. Saving without logo.", "error");
         finalLogoUrl = profile?.logo_url ?? null;
       }
     } else if (!logoUri) {
       finalLogoUrl = null;
     }
+
+    console.log("[BusinessDetails] saving logo_url:", finalLogoUrl);
 
     saveProfileMutation.mutate(
       {
@@ -367,12 +378,18 @@ export default function BusinessDetailsScreen() {
               {logoUri ? (
                 <Image
                   source={{
-                    uri: logoUri.startsWith("https://")
-                      ? `${logoUri}?t=${profile?.updated_at ?? Date.now()}`
-                      : logoUri,
+                    uri: (() => {
+                      const src = logoUri.startsWith("https://")
+                        ? `${logoUri}?t=${profile?.updated_at ?? Date.now()}`
+                        : logoUri;
+                      console.log("[BusinessDetails] Image src:", src);
+                      return src;
+                    })(),
                   }}
                   style={styles.logoImage}
                   cachePolicy="none"
+                  onLoad={() => console.log("[BusinessDetails] Image loaded ✓")}
+                  onError={(e) => console.log("[BusinessDetails] Image error:", e)}
                 />
               ) : (
                 <Feather name="briefcase" size={24} color={colors.textMuted} />

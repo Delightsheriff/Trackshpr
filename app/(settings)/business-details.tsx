@@ -311,32 +311,7 @@ export default function BusinessDetailsScreen() {
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Business Details
         </Text>
-        <Pressable
-          onPress={handleSave}
-          disabled={isPending}
-          style={[
-            styles.headerSaveBtn,
-            { backgroundColor: saved ? colors.successBg : colors.primarySoft },
-            (hasErrors || isPending) && { opacity: 0.4 },
-          ]}
-          android_ripple={{
-            color: saved ? colors.successBg : colors.primarySoft,
-            borderless: false,
-          }}
-        >
-          {isPending ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text
-              style={[
-                styles.headerSaveText,
-                { color: saved ? colors.success : colors.primary },
-              ]}
-            >
-              {saved ? "Saved" : "Save"}
-            </Text>
-          )}
-        </Pressable>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* ── Saved banner ── */}
@@ -601,17 +576,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.34,
   },
-  headerSaveBtn: {
-    borderRadius: radius.full,
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    overflow: "hidden",
-  },
-  headerSaveText: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
+  headerSpacer: { width: 34 },
 
   // Saved banner
   savedBanner: {

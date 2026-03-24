@@ -56,11 +56,13 @@ function PreviewCard({
   accentEnd,
   isPro,
   businessName,
+  displayOption,
 }: {
   accentHex: string;
   accentEnd: string;
   isPro: boolean;
   businessName?: string;
+  displayOption?: DisplayOption;
 }) {
   const { colors, isDark } = useTheme();
 
@@ -98,18 +100,20 @@ function PreviewCard({
         />
 
         <View style={styles.previewBrandRow}>
-          <View
-            style={[
-              styles.previewLogo,
-              { backgroundColor: "rgba(255,255,255,0.15)" },
-            ]}
-          >
-            <Feather
-              name={isPro ? "shopping-bag" : "package"}
-              size={16}
-              color="#FFFFFF"
-            />
-          </View>
+          {(!isPro || displayOption !== "name_only") && (
+            <View
+              style={[
+                styles.previewLogo,
+                { backgroundColor: "rgba(255,255,255,0.15)" },
+              ]}
+            >
+              <Feather
+                name={isPro ? "shopping-bag" : "package"}
+                size={16}
+                color="#FFFFFF"
+              />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={[styles.previewBrandName, { color: "#fff" }]}>
               {isPro ? (businessName ?? "Your Business") : "Trackshpr"}
@@ -670,6 +674,7 @@ export default function BrandCustomizationScreen() {
               accentEnd={accent.end}
               isPro={true}
               businessName={profile?.business_name ?? undefined}
+              displayOption={displayOption}
             />
 
             {/* Colour picker */}

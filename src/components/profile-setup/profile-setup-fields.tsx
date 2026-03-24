@@ -70,7 +70,12 @@ export function TextField({
 }) {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={styles.textFieldWrap}>
+    <View
+      style={[
+        styles.textFieldWrap,
+        focused && styles.textFieldWrapFocused,
+      ]}
+    >
       {prefix && <Text style={styles.fieldPrefix}>{prefix}</Text>}
       <TextInput
         value={value}
@@ -89,12 +94,7 @@ export function TextField({
         multiline={multiline}
         style={[
           styles.textInput,
-          focused && {
-            borderWidth: 2,
-            borderColor: colors.primary,
-            borderRadius: radius.lg,
-          },
-          multiline && { height: 60, textAlignVertical: "top" as const },
+          multiline && { height: 72, textAlignVertical: "top" as const },
         ]}
         returnKeyType={multiline ? "default" : "next"}
       />
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 14,
     gap: 12,
   },
@@ -150,10 +150,10 @@ const styles = StyleSheet.create({
   },
   inputInner: { flex: 1 },
   labelRow: {
-    marginBottom: 3,
+    marginBottom: 5,
   },
   fieldLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
     letterSpacing: 0.5,
@@ -169,21 +169,29 @@ const styles = StyleSheet.create({
   textFieldWrap: {
     flexDirection: "row",
     alignItems: "center",
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginHorizontal: -10,
+    backgroundColor: "transparent",
+  },
+  textFieldWrapFocused: {
+    backgroundColor: colors.primarySoft,
   },
   fieldPrefix: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: font.sans.semiBold,
     color: colors.textSecondary,
     marginRight: 4,
   },
   textInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
     color: colors.textPrimary,
     padding: 0,
     margin: 0,
-    paddingVertical: 2,
+    minHeight: 24,
   },
 });

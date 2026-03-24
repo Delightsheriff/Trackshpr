@@ -12,9 +12,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
+import { Image } from "expo-image";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -365,7 +365,15 @@ export default function BusinessDetailsScreen() {
               ]}
             >
               {logoUri ? (
-                <Image source={{ uri: logoUri }} style={styles.logoImage} />
+                <Image
+                  source={{
+                    uri: logoUri.startsWith("https://")
+                      ? `${logoUri}?t=${profile?.updated_at ?? Date.now()}`
+                      : logoUri,
+                  }}
+                  style={styles.logoImage}
+                  cachePolicy="none"
+                />
               ) : (
                 <Feather name="briefcase" size={24} color={colors.textMuted} />
               )}

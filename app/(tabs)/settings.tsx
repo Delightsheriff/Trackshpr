@@ -6,6 +6,7 @@ import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useProfile, useSession } from "@/src/hooks";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -221,17 +222,24 @@ export default function SettingsScreen() {
             ]}
           >
             <View style={styles.profileAvatarWrap}>
-              <LinearGradient
-                colors={gradients.avatar}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.profileAvatar,
-                  { borderColor: colors.surfaceCard },
-                ]}
-              >
-                <Text style={styles.profileAvatarText}>{initials}</Text>
-              </LinearGradient>
+              {profile?.logo_url ? (
+                <Image
+                  source={{
+                    uri: `${profile.logo_url}?t=${profile.updated_at}`,
+                  }}
+                  style={[styles.profileAvatar, styles.profileAvatarImg, { borderColor: colors.surfaceCard }]}
+                  cachePolicy="none"
+                />
+              ) : (
+                <LinearGradient
+                  colors={gradients.avatar}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.profileAvatar, { borderColor: colors.surfaceCard }]}
+                >
+                  <Text style={styles.profileAvatarText}>{initials}</Text>
+                </LinearGradient>
+              )}
             </View>
             <View style={styles.profileMeta}>
               <Text style={[styles.profileName, { color: colors.textPrimary }]}>
@@ -427,6 +435,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
+  },
+  profileAvatarImg: {
+    borderWidth: 3,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 3,

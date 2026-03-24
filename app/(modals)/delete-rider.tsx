@@ -43,7 +43,8 @@ export default function DeleteRiderSheet() {
     deleteRider.mutate(id, {
       onSuccess: () => {
         showToast(`${name} removed`, "error");
-        router.back();
+        router.dismissAll();
+        router.replace("/(tabs)/riders");
       },
       onError: () => {
         showToast("Could not remove rider. Please try again.", "error");

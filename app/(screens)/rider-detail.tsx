@@ -181,33 +181,37 @@ export default function RiderDetailScreen() {
 
           {/* Action buttons */}
           <View style={styles.heroActions}>
-            <Pressable style={styles.heroActionBtn} onPress={handleCall}>
-              <View style={styles.heroActionContent}>
-                <Feather name="phone" size={12} color={colors.white} />
-                <Text style={[styles.heroActionText, { color: colors.white }]}>Call</Text>
-              </View>
-            </Pressable>
-            <Pressable style={styles.heroActionBtn} onPress={handleWhatsApp}>
-              <View style={styles.heroActionContent}>
-                <Feather name="message-circle" size={12} color={colors.white} />
-                <Text style={[styles.heroActionText, { color: colors.white }]}>WhatsApp</Text>
-              </View>
-            </Pressable>
-            <Pressable style={styles.heroActionBtn} onPress={handleEdit}>
-              <View style={styles.heroActionContent}>
-                <Feather name="edit-2" size={12} color={colors.white} />
-                <Text style={[styles.heroActionText, { color: colors.white }]}>Edit</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              style={[styles.heroActionBtn, styles.heroActionDanger]}
-              onPress={handleRemove}
-            >
-              <View style={styles.heroActionContent}>
-                <Feather name="trash-2" size={12} color="#FCA5A5" />
-                <Text style={styles.heroActionDangerText}>Remove</Text>
-              </View>
-            </Pressable>
+            <View style={styles.heroActionsRow}>
+              <Pressable style={styles.heroActionBtn} onPress={handleCall}>
+                <View style={styles.heroActionContent}>
+                  <Feather name="phone" size={12} color={colors.white} />
+                  <Text style={[styles.heroActionText, { color: colors.white }]}>Call</Text>
+                </View>
+              </Pressable>
+              <Pressable style={styles.heroActionBtn} onPress={handleWhatsApp}>
+                <View style={styles.heroActionContent}>
+                  <Feather name="message-circle" size={12} color={colors.white} />
+                  <Text style={[styles.heroActionText, { color: colors.white }]}>WhatsApp</Text>
+                </View>
+              </Pressable>
+            </View>
+            <View style={styles.heroActionsRow}>
+              <Pressable style={styles.heroActionBtn} onPress={handleEdit}>
+                <View style={styles.heroActionContent}>
+                  <Feather name="edit-2" size={12} color={colors.white} />
+                  <Text style={[styles.heroActionText, { color: colors.white }]}>Edit</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                style={[styles.heroActionBtn, styles.heroActionDanger]}
+                onPress={handleRemove}
+              >
+                <View style={styles.heroActionContent}>
+                  <Feather name="trash-2" size={12} color="#FCA5A5" />
+                  <Text style={styles.heroActionDangerText}>Remove</Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
         </LinearGradient>
 
@@ -292,7 +296,8 @@ const styles = StyleSheet.create({
   heroName: { fontSize: 20, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: -0.4, zIndex: 2, marginBottom: 3 },
   heroPhone: { fontSize: 13, fontFamily: font.mono.regular, color: "rgba(255,255,255,0.6)", zIndex: 2 },
 
-  heroActions: { flexDirection: "row", gap: 8, marginTop: 16, zIndex: 2 },
+  heroActions: { flexDirection: "column", gap: 8, marginTop: 16, zIndex: 2 },
+  heroActionsRow: { flexDirection: "row", gap: 8 },
   heroActionBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.full, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   heroActionContent: { flexDirection: "row", alignItems: "center", gap: 6 },
   heroActionText: { fontSize: 12, fontFamily: font.sans.bold, fontWeight: "700" },

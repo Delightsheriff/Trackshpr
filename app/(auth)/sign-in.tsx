@@ -11,12 +11,11 @@ import SignInHero from "@/src/components/auth/sign-in-hero";
 import GoogleIcon from "@/src/components/auth/google-icon";
 import { colors, font, radius, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
-import { supabase } from "@/src/lib/supabase";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Pressable,
@@ -71,9 +70,22 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const heroH = height * 0.58;
 
-  const [loading, setLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const signIn = useMutation({
+    mutationFn: signInWithGoogle,
+    onError: (err: Error) => {
+      if ((err as any).cancelled) {
+        console.log("[SignIn] User cancelled.");
+        return;
+      }
+      console.log("[SignIn] Sign-in error:", err.message);
+      showToast(err.message ?? "Sign-in failed. Please try again.");
+    },
+  });
+
+  const loading = signIn.isPending;
 
   // Staggered content entrance — matches HTML fadeUp keyframe
   const w0 = useSharedValue(0); // wordmark     delay 200ms
@@ -136,51 +148,10 @@ export default function SignInScreen() {
     [toastOp, toastY],
   );
 
-  const handleSignIn = useCallback(async () => {
-    setLoading(true);
-
-    console.log("[SignIn] Starting sign-in flow...");
-    const result = await signInWithGoogle();
-    console.log("[SignIn] signInWithGoogle result:", JSON.stringify(result));
-
-    if (!result.ok) {
-      if ("cancelled" in result) {
-        console.log("[SignIn] User cancelled.");
-        setLoading(false);
-        return;
-      }
-      console.log("[SignIn] Sign-in error:", result.error);
-      showToast(result.error);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log("[SignIn] Fetching user session...");
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      console.log("[SignIn] User:", user ? user.id : "null");
-
-      if (!user) throw new Error("No user");
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_complete")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      console.log("[SignIn] Profile:", profile);
-
-      const destination = profile?.onboarding_complete ? "/(tabs)" : "/(auth)/profile-setup";
-      console.log("[SignIn] Redirecting to:", destination);
-      router.replace(destination);
-    } catch (err) {
-      console.log("[SignIn] Catch error:", err);
-      showToast("Couldn't complete sign-in. Please try again.");
-      setLoading(false);
-    }
-  }, [showToast]);
+  const handleSignIn = useCallback(() => {
+    console.log("[SignIn] Starting sign-in...");
+    signIn.mutate(undefined);
+  }, [signIn]);
 
   return (
     <View style={styles.root}>

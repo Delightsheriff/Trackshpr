@@ -16,8 +16,8 @@ export type OrderStatus = "pending" | "picked_up" | "in_transit" | "delivered" |
 
 export interface Profile {
   id: string;
-  business_name: string;
-  phone: string;
+  business_name: string | null;
+  phone: string | null;
   city: string | null;
   logo_url: string | null;
   brand_name: string | null;

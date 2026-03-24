@@ -5,12 +5,14 @@
  * TODO: wire sign-out to supabase.auth.signOut() + confirmation sheet.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { supabase } from "@/src/lib/supabase";
 import { router } from "expo-router";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { Alert } from "react-native";
+import { useCallback, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -129,6 +131,26 @@ export default function SettingsScreen() {
   const { colors, isDark } = useTheme();
   const { toggle } = useThemeStore();
   const [notifs, setNotifs] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = useCallback(async () => {
+    Alert.alert(
+      "Sign out",
+      "Are you sure you want to sign out of Trackshpr?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: async () => {
+            setSigningOut(true);
+            await supabase.auth.signOut();
+            router.replace("/sign-in");
+          },
+        },
+      ]
+    );
+  }, []);
 
   const profileSectionShadow = isDark
     ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
@@ -268,13 +290,12 @@ export default function SettingsScreen() {
 
         {/* ── Danger zone ───────────────────────────────────────────────── */}
         <SettingGroup>
-          {/* TODO: show confirmation sheet (DS §11.4) before signing out */}
           <SettingRow
             icon="🚪"
             iconBg={colors.errorBg}
             label="Sign out"
             danger
-            onPress={() => {}}
+            onPress={handleSignOut}
           />
         </SettingGroup>
 

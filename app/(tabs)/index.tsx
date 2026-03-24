@@ -2,33 +2,51 @@
  * Home / Dashboard tab (DS §8.1, §8.4).
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useTheme } from "@/src/stores/themeStore";
 import { supabase } from "@/src/lib/supabase";
 import { fetchProfile } from "@/src/lib/supabaseQueries";
+import { useTheme } from "@/src/stores/themeStore";
+import { Feather } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useIsFocused } from "@react-navigation/native";
-import { Feather } from "@expo/vector-icons";
 
 // ── Dummy data — TODO: replace with real Supabase query ──────────────────────
 const DUMMY_STATS = { total: 18, delivered: 11, inTransit: 5, failed: 2 };
 
 const DUMMY_ORDERS = [
-  { id: "1", item: "Adire Maxi Dress × 2", customer: "Amara Obi",
-    area: "Lekki Phase 1", status: "in_transit" as const, time: "12m ago" },
-  { id: "2", item: "Ankara Tote Bag",       customer: "Tunde Bello",
-    area: "Yaba",          status: "pending"    as const, time: "34m ago" },
-  { id: "3", item: "Beaded Necklace Set",   customer: "Chisom Eze",
-    area: "Surulere",      status: "delivered"  as const, time: "1h ago" },
+  {
+    id: "1",
+    item: "Adire Maxi Dress × 2",
+    customer: "Amara Obi",
+    area: "Lekki Phase 1",
+    status: "in_transit" as const,
+    time: "12m ago",
+  },
+  {
+    id: "2",
+    item: "Ankara Tote Bag",
+    customer: "Tunde Bello",
+    area: "Yaba",
+    status: "pending" as const,
+    time: "34m ago",
+  },
+  {
+    id: "3",
+    item: "Beaded Necklace Set",
+    customer: "Chisom Eze",
+    area: "Surulere",
+    status: "delivered" as const,
+    time: "1h ago",
+  },
 ];
 
 const QUICK_ACTIONS: { icon: string; label: string; route?: string }[] = [
-  { icon: "🗺️", label: "Fleet map",  route: "/(screens)/fleet-map" },
-  { icon: "📊", label: "Analytics",  route: "/(screens)/analytics" },
+  { icon: "🗺️", label: "Fleet map", route: "/(screens)/fleet-map" },
+  { icon: "📊", label: "Analytics", route: "/(screens)/analytics" },
   { icon: "📋", label: "Export CSV" },
   { icon: "🔗", label: "Copy link" },
 ];
@@ -39,10 +57,30 @@ type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
 // STATUS_MAP is resolved at render time from live colors — built inline per component
 function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
   return {
-    in_transit: { label: "In Transit", fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
-    pending:    { label: "Pending",    fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
-    delivered:  { label: "Delivered",  fg: colors.success, bg: colors.successBg, emoji: "✅" },
-    failed:     { label: "Failed",     fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
+    in_transit: {
+      label: "In Transit",
+      fg: colors.info,
+      bg: colors.infoBg,
+      emoji: "📦",
+    },
+    pending: {
+      label: "Pending",
+      fg: colors.warning,
+      bg: colors.warningBg,
+      emoji: "🛍️",
+    },
+    delivered: {
+      label: "Delivered",
+      fg: colors.success,
+      bg: colors.successBg,
+      emoji: "✅",
+    },
+    failed: {
+      label: "Failed",
+      fg: colors.error,
+      bg: colors.errorBg,
+      emoji: "❌",
+    },
   } as const;
 }
 
@@ -65,26 +103,63 @@ function StatusPill({ status }: { status: OrderStatus }) {
   );
 }
 
-function OrderCard({ item, customer, area, status, time }: {
-  item: string; customer: string; area: string; status: OrderStatus; time: string;
+function OrderCard({
+  item,
+  customer,
+  area,
+  status,
+  time,
+}: {
+  item: string;
+  customer: string;
+  area: string;
+  status: OrderStatus;
+  time: string;
 }) {
   const { colors, isDark } = useTheme();
   const cfg = getStatusMap(colors)[status];
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
   return (
-    <View style={[styles.orderCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+    <View
+      style={[
+        styles.orderCard,
+        { backgroundColor: colors.surfaceCard },
+        cardShadow,
+      ]}
+    >
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
         <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
       </View>
       <View style={styles.orderInfo}>
-        <Text style={[styles.orderName, { color: colors.textPrimary }]} numberOfLines={1}>{item}</Text>
-        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>{customer} · {area}</Text>
+        <Text
+          style={[styles.orderName, { color: colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {item}
+        </Text>
+        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>
+          {customer} · {area}
+        </Text>
       </View>
       <View style={styles.orderRight}>
         <StatusPill status={status} />
-        <Text style={[styles.orderTime, { color: colors.textMuted }]}>{time}</Text>
+        <Text style={[styles.orderTime, { color: colors.textMuted }]}>
+          {time}
+        </Text>
       </View>
     </View>
   );
@@ -98,7 +173,9 @@ function IncompleteProfileBanner() {
       onPress={() => router.push("/(auth)/profile-setup")}
       style={[styles.profileBanner, { backgroundColor: colors.warningBg }]}
     >
-      <View style={[styles.bannerIcon, { backgroundColor: "rgba(245,166,35,0.2)" }]}>
+      <View
+        style={[styles.bannerIcon, { backgroundColor: "rgba(245,166,35,0.2)" }]}
+      >
         <Text style={{ fontSize: 16 }}>🏪</Text>
       </View>
       <View style={styles.bannerText}>
@@ -106,7 +183,8 @@ function IncompleteProfileBanner() {
           Complete your profile
         </Text>
         <Text style={[styles.bannerSub, { color: colors.textSecondary }]}>
-          Add your business name so customers{'\n'}recognise you on tracking pages
+          Add your business name so customers{"\n"}recognise you on tracking
+          pages
         </Text>
       </View>
       <Feather name="chevron-right" size={18} color={colors.warning} />
@@ -126,26 +204,56 @@ export default function HomeScreen() {
     if (!isFocused) return;
 
     async function checkProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setProfileIncomplete(false);
+        return;
+      }
 
       try {
         const profile = await fetchProfile(user.id);
         setProfileIncomplete(!profile?.onboarding_complete);
       } catch {
-        setProfileIncomplete(false);
+        // Missing profile row should still prompt completion.
+        setProfileIncomplete(true);
       }
     }
     checkProfile();
   }, [isFocused]);
 
   const statCardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const chipShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -158,15 +266,17 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Profile incomplete banner ─────────────────────────────── */}
-        {profileIncomplete && (
-          <IncompleteProfileBanner />
-        )}
+        {profileIncomplete && <IncompleteProfileBanner />}
 
         {/* ── Header ───────────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.greeting, { color: colors.textMuted }]}>{greeting()}</Text>
-            <Text style={[styles.businessName, { color: colors.textPrimary }]}>Zara&apos;s Closet</Text>
+            <Text style={[styles.greeting, { color: colors.textMuted }]}>
+              {greeting()}
+            </Text>
+            <Text style={[styles.businessName, { color: colors.textPrimary }]}>
+              Zara&apos;s Closet
+            </Text>
           </View>
           <View style={styles.avatarWrap}>
             <LinearGradient
@@ -204,20 +314,44 @@ export default function HomeScreen() {
 
         {/* ── Mini stat row ─────────────────────────────────────────────── */}
         <View style={styles.statRow}>
-          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Done</Text>
+          <View
+            style={[
+              styles.statMini,
+              { backgroundColor: colors.surfaceCard },
+              statCardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              Done
+            </Text>
             <Text style={[styles.statNum, { color: colors.success }]}>
               {DUMMY_STATS.delivered}
             </Text>
           </View>
-          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Moving</Text>
+          <View
+            style={[
+              styles.statMini,
+              { backgroundColor: colors.surfaceCard },
+              statCardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              Moving
+            </Text>
             <Text style={[styles.statNum, { color: colors.warning }]}>
               {DUMMY_STATS.inTransit}
             </Text>
           </View>
-          <View style={[styles.statMini, { backgroundColor: colors.surfaceCard }, statCardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Failed</Text>
+          <View
+            style={[
+              styles.statMini,
+              { backgroundColor: colors.surfaceCard },
+              statCardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              Failed
+            </Text>
             <Text style={[styles.statNum, { color: colors.error }]}>
               {DUMMY_STATS.failed}
             </Text>
@@ -233,19 +367,31 @@ export default function HomeScreen() {
           {QUICK_ACTIONS.map(({ icon, label, route }) => (
             <Pressable
               key={label}
-              style={[styles.quickChip, { backgroundColor: colors.surfaceCard }, chipShadow]}
+              style={[
+                styles.quickChip,
+                { backgroundColor: colors.surfaceCard },
+                chipShadow,
+              ]}
               onPress={route ? () => router.push(route as any) : undefined}
             >
               <Text style={styles.quickChipIcon}>{icon}</Text>
-              <Text style={[styles.quickChipLabel, { color: colors.textPrimary }]}>{label}</Text>
+              <Text
+                style={[styles.quickChipLabel, { color: colors.textPrimary }]}
+              >
+                {label}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
 
         {/* ── Active orders ─────────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Active Orders</Text>
-          <Text style={[styles.sectionLink, { color: colors.primary }]}>See all</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Active Orders
+          </Text>
+          <Text style={[styles.sectionLink, { color: colors.primary }]}>
+            See all
+          </Text>
         </View>
 
         {DUMMY_ORDERS.map((o) => (

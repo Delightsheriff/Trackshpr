@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
+  BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -18,7 +19,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,7 +75,7 @@ function SheetInput({
           {label}
           {optional && <Text style={{ color: colors.textMuted }}> · Optional</Text>}
         </Text>
-        <TextInput
+        <BottomSheetTextInput
           value={value}
           onChangeText={onChange}
           onFocus={() => setFocused(true)}
@@ -86,7 +86,7 @@ function SheetInput({
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
           keyboardType={keyboardType}
-          style={[si.input, { color: colors.textPrimary }]}
+          style={[si.input, { color: colors.textPrimary } as any]}
           returnKeyType="next"
         />
       </View>
@@ -168,6 +168,8 @@ export default function AddRiderSheet() {
         enablePanDownToClose
         onClose={handleClose}
         backdropComponent={renderBackdrop}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
         backgroundStyle={[styles.sheetBg, { backgroundColor: colors.surfaceElevated }, sheetShadow]}
         handleIndicatorStyle={{ backgroundColor: colors.surfaceHighlight }}
       >

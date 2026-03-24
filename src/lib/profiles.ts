@@ -1,6 +1,8 @@
 /**
  * Profile-related API calls: logo upload, profile load, and profile upsert.
  */
+import { decode } from "base64-arraybuffer";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "./supabase";
 
@@ -48,12 +50,16 @@ export async function uploadLogo(
   const fileName = `${userId}.${ext}`;
   const contentType = ext === "png" ? "image/png" : "image/jpeg";
 
-  const res = await fetch(uri);
-  const blob = await res.blob();
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: "base64",
+  });
+
+  // Delete before re-uploading so the CDN doesn't serve a stale cached version
+  await supabase.storage.from("logos").remove([fileName]);
 
   const { error } = await supabase.storage
     .from("logos")
-    .upload(fileName, blob, { upsert: true, contentType });
+    .upload(fileName, decode(base64), { contentType });
 
   if (error) return { publicUrl: null, error: error.message };
 

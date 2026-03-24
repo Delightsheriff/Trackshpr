@@ -11,13 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -183,7 +177,6 @@ export default function SettingsScreen() {
         elevation: 2,
       };
 
-  console.log("[Settings] profile:", { logo_url: profile?.logo_url, updated_at: profile?.updated_at });
   const businessName = profile?.business_name ?? "My Business";
   const initials = businessName
     .split(" ")
@@ -225,20 +218,26 @@ export default function SettingsScreen() {
             <View style={styles.profileAvatarWrap}>
               {profile?.logo_url ? (
                 <Image
-                  source={{
-                    uri: `${profile.logo_url}?t=${profile.updated_at}`,
-                  }}
-                  style={[styles.profileAvatar, styles.profileAvatarImg, { borderColor: colors.surfaceCard }]}
-                  cachePolicy="none"
-                  onLoad={() => console.log("[Settings] avatar loaded ✓")}
-                  onError={(e) => console.log("[Settings] avatar error:", e)}
+                  key={profile.updated_at}
+                  source={{ uri: profile.logo_url }}
+                  style={[
+                    styles.profileAvatar,
+                    styles.profileAvatarImg,
+                    { borderColor: colors.surfaceCard },
+                  ]}
+                  className="w-full h-full"
+                  // contentFit="cover"
+                  contentFit="cover"
                 />
               ) : (
                 <LinearGradient
                   colors={gradients.avatar}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.profileAvatar, { borderColor: colors.surfaceCard }]}
+                  style={[
+                    styles.profileAvatar,
+                    { borderColor: colors.surfaceCard },
+                  ]}
                 >
                   <Text style={styles.profileAvatarText}>{initials}</Text>
                 </LinearGradient>
@@ -250,8 +249,14 @@ export default function SettingsScreen() {
               </Text>
               <View style={styles.profileMetaRow}>
                 {!!profile?.city && (
-                  <Text style={[styles.profileCity, { color: colors.textMuted }]}>
-                    <Feather name="map-pin" size={12} color={colors.textMuted} />{" "}
+                  <Text
+                    style={[styles.profileCity, { color: colors.textMuted }]}
+                  >
+                    <Feather
+                      name="map-pin"
+                      size={12}
+                      color={colors.textMuted}
+                    />{" "}
                     {profile.city}
                   </Text>
                 )}
@@ -375,7 +380,12 @@ export default function SettingsScreen() {
             sublabel="Chat with us"
             onPress={() => {}}
           />
-          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
           <SettingRow
             icon="user"
             iconColor={colors.textSecondary}

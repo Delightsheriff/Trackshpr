@@ -3,16 +3,21 @@
  * Back + Save header, logo upload, required/optional fields, validation.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useProfile, useSaveProfile, useSession, useUploadLogo } from "@/src/hooks";
+import {
+  useProfile,
+  useSaveProfile,
+  useSession,
+  useUploadLogo,
+} from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Image } from "expo-image";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -169,10 +174,6 @@ export default function BusinessDetailsScreen() {
   // Pre-fill from profile once loaded
   useEffect(() => {
     if (profile) {
-      console.log("[BusinessDetails] profile loaded:", {
-        logo_url: profile.logo_url,
-        updated_at: profile.updated_at,
-      });
       setBusinessName(profile.business_name ?? "");
       setPhone(profile.phone ?? "");
       setCity(profile.city ?? "");
@@ -220,14 +221,15 @@ export default function BusinessDetailsScreen() {
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.85,
+      quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
       setLogoUri(result.assets[0].uri);
     }
   };
 
-  const isPending = saveProfileMutation.isPending || uploadLogoMutation.isPending;
+  const isPending =
+    saveProfileMutation.isPending || uploadLogoMutation.isPending;
 
   const showBanner = () => {
     bannerY.value = -40;
@@ -247,27 +249,27 @@ export default function BusinessDetailsScreen() {
     setPhoneErr(!phoneOk);
     if (!nameOk || !phoneOk) return;
 
-    let finalLogoUrl: string | null = logoUri?.startsWith("https://") ? logoUri : (profile?.logo_url ?? null);
-
-    console.log("[BusinessDetails] handleSave — logoUri:", logoUri);
-    console.log("[BusinessDetails] handleSave — initial finalLogoUrl:", finalLogoUrl);
+    let finalLogoUrl: string | null = logoUri?.startsWith("https://")
+      ? logoUri
+      : (profile?.logo_url ?? null);
 
     // Upload new local image if picked
     if (logoUri && !logoUri.startsWith("https://")) {
       try {
         const result = await uploadLogoMutation.mutateAsync({ userId, uri: logoUri });
-        console.log("[BusinessDetails] upload result:", result);
-        finalLogoUrl = result.publicUrl;
+        if (result.error) {
+          showToast(`Upload error: ${result.error}`, "error");
+          finalLogoUrl = profile?.logo_url ?? null;
+        } else {
+          finalLogoUrl = result.publicUrl;
+        }
       } catch (e) {
-        console.log("[BusinessDetails] upload error:", e);
-        showToast("Logo upload failed. Saving without logo.", "error");
+        showToast("Logo upload failed. Please try again.", "error");
         finalLogoUrl = profile?.logo_url ?? null;
       }
     } else if (!logoUri) {
       finalLogoUrl = null;
     }
-
-    console.log("[BusinessDetails] saving logo_url:", finalLogoUrl);
 
     saveProfileMutation.mutate(
       {
@@ -377,19 +379,12 @@ export default function BusinessDetailsScreen() {
             >
               {logoUri ? (
                 <Image
-                  source={{
-                    uri: (() => {
-                      const src = logoUri.startsWith("https://")
-                        ? `${logoUri}?t=${profile?.updated_at ?? Date.now()}`
-                        : logoUri;
-                      console.log("[BusinessDetails] Image src:", src);
-                      return src;
-                    })(),
-                  }}
+                  key={profile?.updated_at ?? logoUri}
+                  source={{ uri: logoUri }}
                   style={styles.logoImage}
-                  cachePolicy="none"
-                  onLoad={() => console.log("[BusinessDetails] Image loaded ✓")}
-                  onError={(e) => console.log("[BusinessDetails] Image error:", e)}
+                  className="w-full h-full"
+                  // contentFit="cover"
+                  contentFit="cover"
                 />
               ) : (
                 <Feather name="briefcase" size={24} color={colors.textMuted} />

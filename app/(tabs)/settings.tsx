@@ -1,19 +1,16 @@
 /**
- * Settings tab — profile, plan upgrade, preferences, sign out.
+ * Settings tab — profile, plan upgrade, preferences, account.
  * Dark mode toggle wired to useThemeStore. DS §9.1, §7.4.
- * TODO: replace DUMMY_PROFILE with real Supabase session.
- * TODO: wire sign-out to supabase.auth.signOut() + confirmation sheet.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { supabase } from "@/src/lib/supabase";
+import { useProfile, useSession } from "@/src/hooks";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,13 +24,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// ── Dummy data — TODO: replace with real Supabase session ────────────────────
-const DUMMY_PROFILE = {
-  business_name: "Zara's Closet",
-  city: "Lagos",
-  plan: "free" as const,
-};
 
 // ── Toggle switch (DS §8.7) ───────────────────────────────────────────────────
 function Toggle({
@@ -173,22 +163,8 @@ export default function SettingsScreen() {
   const { colors, isDark } = useTheme();
   const { toggle } = useThemeStore();
   const [notifs, setNotifs] = useState(true);
-  const [signingOut, setSigningOut] = useState(false);
-
-  const handleSignOut = useCallback(async () => {
-    Alert.alert("Sign out", "Are you sure you want to sign out of Trackshpr?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          setSigningOut(true);
-          await supabase.auth.signOut();
-          router.replace("/sign-in");
-        },
-      },
-    ]);
-  }, []);
+  const { userId } = useSession();
+  const { data: profile } = useProfile(userId);
 
   const profileSectionShadow = isDark
     ? {
@@ -206,7 +182,8 @@ export default function SettingsScreen() {
         elevation: 2,
       };
 
-  const initials = DUMMY_PROFILE.business_name
+  const businessName = profile?.business_name ?? "My Business";
+  const initials = businessName
     .split(" ")
     .map((w) => w[0])
     .join("")
@@ -258,13 +235,15 @@ export default function SettingsScreen() {
             </View>
             <View style={styles.profileMeta}>
               <Text style={[styles.profileName, { color: colors.textPrimary }]}>
-                {DUMMY_PROFILE.business_name}
+                {businessName}
               </Text>
               <View style={styles.profileMetaRow}>
-                <Text style={[styles.profileCity, { color: colors.textMuted }]}>
-                  <Feather name="map-pin" size={12} color={colors.textMuted} />{" "}
-                  {DUMMY_PROFILE.city}
-                </Text>
+                {!!profile?.city && (
+                  <Text style={[styles.profileCity, { color: colors.textMuted }]}>
+                    <Feather name="map-pin" size={12} color={colors.textMuted} />{" "}
+                    {profile.city}
+                  </Text>
+                )}
                 <View
                   style={[
                     styles.planBadge,
@@ -385,17 +364,14 @@ export default function SettingsScreen() {
             sublabel="Chat with us"
             onPress={() => {}}
           />
-        </SettingGroup>
-
-        {/* ── Danger zone ───────────────────────────────────────────────── */}
-        <SettingGroup>
+          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
           <SettingRow
-            icon="log-out"
-            iconColor={colors.error}
-            iconBg={colors.errorBg}
-            label="Sign out"
-            danger
-            onPress={handleSignOut}
+            icon="user"
+            iconColor={colors.textSecondary}
+            iconBg={colors.surfaceContainer}
+            label="Account"
+            sublabel="Sign out, delete account"
+            onPress={() => router.push("/(settings)/account")}
           />
         </SettingGroup>
 

@@ -2,16 +2,17 @@
  * Brand Customization settings screen.
  * Free state: upgrade banner + locked preview + feature list.
  * Pro state: live preview card, colour swatches, display options, save.
- * TODO: upsert brand_color + display_option to Supabase profiles table.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useProfile, useSaveProfile, useSession } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -19,14 +20,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// ── Toggle between 'free' and 'pro' to test states ───────────────────────────
-const DUMMY_PLAN: "free" | "pro" = "pro";
-
-const DUMMY_PROFILE = {
-  business_name: "Zara's Closet",
-  tagline: "Premium fashion · Lagos",
-};
 
 // ── Colour options (data, not UI tokens) ─────────────────────────────────────
 const ACCENT_COLORS: { name: string; hex: string; end: string }[] = [
@@ -62,10 +55,12 @@ function PreviewCard({
   accentHex,
   accentEnd,
   isPro,
+  businessName,
 }: {
   accentHex: string;
   accentEnd: string;
   isPro: boolean;
+  businessName?: string;
 }) {
   const { colors, isDark } = useTheme();
 
@@ -117,7 +112,7 @@ function PreviewCard({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.previewBrandName, { color: "#fff" }]}>
-              {isPro ? DUMMY_PROFILE.business_name : "Trackshpr"}
+              {isPro ? (businessName ?? "Your Business") : "Trackshpr"}
             </Text>
             <Text
               style={[
@@ -125,7 +120,7 @@ function PreviewCard({
                 { color: "rgba(255,255,255,0.55)" },
               ]}
             >
-              {isPro ? DUMMY_PROFILE.tagline : "Delivery tracking"}
+              {isPro ? "Delivery tracking" : "Delivery tracking"}
             </Text>
           </View>
           <View
@@ -347,6 +342,11 @@ function DisplayOptionRow({
 export default function BrandCustomizationScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const showToast = useToastStore((s) => s.show);
+  const { userId } = useSession();
+
+  const { data: profile } = useProfile(userId);
+  const saveProfileMutation = useSaveProfile();
 
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [displayOption, setDisplayOption] =
@@ -356,7 +356,20 @@ export default function BrandCustomizationScreen() {
   const bannerY = useSharedValue(-40);
   const bannerOp = useSharedValue(0);
 
-  const isPro = DUMMY_PLAN === "pro";
+  // Pre-fill from profile
+  useEffect(() => {
+    if (profile) {
+      if (profile.brand_color) {
+        const idx = ACCENT_COLORS.findIndex((c) => c.hex === profile.brand_color);
+        if (idx !== -1) setSelectedIdx(idx);
+      }
+      if (profile.display_option === "name_only" || profile.display_option === "logo_name") {
+        setDisplayOption(profile.display_option);
+      }
+    }
+  }, [profile]);
+
+  const isPro = true; // plan gating to be added later
   const accent = ACCENT_COLORS[selectedIdx];
 
   const cardShadow = isDark
@@ -406,10 +419,26 @@ export default function BrandCustomizationScreen() {
   };
 
   const handleSave = () => {
-    // TODO: upsert brand_color + display_option to Supabase profiles
-    setSaved(true);
-    showBanner();
-    setTimeout(() => setSaved(false), 3000);
+    if (!userId || !profile) return;
+    saveProfileMutation.mutate(
+      {
+        id: userId,
+        business_name: profile.business_name ?? "",
+        phone: profile.phone ?? "",
+        brand_color: accent.hex,
+        display_option: displayOption,
+      },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          showBanner();
+          setTimeout(() => setSaved(false), 3000);
+        },
+        onError: () => {
+          showToast("Could not save brand settings. Please try again.", "error");
+        },
+      },
+    );
   };
 
   const bannerStyle = useAnimatedStyle(() => ({
@@ -445,10 +474,12 @@ export default function BrandCustomizationScreen() {
         {isPro ? (
           <Pressable
             onPress={handleSave}
+            disabled={saveProfileMutation.isPending}
             style={[
               styles.headerSaveBtn,
               {
                 backgroundColor: saved ? colors.successBg : colors.primarySoft,
+                opacity: saveProfileMutation.isPending ? 0.5 : 1,
               },
             ]}
             android_ripple={{
@@ -456,14 +487,18 @@ export default function BrandCustomizationScreen() {
               borderless: false,
             }}
           >
-            <Text
-              style={[
-                styles.headerSaveText,
-                { color: saved ? colors.success : colors.primary },
-              ]}
-            >
-              {saved ? "Saved" : "Save"}
-            </Text>
+            {saveProfileMutation.isPending ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text
+                style={[
+                  styles.headerSaveText,
+                  { color: saved ? colors.success : colors.primary },
+                ]}
+              >
+                {saved ? "Saved" : "Save"}
+              </Text>
+            )}
           </Pressable>
         ) : null}
       </View>
@@ -634,6 +669,7 @@ export default function BrandCustomizationScreen() {
               accentHex={accent.hex}
               accentEnd={accent.end}
               isPro={true}
+              businessName={profile?.business_name ?? undefined}
             />
 
             {/* Colour picker */}

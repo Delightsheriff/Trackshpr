@@ -1,17 +1,19 @@
 /**
  * Business Details settings screen.
  * Back + Save header, logo upload, required/optional fields, validation.
- * TODO: upsert to Supabase profiles table on save.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useProfile, useSaveProfile, useSession, useUploadLogo } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -29,15 +31,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// ── Dummy data — TODO: replace with real Supabase session ────────────────────
-const DUMMY_PROFILE = {
-  business_name: "Zara's Closet",
-  phone: "0803 456 7890",
-  city: "Lagos",
-  description: "Premium fashion delivered across Lagos",
-  logo_url: null as string | null,
-};
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
@@ -152,12 +145,18 @@ function FormInput({
 export default function BusinessDetailsScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const showToast = useToastStore((s) => s.show);
+  const { userId } = useSession();
 
-  const [businessName, setBusinessName] = useState(DUMMY_PROFILE.business_name);
-  const [phone, setPhone] = useState(DUMMY_PROFILE.phone);
-  const [city, setCity] = useState(DUMMY_PROFILE.city);
-  const [description, setDescription] = useState(DUMMY_PROFILE.description);
-  const [logoUri, setLogoUri] = useState<string | null>(DUMMY_PROFILE.logo_url);
+  const { data: profile, isLoading: profileLoading } = useProfile(userId);
+  const saveProfileMutation = useSaveProfile();
+  const uploadLogoMutation = useUploadLogo();
+
+  const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoUri, setLogoUri] = useState<string | null>(null);
   const [nameErr, setNameErr] = useState(false);
   const [phoneErr, setPhoneErr] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -166,6 +165,17 @@ export default function BusinessDetailsScreen() {
   const bannerOp = useSharedValue(0);
 
   const hasErrors = nameErr || phoneErr;
+
+  // Pre-fill from profile once loaded
+  useEffect(() => {
+    if (profile) {
+      setBusinessName(profile.business_name ?? "");
+      setPhone(profile.phone ?? "");
+      setCity(profile.city ?? "");
+      setDescription(profile.description ?? "");
+      setLogoUri(profile.logo_url ?? null);
+    }
+  }, [profile]);
 
   const cardShadow = isDark
     ? {
@@ -213,6 +223,8 @@ export default function BusinessDetailsScreen() {
     }
   };
 
+  const isPending = saveProfileMutation.isPending || uploadLogoMutation.isPending;
+
   const showBanner = () => {
     bannerY.value = -40;
     bannerOp.value = 0;
@@ -223,16 +235,50 @@ export default function BusinessDetailsScreen() {
     }, 2800);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!userId || isPending) return;
     const nameOk = businessName.trim().length > 0;
     const phoneOk = phone.trim().length > 0;
     setNameErr(!nameOk);
     setPhoneErr(!phoneOk);
     if (!nameOk || !phoneOk) return;
-    // TODO: upsert to Supabase profiles table
-    setSaved(true);
-    showBanner();
-    setTimeout(() => setSaved(false), 3000);
+
+    let finalLogoUrl: string | null = logoUri?.startsWith("https://") ? logoUri : (profile?.logo_url ?? null);
+
+    // Upload new local image if picked
+    if (logoUri && !logoUri.startsWith("https://")) {
+      try {
+        const result = await uploadLogoMutation.mutateAsync({ userId, uri: logoUri });
+        finalLogoUrl = result.publicUrl;
+      } catch {
+        showToast("Logo upload failed. Saving without logo.", "error");
+        finalLogoUrl = profile?.logo_url ?? null;
+      }
+    } else if (!logoUri) {
+      finalLogoUrl = null;
+    }
+
+    saveProfileMutation.mutate(
+      {
+        id: userId,
+        business_name: businessName.trim(),
+        phone: phone.trim(),
+        city: city.trim() || null,
+        description: description.trim() || null,
+        logo_url: finalLogoUrl,
+        onboarding_complete: true,
+      },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          showBanner();
+          setTimeout(() => setSaved(false), 3000);
+        },
+        onError: () => {
+          showToast("Could not save details. Please try again.", "error");
+        },
+      },
+    );
   };
 
   const bannerStyle = useAnimatedStyle(() => ({
@@ -267,24 +313,29 @@ export default function BusinessDetailsScreen() {
         </Text>
         <Pressable
           onPress={handleSave}
+          disabled={isPending}
           style={[
             styles.headerSaveBtn,
             { backgroundColor: saved ? colors.successBg : colors.primarySoft },
-            hasErrors && { opacity: 0.4 },
+            (hasErrors || isPending) && { opacity: 0.4 },
           ]}
           android_ripple={{
             color: saved ? colors.successBg : colors.primarySoft,
             borderless: false,
           }}
         >
-          <Text
-            style={[
-              styles.headerSaveText,
-              { color: saved ? colors.success : colors.primary },
-            ]}
-          >
-            {saved ? "Saved" : "Save"}
-          </Text>
+          {isPending ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text
+              style={[
+                styles.headerSaveText,
+                { color: saved ? colors.success : colors.primary },
+              ]}
+            >
+              {saved ? "Saved" : "Save"}
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -488,11 +539,12 @@ export default function BusinessDetailsScreen() {
             style={[
               styles.saveShadow,
               { backgroundColor: colors.primary },
-              hasErrors && styles.saveShadowDim,
+              (hasErrors || isPending) && styles.saveShadowDim,
             ]}
           >
             <Pressable
               onPress={handleSave}
+              disabled={isPending}
               style={styles.savePressable}
               android_ripple={{
                 color: "rgba(255,255,255,0.2)",
@@ -505,9 +557,13 @@ export default function BusinessDetailsScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.saveBtn}
               >
-                <Text style={[styles.saveBtnText, { color: "#fff" }]}>
-                  Save Changes
-                </Text>
+                {isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={[styles.saveBtnText, { color: "#fff" }]}>
+                    Save Changes
+                  </Text>
+                )}
               </LinearGradient>
             </Pressable>
           </View>

@@ -19,9 +19,11 @@ export interface Profile {
   business_name: string | null;
   phone: string | null;
   city: string | null;
+  description: string | null;
   logo_url: string | null;
   brand_name: string | null;
   brand_color: string | null;
+  display_option: string | null;
   secondary_phone: string | null;
   pickup_address: string | null;
   instagram_handle: string | null;

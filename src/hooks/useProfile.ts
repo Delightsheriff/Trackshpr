@@ -2,6 +2,7 @@
  * useProfile — TanStack Query hook for profile data + save mutation.
  */
 import { saveProfile, uploadLogo } from "@/src/lib/profiles";
+import { supabase } from "@/src/lib/supabase";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { fetchProfile, type Profile } from "@/src/lib/supabaseQueries";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +26,10 @@ interface SaveProfilePayload {
   phone: string;
   secondary_phone?: string | null;
   city?: string | null;
+  description?: string | null;
   brand_name?: string | null;
+  brand_color?: string | null;
+  display_option?: string | null;
   logo_url?: string | null;
   pickup_address?: string | null;
   instagram_handle?: string | null;
@@ -53,6 +57,18 @@ export function useUploadLogo() {
   return useMutation({
     mutationFn: ({ userId, uri }: { userId: string; uri: string }) =>
       uploadLogo(userId, uri),
+  });
+}
+
+// ── Delete account ────────────────────────────────────────────────────────────
+
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("delete_user");
+      if (error) throw new Error(error.message);
+      await supabase.auth.signOut();
+    },
   });
 }
 

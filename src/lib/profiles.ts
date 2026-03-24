@@ -11,7 +11,10 @@ export interface ProfilePayload {
   business_name: string;
   phone: string;
   city?: string | null;
+  description?: string | null;
   brand_name?: string | null;
+  brand_color?: string | null;
+  display_option?: string | null;
   logo_url?: string | null;
   secondary_phone?: string | null;
   pickup_address?: string | null;
@@ -68,7 +71,10 @@ export async function saveProfile(
     business_name: payload.business_name,
     phone: payload.phone,
     city: payload.city ?? null,
+    description: payload.description ?? null,
     brand_name: payload.brand_name ?? null,
+    brand_color: payload.brand_color ?? null,
+    display_option: payload.display_option ?? null,
     logo_url: payload.logo_url ?? null,
     secondary_phone: payload.secondary_phone ?? null,
     pickup_address: payload.pickup_address ?? null,

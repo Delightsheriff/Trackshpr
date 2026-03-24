@@ -40,6 +40,7 @@ export default function RootLayout() {
             <Stack.Screen name="(modals)/select-rider" options={{ presentation: "modal" }} />
             <Stack.Screen name="(settings)/business-details" />
             <Stack.Screen name="(settings)/brand-customization" />
+            <Stack.Screen name="(settings)/account" />
             <Stack.Screen name="(screens)/order-detail" />
             <Stack.Screen name="(screens)/rider-detail" />
             <Stack.Screen name="(screens)/analytics" />
@@ -51,6 +52,8 @@ export default function RootLayout() {
             <Stack.Screen name="(modals)/delete-rider" options={{ presentation: "transparentModal" }} />
             <Stack.Screen name="(modals)/add-customer" options={{ presentation: "transparentModal" }} />
             <Stack.Screen name="(modals)/delete-customer" options={{ presentation: "transparentModal" }} />
+            <Stack.Screen name="(modals)/sign-out" options={{ presentation: "transparentModal" }} />
+            <Stack.Screen name="(modals)/delete-account" options={{ presentation: "transparentModal" }} />
           </Stack>
 
           <ToastOverlay />

@@ -1,4 +1,5 @@
 # Trackshpr Design System
+
 ## "Kinetic Precision" — v1.1 Production Spec
 
 ---
@@ -22,36 +23,36 @@
 ```typescript
 export const lightColors = {
   // Brand
-  primary:          '#4647D3',
-  primaryDim:       '#3939C7',   // pressed / active state
-  primaryContainer: '#9396FF',   // gradient endpoint, secondary accents
-  primarySoft:      '#EEEEFF',   // subtle tint backgrounds, chips
+  primary: "#4647D3",
+  primaryDim: "#3939C7", // pressed / active state
+  primaryContainer: "#9396FF", // gradient endpoint, secondary accents
+  primarySoft: "#EEEEFF", // subtle tint backgrounds, chips
 
   // Surfaces
-  surface:              '#FAF4FF',  // app background
-  surfaceContainer:     '#ECE4FF',  // sections, input backgrounds, grouped content
-  surfaceCard:          '#FFFFFF',  // cards, list items, elevated content
-  surfaceElevated:      '#F4EEFF',  // modals, bottom sheets
+  surface: "#FAF4FF", // app background
+  surfaceContainer: "#ECE4FF", // sections, input backgrounds, grouped content
+  surfaceCard: "#FFFFFF", // cards, list items, elevated content
+  surfaceElevated: "#F4EEFF", // modals, bottom sheets
 
   // Text
-  textPrimary:   '#302950',
-  textSecondary: '#5E5680',
-  textMuted:     '#9590B0',
+  textPrimary: "#302950",
+  textSecondary: "#5E5680",
+  textMuted: "#9590B0",
 
   // Status
-  success:    '#00873A',
-  successBg:  '#E6F4EC',
-  warning:    '#F5A623',
-  warningBg:  '#FEF3E2',
-  error:      '#DC2626',
-  errorBg:    '#FEE2E2',
-  info:       '#1A7FCC',
-  infoBg:     '#E1F0FA',
+  success: "#00873A",
+  successBg: "#E6F4EC",
+  warning: "#F5A623",
+  warningBg: "#FEF3E2",
+  error: "#DC2626",
+  errorBg: "#FEE2E2",
+  info: "#1A7FCC",
+  infoBg: "#E1F0FA",
 
   // Misc
-  border:  'rgba(70, 71, 211, 0.07)',   // bottom nav top border only
-  overlay: 'rgba(48, 41, 80, 0.4)',     // sheet backdrop
-} as const
+  border: "rgba(70, 71, 211, 0.07)", // bottom nav top border only
+  overlay: "rgba(48, 41, 80, 0.4)", // sheet backdrop
+} as const;
 ```
 
 ### 2.2 Dark Mode
@@ -59,74 +60,74 @@ export const lightColors = {
 ```typescript
 export const darkColors = {
   // Brand — shifted lighter for dark bg readability
-  primary:          '#6366F1',
-  primaryDim:       '#4647D3',
-  primaryContainer: '#9396FF',
-  primarySoft:      '#1e1f4a',
+  primary: "#6366F1",
+  primaryDim: "#4647D3",
+  primaryContainer: "#9396FF",
+  primarySoft: "#1e1f4a",
 
   // Surfaces — layered darkest to lightest
-  surface:              '#0f0e1a',
-  surfaceContainer:     '#1a1828',
-  surfaceCard:          '#1e1c2e',
-  surfaceElevated:      '#252338',
-  surfaceHighlight:     '#2a2840',  // toggles off, subtle separators
+  surface: "#0f0e1a",
+  surfaceContainer: "#1a1828",
+  surfaceCard: "#1e1c2e",
+  surfaceElevated: "#252338",
+  surfaceHighlight: "#2a2840", // toggles off, subtle separators
 
   // Text
-  textPrimary:   '#EEEAF8',
-  textSecondary: '#A89EC0',
-  textMuted:     '#6B6180',
+  textPrimary: "#EEEAF8",
+  textSecondary: "#A89EC0",
+  textMuted: "#6B6180",
 
   // Status — softened for dark backgrounds
-  success:    '#34D399',   // NOT #00873A — too dark on dark bg
-  successBg:  '#0d2e22',
-  warning:    '#FBBF24',
-  warningBg:  '#2a1f08',
-  error:      '#F87171',
-  errorBg:    '#2e0f0f',
-  info:       '#60A5FA',
-  infoBg:     '#0d1f38',
+  success: "#34D399", // NOT #00873A — too dark on dark bg
+  successBg: "#0d2e22",
+  warning: "#FBBF24",
+  warningBg: "#2a1f08",
+  error: "#F87171",
+  errorBg: "#2e0f0f",
+  info: "#60A5FA",
+  infoBg: "#0d1f38",
 
   // Misc
-  border:     'rgba(99, 102, 241, 0.1)',
-  overlay:    'rgba(0, 0, 0, 0.6)',
-  cardShine:  'rgba(255, 255, 255, 0.03)',  // subtle top edge on dark cards
-} as const
+  border: "rgba(99, 102, 241, 0.1)",
+  overlay: "rgba(0, 0, 0, 0.6)",
+  cardShine: "rgba(255, 255, 255, 0.03)", // subtle top edge on dark cards
+} as const;
 ```
 
 ### 2.3 Gradient Tokens
 
 ```typescript
 export const gradients = {
-  primary:     ['#4647D3', '#6366F1'],
-  primaryHero: ['#1e1f4a', '#2d2f6b', '#3a3b82'],  // dark mode hero card
-  avatar:      ['#4647D3', '#9396FF'],
-  success:     ['#00873A', '#00A347'],
-} as const
+  primary: ["#4647D3", "#6366F1"],
+  primaryHero: ["#1e1f4a", "#2d2f6b", "#3a3b82"], // dark mode hero card
+  avatar: ["#4647D3", "#9396FF"],
+  success: ["#00873A", "#00A347"],
+} as const;
 // Rule: max 2 gradient elements visible on screen at once
 ```
 
 ### 2.4 Status Color Map
 
-| Status     | Light fg   | Light bg   | Dark fg    | Dark bg    |
-|------------|------------|------------|------------|------------|
-| Pending    | `#F5A623`  | `#FEF3E2`  | `#FBBF24`  | `#2a1f08`  |
-| Picked Up  | `#1A7FCC`  | `#E1F0FA`  | `#60A5FA`  | `#0d1f38`  |
-| In Transit | `#1A7FCC`  | `#E1F0FA`  | `#60A5FA`  | `#0d1f38`  |
-| Delivered  | `#00873A`  | `#E6F4EC`  | `#34D399`  | `#0d2e22`  |
-| Failed     | `#DC2626`  | `#FEE2E2`  | `#F87171`  | `#2e0f0f`  |
+| Status     | Light fg  | Light bg  | Dark fg   | Dark bg   |
+| ---------- | --------- | --------- | --------- | --------- |
+| Pending    | `#F5A623` | `#FEF3E2` | `#FBBF24` | `#2a1f08` |
+| Picked Up  | `#1A7FCC` | `#E1F0FA` | `#60A5FA` | `#0d1f38` |
+| In Transit | `#1A7FCC` | `#E1F0FA` | `#60A5FA` | `#0d1f38` |
+| Delivered  | `#00873A` | `#E6F4EC` | `#34D399` | `#0d2e22` |
+| Failed     | `#DC2626` | `#FEE2E2` | `#F87171` | `#2e0f0f` |
 
 ### 2.5 Dark Mode Color Shift Rationale
 
-| Token        | Light      | Dark       | Why                          |
-|--------------|------------|------------|------------------------------|
-| primary      | `#4647D3`  | `#6366F1`  | Lighter reads better on dark |
-| success      | `#00873A`  | `#34D399`  | Avoids mud on dark surfaces  |
-| error        | `#DC2626`  | `#F87171`  | Softened for eye comfort     |
-| warning      | `#F5A623`  | `#FBBF24`  | Softened                     |
-| info         | `#1A7FCC`  | `#60A5FA`  | Softened                     |
-| surface      | `#FAF4FF`  | `#0f0e1a`  | Inverted                     |
-| surfaceCard  | `#FFFFFF`  | `#1e1c2e`  | Inverted                     |
-| textPrimary  | `#302950`  | `#EEEAF8`  | Inverted                     |
+| Token       | Light     | Dark      | Why                          |
+| ----------- | --------- | --------- | ---------------------------- |
+| primary     | `#4647D3` | `#6366F1` | Lighter reads better on dark |
+| success     | `#00873A` | `#34D399` | Avoids mud on dark surfaces  |
+| error       | `#DC2626` | `#F87171` | Softened for eye comfort     |
+| warning     | `#F5A623` | `#FBBF24` | Softened                     |
+| info        | `#1A7FCC` | `#60A5FA` | Softened                     |
+| surface     | `#FAF4FF` | `#0f0e1a` | Inverted                     |
+| surfaceCard | `#FFFFFF` | `#1e1c2e` | Inverted                     |
+| textPrimary | `#302950` | `#EEEAF8` | Inverted                     |
 
 ---
 
@@ -137,35 +138,112 @@ export const gradients = {
 ```typescript
 export const typography = {
   // Display — hero metrics, large stat numbers
-  displayLg: { fontSize: 40, fontWeight: '700', letterSpacing: -1.6,  fontFamily: 'DMSans_700Bold' },
-  displayMd: { fontSize: 28, fontWeight: '700', letterSpacing: -0.84, fontFamily: 'DMSans_700Bold' },
+  displayLg: {
+    fontSize: 40,
+    fontWeight: "700",
+    letterSpacing: -1.6,
+    fontFamily: "DMSans_700Bold",
+  },
+  displayMd: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.84,
+    fontFamily: "DMSans_700Bold",
+  },
 
   // Headings
-  headingLg: { fontSize: 22, fontWeight: '700', letterSpacing: -0.44, fontFamily: 'DMSans_700Bold' },
-  headingMd: { fontSize: 20, fontWeight: '700', letterSpacing: -0.4,  fontFamily: 'DMSans_700Bold' },
-  headingSm: { fontSize: 17, fontWeight: '700', letterSpacing: -0.34, fontFamily: 'DMSans_700Bold' },
+  headingLg: {
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: -0.44,
+    fontFamily: "DMSans_700Bold",
+  },
+  headingMd: {
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+    fontFamily: "DMSans_700Bold",
+  },
+  headingSm: {
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+    fontFamily: "DMSans_700Bold",
+  },
 
   // Body
-  bodyLg: { fontSize: 15, fontWeight: '400', fontFamily: 'DMSans_400Regular' },
-  bodyMd: { fontSize: 14, fontWeight: '400', fontFamily: 'DMSans_400Regular' },
-  bodySm: { fontSize: 13, fontWeight: '400', fontFamily: 'DMSans_400Regular' },
+  bodyLg: { fontSize: 15, fontWeight: "400", fontFamily: "DMSans_400Regular" },
+  bodyMd: { fontSize: 14, fontWeight: "400", fontFamily: "DMSans_400Regular" },
+  bodySm: { fontSize: 13, fontWeight: "400", fontFamily: "DMSans_400Regular" },
 
   // Labels
-  labelLg: { fontSize: 15, fontWeight: '700', letterSpacing: -0.15, fontFamily: 'DMSans_700Bold' },
-  labelMd: { fontSize: 14, fontWeight: '600', letterSpacing: -0.14, fontFamily: 'DMSans_600SemiBold' },
-  labelSm: { fontSize: 13, fontWeight: '600', letterSpacing: -0.13, fontFamily: 'DMSans_600SemiBold' },
-  labelXs: { fontSize: 11, fontWeight: '600', letterSpacing: 0.04,  fontFamily: 'DMSans_600SemiBold' },
+  labelLg: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.15,
+    fontFamily: "DMSans_700Bold",
+  },
+  labelMd: {
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: -0.14,
+    fontFamily: "DMSans_600SemiBold",
+  },
+  labelSm: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: -0.13,
+    fontFamily: "DMSans_600SemiBold",
+  },
+  labelXs: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.04,
+    fontFamily: "DMSans_600SemiBold",
+  },
 
   // Caps labels — section headers, small badges
-  capsLg: { fontSize: 11, fontWeight: '700', letterSpacing: 0.08, textTransform: 'uppercase', fontFamily: 'DMSans_700Bold' },
-  capsSm: { fontSize: 10, fontWeight: '700', letterSpacing: 0.1,  textTransform: 'uppercase', fontFamily: 'DMSans_700Bold' },
+  capsLg: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.08,
+    textTransform: "uppercase",
+    fontFamily: "DMSans_700Bold",
+  },
+  capsSm: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+    textTransform: "uppercase",
+    fontFamily: "DMSans_700Bold",
+  },
 
   // Mono — all numbers, amounts, times, IDs
-  monoLg: { fontSize: 40, fontWeight: '700', fontFamily: 'DMMono_500Medium', fontVariant: ['tabular-nums'] },
-  monoMd: { fontSize: 22, fontWeight: '500', fontFamily: 'DMMono_500Medium', fontVariant: ['tabular-nums'] },
-  monoSm: { fontSize: 14, fontWeight: '400', fontFamily: 'DMMono_400Regular', fontVariant: ['tabular-nums'] },
-  monoXs: { fontSize: 11, fontWeight: '400', fontFamily: 'DMMono_400Regular', fontVariant: ['tabular-nums'] },
-} as const
+  monoLg: {
+    fontSize: 40,
+    fontWeight: "700",
+    fontFamily: "DMMono_500Medium",
+    fontVariant: ["tabular-nums"],
+  },
+  monoMd: {
+    fontSize: 22,
+    fontWeight: "500",
+    fontFamily: "DMMono_500Medium",
+    fontVariant: ["tabular-nums"],
+  },
+  monoSm: {
+    fontSize: 14,
+    fontWeight: "400",
+    fontFamily: "DMMono_400Regular",
+    fontVariant: ["tabular-nums"],
+  },
+  monoXs: {
+    fontSize: 11,
+    fontWeight: "400",
+    fontFamily: "DMMono_400Regular",
+    fontVariant: ["tabular-nums"],
+  },
+} as const;
 
 // Usage rules:
 // ₦ amounts         → monoSm or monoMd
@@ -181,24 +259,24 @@ export const typography = {
 
 ```typescript
 export const spacing = {
-  1:  4,
-  2:  8,
-  3:  12,
-  4:  16,
-  5:  20,
-  6:  24,
-  8:  32,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
   10: 40,
   12: 48,
-} as const
+} as const;
 
 export const layout = {
-  screenPaddingH:   18,   // horizontal padding on all screens
-  screenPaddingTop: 10,   // below status bar
-  cardPadding:      14,   // internal card padding
-  sectionGap:       18,   // gap between major page sections
-  listGap:          8,    // gap between list item cards
-} as const
+  screenPaddingH: 18, // horizontal padding on all screens
+  screenPaddingTop: 10, // below status bar
+  cardPadding: 14, // internal card padding
+  sectionGap: 18, // gap between major page sections
+  listGap: 8, // gap between list item cards
+} as const;
 ```
 
 ---
@@ -207,14 +285,14 @@ export const layout = {
 
 ```typescript
 export const radius = {
-  sm:   4,    // internal chips, micro elements
-  md:   8,    // small tags, secondary badges
-  lg:   13,   // order icons, small cards
-  xl:   18,   // order cards, rider cards, customer cards
-  card: 20,   // stat cards, hero cards
-  xxl:  28,   // bottom sheets, modals
-  full: 100,  // pills, FABs, filter tabs, status badges
-} as const
+  sm: 4, // internal chips, micro elements
+  md: 8, // small tags, secondary badges
+  lg: 13, // order icons, small cards
+  xl: 18, // order cards, rider cards, customer cards
+  card: 20, // stat cards, hero cards
+  xxl: 28, // bottom sheets, modals
+  full: 100, // pills, FABs, filter tabs, status badges
+} as const;
 ```
 
 ---
@@ -223,18 +301,66 @@ export const radius = {
 
 ```typescript
 export const shadowsLight = {
-  card:  { shadowColor:'#302950', shadowOffset:{width:0,height:1}, shadowOpacity:0.05, shadowRadius:8,  elevation:2  },
-  modal: { shadowColor:'#302950', shadowOffset:{width:0,height:8}, shadowOpacity:0.1,  shadowRadius:30, elevation:10 },
-  fab:   { shadowColor:'#4647D3', shadowOffset:{width:0,height:6}, shadowOpacity:0.4,  shadowRadius:20, elevation:12 },
-  sheet: { shadowColor:'#302950', shadowOffset:{width:0,height:-4},shadowOpacity:0.08, shadowRadius:20, elevation:8  },
-}
+  card: {
+    shadowColor: "#302950",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  modal: {
+    shadowColor: "#302950",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
+    elevation: 10,
+  },
+  fab: {
+    shadowColor: "#4647D3",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  sheet: {
+    shadowColor: "#302950",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+};
 
 export const shadowsDark = {
-  card:  { shadowColor:'#000000', shadowOffset:{width:0,height:4}, shadowOpacity:0.3,  shadowRadius:20, elevation:4  },
-  modal: { shadowColor:'#000000', shadowOffset:{width:0,height:8}, shadowOpacity:0.5,  shadowRadius:40, elevation:12 },
-  fab:   { shadowColor:'#6366F1', shadowOffset:{width:0,height:6}, shadowOpacity:0.5,  shadowRadius:24, elevation:14 },
-  sheet: { shadowColor:'#000000', shadowOffset:{width:0,height:-4},shadowOpacity:0.4,  shadowRadius:24, elevation:10 },
-}
+  card: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  modal: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    elevation: 12,
+  },
+  fab: {
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  sheet: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+};
 ```
 
 ---
@@ -245,81 +371,81 @@ export const shadowsDark = {
 
 ### 7.1 Navigation Icons
 
-| Tab       | Feather icon   | Size | Active       | Inactive   |
-|-----------|----------------|------|--------------|------------|
-| Home      | `home`         | 22   | `primary`    | `textMuted`|
-| Orders    | `package`      | 22   | `primary`    | `textMuted`|
-| New (FAB) | `plus`         | 24   | white        | —          |
-| Riders    | `user`         | 22   | `primary`    | `textMuted`|
-| Settings  | `settings`     | 22   | `primary`    | `textMuted`|
+| Tab       | Feather icon | Size | Active    | Inactive    |
+| --------- | ------------ | ---- | --------- | ----------- |
+| Home      | `home`       | 22   | `primary` | `textMuted` |
+| Orders    | `package`    | 22   | `primary` | `textMuted` |
+| New (FAB) | `plus`       | 24   | white     | —           |
+| Riders    | `user`       | 22   | `primary` | `textMuted` |
+| Settings  | `settings`   | 22   | `primary` | `textMuted` |
 
 ### 7.2 Action Icons
 
-| Action          | Feather icon        | Size | Container bg          |
-|-----------------|---------------------|------|-----------------------|
-| Call            | `phone`             | 16   | `successBg`           |
-| More options    | `more-horizontal`   | 16   | `surfaceContainer`    |
-| Delete          | `trash-2`           | 15   | `errorBg`             |
-| Edit            | `edit-2`            | 14   | transparent           |
-| Copy link       | `copy`              | 14   | `primarySoft`         |
-| Share           | `share-2`           | 14   | `primarySoft`         |
-| Search          | `search`            | 15   | inline, `textMuted`   |
-| Back            | `arrow-left`        | 18   | `surfaceCard` button  |
-| Bell            | `bell`              | 20   | inline                |
-| Camera          | `camera`            | 16   | `primarySoft`         |
-| Export          | `download`          | 16   | `successBg`           |
-| Map pin         | `map-pin`           | 14   | status-dependent      |
-| Chevron right   | `chevron-right`     | 16   | inline, `textMuted`   |
-| Check           | `check`             | 14   | inline (select state) |
+| Action        | Feather icon      | Size | Container bg          |
+| ------------- | ----------------- | ---- | --------------------- |
+| Call          | `phone`           | 16   | `successBg`           |
+| More options  | `more-horizontal` | 16   | `surfaceContainer`    |
+| Delete        | `trash-2`         | 15   | `errorBg`             |
+| Edit          | `edit-2`          | 14   | transparent           |
+| Copy link     | `copy`            | 14   | `primarySoft`         |
+| Share         | `share-2`         | 14   | `primarySoft`         |
+| Search        | `search`          | 15   | inline, `textMuted`   |
+| Back          | `arrow-left`      | 18   | `surfaceCard` button  |
+| Bell          | `bell`            | 20   | inline                |
+| Camera        | `camera`          | 16   | `primarySoft`         |
+| Export        | `download`        | 16   | `successBg`           |
+| Map pin       | `map-pin`         | 14   | status-dependent      |
+| Chevron right | `chevron-right`   | 16   | inline, `textMuted`   |
+| Check         | `check`           | 14   | inline (select state) |
 
-### 7.3 Status + State Emoji Illustrations
+### 7.3 Status + State Icons
 
-| Context              | Emoji | Notes                          |
-|----------------------|-------|--------------------------------|
-| App icon / splash    | 📦    | Brand mark                     |
-| Rider / in transit   | 🚴    | Hero cards, map pins, nav FAB  |
-| Delivered            | ✅    | Delivered order icon           |
-| Failed               | ❌    | Failed order icon              |
-| Pending              | 🛍️   | Pending order icon             |
-| Photo / evidence     | 📸    | Upload prompts                 |
-| WhatsApp sent        | 📲    | Confirmation card              |
-| Call (web pages)     | 📞    | Call seller / rider buttons    |
-| Address / location   | 📍    | Address fields, map labels     |
-| Network offline      | 📡    | Network error screen           |
-| Server error         | ⚡    | 5xx error screen               |
-| Invalid link         | 🔗    | Rider/customer bad link screen |
-| Not found            | 🗺️   | 404 screen                     |
+| Context            | Feather icon   | Notes                          |
+| ------------------ | -------------- | ------------------------------ |
+| App icon / splash  | `package`      | Brand mark                     |
+| Rider / in transit | `bike`         | Hero cards, map pins, nav FAB  |
+| Delivered          | `check-circle` | Delivered order icon           |
+| Failed             | `x-circle`     | Failed order icon              |
+| Pending            | `shopping-bag` | Pending order icon             |
+| Photo / evidence   | `camera`       | Upload prompts                 |
+| WhatsApp sent      | `send`         | Confirmation card              |
+| Call (web pages)   | `phone-call`   | Call seller / rider buttons    |
+| Address / location | `map-pin`      | Address fields, map labels     |
+| Network offline    | `wifi-off`     | Network error screen           |
+| Server error       | `zap`          | 5xx error screen               |
+| Invalid link       | `link-2`       | Rider/customer bad link screen |
+| Not found          | `map`          | 404 screen                     |
 
 ### 7.4 Settings Row Icons
 
-| Row                  | Emoji | Container bg       |
-|----------------------|-------|--------------------|
-| Business details     | 🏪    | `primarySoft`      |
-| Brand customization  | 🎨    | `warningBg`        |
-| Export history       | 📊    | `successBg`        |
-| Dark mode            | 🌙    | `surfaceContainer` |
-| Push notifications   | 🔔    | `primarySoft`      |
-| Help & support       | 💬    | `infoBg`           |
-| Sign out             | 🚪    | `errorBg`          |
+| Row                 | Feather icon     | Container bg       |
+| ------------------- | ---------------- | ------------------ |
+| Business details    | `briefcase`      | `primarySoft`      |
+| Brand customization | `sliders`        | `warningBg`        |
+| Export history      | `download`       | `successBg`        |
+| Dark mode           | `moon`           | `surfaceContainer` |
+| Push notifications  | `bell`           | `primarySoft`      |
+| Help & support      | `message-circle` | `infoBg`           |
+| Sign out            | `log-out`        | `errorBg`          |
 
 ### 7.5 Icon Sizing Rules
 
 ```typescript
 export const iconSize = {
-  nav:       22,   // bottom navigation tabs
-  action:    16,   // action buttons inside cards
-  input:     16,   // inside input fields
-  settings:  18,   // settings row icons (inside 36px container)
-  heading:   20,   // next to screen titles
-  large:     32,   // empty states
-  hero:      48,   // splash, error screens
-} as const
+  nav: 22, // bottom navigation tabs
+  action: 16, // action buttons inside cards
+  input: 16, // inside input fields
+  settings: 18, // settings row icons (inside 36px container)
+  heading: 20, // next to screen titles
+  large: 32, // empty states
+  hero: 48, // splash, error screens
+} as const;
 
 export const iconContainerSize = {
   settings: { size: 36, radius: 12 },
-  order:    { size: 42, radius: 13 },
-  action:   { size: 32, radius: 10 },
-}
+  order: { size: 42, radius: 13 },
+  action: { size: 32, radius: 10 },
+};
 ```
 
 ---
@@ -471,9 +597,9 @@ On cancel:         snap back animation
 ```typescript
 // Shimmer animates left → right, 1.6s ease-in-out infinite
 const shimmerColors = {
-  light: ['#ECE4FF', '#E0D6F5', '#ECE4FF'],
-  dark:  ['#1a1828', '#252338', '#1a1828'],
-}
+  light: ["#ECE4FF", "#E0D6F5", "#ECE4FF"],
+  dark: ["#1a1828", "#252338", "#1a1828"],
+};
 // Shapes must match real content dimensions exactly — no layout shift on load
 ```
 
@@ -485,15 +611,15 @@ const shimmerColors = {
 
 ```typescript
 // stores/themeStore.ts
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { lightColors, darkColors } from '@/constants/tokens'
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { lightColors, darkColors } from "@/constants/tokens";
 
 interface ThemeState {
-  isDark: boolean
-  colors: typeof lightColors
-  toggle: () => void
+  isDark: boolean;
+  colors: typeof lightColors;
+  toggle: () => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -502,27 +628,28 @@ export const useThemeStore = create<ThemeState>()(
       isDark: false,
       colors: lightColors,
       toggle: () => {
-        const next = !get().isDark
-        set({ isDark: next, colors: next ? darkColors : lightColors })
+        const next = !get().isDark;
+        set({ isDark: next, colors: next ? darkColors : lightColors });
       },
     }),
-    { name: 'trackshpr-theme', storage: createJSONStorage(() => AsyncStorage) }
-  )
-)
+    { name: "trackshpr-theme", storage: createJSONStorage(() => AsyncStorage) },
+  ),
+);
 
 // Shortcut hook
-export const useTheme = () => useThemeStore(s => ({ colors: s.colors, isDark: s.isDark }))
+export const useTheme = () =>
+  useThemeStore((s) => ({ colors: s.colors, isDark: s.isDark }));
 ```
 
 ### 9.2 Always-Light Screens
 
-| Screen                 | Mode   | Reason                          |
-|------------------------|--------|---------------------------------|
-| Rider web page         | Light  | Outdoor, bright environments    |
-| Customer tracking page | Light  | All devices, all audiences      |
-| Sign-in page           | Dark   | Always dark — brand entry       |
-| Splash screen          | Dark   | Always dark — brand entry       |
-| Onboarding slides      | Mixed  | Dark/light alternating by slide |
+| Screen                 | Mode  | Reason                          |
+| ---------------------- | ----- | ------------------------------- |
+| Rider web page         | Light | Outdoor, bright environments    |
+| Customer tracking page | Light | All devices, all audiences      |
+| Sign-in page           | Dark  | Always dark — brand entry       |
+| Splash screen          | Dark  | Always dark — brand entry       |
+| Onboarding slides      | Mixed | Dark/light alternating by slide |
 
 ---
 
@@ -588,7 +715,7 @@ Layout (all):
   background: surface (light) / surface (dark)
 
 Network Error:
-  icon:   📡 in warningBg container, 56×56px radius 18px
+  icon:   `wifi-off` in warningBg container, 56×56px radius 18px
   ring:   warningColor pulse, 0.3 opacity
   code:   "No Connection" — warningBg bg, warningColor text
   title:  "You're offline"
@@ -597,7 +724,7 @@ Network Error:
   CTA 2:  "View cached orders" — secondary
 
 Server Error (5xx):
-  icon:   ⚡ in errorBg container
+  icon:   `zap` in errorBg container
   code:   "Server Error" — errorBg/error color
   title:  "Something broke on our end"
   sub:    "We've been notified. Your delivery data is safe."
@@ -605,7 +732,7 @@ Server Error (5xx):
   CTA 2:  "Go to Dashboard"
 
 Invalid / Expired Link (rider + customer web pages):
-  icon:   🔗 in infoBg container
+  icon:   `link-2` in infoBg container
   code:   "Invalid Link" — infoBg/info color
   title:  "This link isn't valid"
   sub:    "This tracking link may have already been used. Contact the seller directly."
@@ -615,7 +742,7 @@ Invalid / Expired Link (rider + customer web pages):
 404 Not Found:
   theme:  dark screen always
   bg num: "404" — 120px DM Mono, rgba(white,0.08) ghost text
-  icon:   🗺️ 48px, floating above number
+  icon:   `map` 48px, floating above number
   title:  "Wrong turn, rider" — white
   sub:    text rgba(white,0.35)
   CTA:    "Back to Dashboard" — primary gradient
@@ -627,31 +754,31 @@ All empty states share this layout: illustration → title → sub → optional 
 
 ```
 No orders:
-  icon:  📦 64px, primarySoft bg, radius 24px
+  icon:  `package` 64px, primarySoft bg, radius 24px
   title: "No deliveries yet"
   sub:   "Create your first delivery and send a tracking link to your customer."
   CTA:   "New Delivery"
 
 No riders:
-  icon:  🚴
+  icon:  `users`
   title: "No riders saved"
   sub:   "Save your frequent riders to assign them faster."
   CTA:   "Add Rider"
 
 No customers:
-  icon:  👤
+  icon:  `user`
   title: "Address book is empty"
   sub:   "Saved addresses make creating deliveries much faster."
   CTA:   "Add Customer"
 
 Search no results:
-  icon:  🔍
+  icon:  `search`
   title: "Nothing found"
   sub:   "Try a different name or phone number."
   NO CTA
 
 Filtered list empty:
-  icon:  📋
+  icon:  `clipboard`
   title: "No [status] orders"
   sub:   "Switch filters to see other orders."
   NO CTA
@@ -666,9 +793,9 @@ borderRadius: xl (18px)
 duration:    3000ms auto-dismiss
 
 Types:
-  success: successBg bg, success text, ✅ prefix
-  error:   errorBg bg, error text, ❌ prefix
-  info:    infoBg bg, info text, 📦 prefix
+  success: successBg bg, success text, `check-circle` prefix icon
+  error:   errorBg bg, error text, `x-circle` prefix icon
+  info:    infoBg bg, info text, `info` prefix icon
 
 Animation:
   enter: translateY(-20) → 0, opacity 0→1, 300ms spring
@@ -710,17 +837,17 @@ Show loading state max 10s — then auto-reset with error toast
 ## 12. Animation Tokens
 
 ```typescript
-import { withSpring, withTiming } from 'react-native-reanimated'
+import { withSpring, withTiming } from "react-native-reanimated";
 
-export const spring = { damping: 20, stiffness: 300, mass: 0.8 }
+export const spring = { damping: 20, stiffness: 300, mass: 0.8 };
 
 export const timing = {
-  fast:   150,   // button press feedback, color transitions
-  normal: 250,   // tab switches, input focus
-  slow:   350,   // sheet slide up, modal appear
-}
+  fast: 150, // button press feedback, color transitions
+  normal: 250, // tab switches, input focus
+  slow: 350, // sheet slide up, modal appear
+};
 
-export const staggerDelay = (index: number) => Math.min(index * 50, 250)
+export const staggerDelay = (index: number) => Math.min(index * 50, 250);
 // Max 5 items staggered — 250ms total cap
 
 // Recurring animations
@@ -737,7 +864,7 @@ export const animations = {
     // Skeleton loading
     // backgroundPosition -400 → 400, 1600ms ease-in-out infinite
   },
-}
+};
 ```
 
 ---
@@ -769,34 +896,34 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'surface':        '#FAF4FF',
-        'surface-c':      '#ECE4FF',
-        'surface-card':   '#FFFFFF',
-        'brand':          '#4647D3',
-        'brand-soft':     '#EEEEFF',
-        'brand-c':        '#9396FF',
-        't-primary':      '#302950',
-        't-secondary':    '#5E5680',
-        't-muted':        '#9590B0',
-        'ok':             '#00873A',
-        'ok-bg':          '#E6F4EC',
-        'warn':           '#F5A623',
-        'warn-bg':        '#FEF3E2',
-        'danger':         '#DC2626',
-        'danger-bg':      '#FEE2E2',
-        'notice':         '#1A7FCC',
-        'notice-bg':      '#E1F0FA',
+        surface: "#FAF4FF",
+        "surface-c": "#ECE4FF",
+        "surface-card": "#FFFFFF",
+        brand: "#4647D3",
+        "brand-soft": "#EEEEFF",
+        "brand-c": "#9396FF",
+        "t-primary": "#302950",
+        "t-secondary": "#5E5680",
+        "t-muted": "#9590B0",
+        ok: "#00873A",
+        "ok-bg": "#E6F4EC",
+        warn: "#F5A623",
+        "warn-bg": "#FEF3E2",
+        danger: "#DC2626",
+        "danger-bg": "#FEE2E2",
+        notice: "#1A7FCC",
+        "notice-bg": "#E1F0FA",
       },
       borderRadius: {
-        'card':  '18px',
-        'stat':  '20px',
-        'sheet': '28px',
-        'pill':  '100px',
-        'input': '13px',
+        card: "18px",
+        stat: "20px",
+        sheet: "28px",
+        pill: "100px",
+        input: "13px",
       },
     },
   },
-}
+};
 // Note: dark mode values applied via useTheme hook + inline styles
 // NativeWind dark: prefix not used — theme store controls colors directly
 ```

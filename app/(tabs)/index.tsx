@@ -44,11 +44,15 @@ const DUMMY_ORDERS = [
   },
 ];
 
-const QUICK_ACTIONS: { icon: string; label: string; route?: string }[] = [
-  { icon: "🗺️", label: "Fleet map", route: "/(screens)/fleet-map" },
-  { icon: "📊", label: "Analytics", route: "/(screens)/analytics" },
-  { icon: "📋", label: "Export CSV" },
-  { icon: "🔗", label: "Copy link" },
+const QUICK_ACTIONS: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  label: string;
+  route?: string;
+}[] = [
+  { icon: "map", label: "Fleet map", route: "/(screens)/fleet-map" },
+  { icon: "bar-chart-2", label: "Analytics", route: "/(screens)/analytics" },
+  { icon: "clipboard", label: "Export CSV" },
+  { icon: "link-2", label: "Copy link" },
 ];
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -61,34 +65,34 @@ function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
       label: "In Transit",
       fg: colors.info,
       bg: colors.infoBg,
-      emoji: "📦",
+      icon: "truck" as const,
     },
     pending: {
       label: "Pending",
       fg: colors.warning,
       bg: colors.warningBg,
-      emoji: "🛍️",
+      icon: "shopping-bag" as const,
     },
     delivered: {
       label: "Delivered",
       fg: colors.success,
       bg: colors.successBg,
-      emoji: "✅",
+      icon: "check-circle" as const,
     },
     failed: {
       label: "Failed",
       fg: colors.error,
       bg: colors.errorBg,
-      emoji: "❌",
+      icon: "x-circle" as const,
     },
   } as const;
 }
 
 function greeting() {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning 👋";
-  if (h < 17) return "Good afternoon 👋";
-  return "Good evening 👋";
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -142,7 +146,7 @@ function OrderCard({
       ]}
     >
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
-        <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
+        <Feather name={cfg.icon} size={16} color={cfg.fg} />
       </View>
       <View style={styles.orderInfo}>
         <Text
@@ -176,7 +180,7 @@ function IncompleteProfileBanner() {
       <View
         style={[styles.bannerIcon, { backgroundColor: "rgba(245,166,35,0.2)" }]}
       >
-        <Text style={{ fontSize: 16 }}>🏪</Text>
+        <Feather name="briefcase" size={16} color={colors.warning} />
       </View>
       <View style={styles.bannerText}>
         <Text style={[styles.bannerTitle, { color: colors.warning }]}>
@@ -307,7 +311,7 @@ export default function HomeScreen() {
               <Text style={styles.heroSub}>↑ 3 more than yesterday</Text>
             </View>
             <View style={styles.heroIconWrap}>
-              <Text style={styles.heroIconEmoji}>🚴</Text>
+              <Feather name="truck" size={22} color="#FFFFFF" />
             </View>
           </LinearGradient>
         </View>
@@ -374,7 +378,12 @@ export default function HomeScreen() {
               ]}
               onPress={route ? () => router.push(route as any) : undefined}
             >
-              <Text style={styles.quickChipIcon}>{icon}</Text>
+              <Feather
+                name={icon}
+                size={14}
+                color={colors.textSecondary}
+                style={styles.quickChipIcon}
+              />
               <Text
                 style={[styles.quickChipLabel, { color: colors.textPrimary }]}
               >
@@ -523,7 +532,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 2,
   },
-  heroIconEmoji: { fontSize: 22 },
 
   // Mini stats
   statRow: {
@@ -567,7 +575,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
   },
-  quickChipIcon: { fontSize: 14 },
+  quickChipIcon: { flexShrink: 0 },
   quickChipLabel: {
     fontSize: 12,
     fontFamily: font.sans.semiBold,
@@ -610,7 +618,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  orderIconEmoji: { fontSize: 17 },
   orderInfo: { flex: 1, minWidth: 0 },
   orderName: {
     fontSize: 13,

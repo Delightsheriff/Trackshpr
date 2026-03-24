@@ -2,17 +2,13 @@
  * Profile setup screen — light mode always (DS §9.2).
  * One-time setup: business details, contact, socials, pickup info.
  */
-import {
-  colors,
-  font,
-  gradients,
-  radius,
-} from "@/src/constants/tokens";
+import LogoUploader from "@/src/components/auth/logo-uploader";
+import { colors, font, gradients, radius } from "@/src/constants/tokens";
 import { useProfile, useSaveProfile, useUploadLogo } from "@/src/hooks";
 import { pickLogoUri } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
-import LogoUploader from "@/src/components/auth/logo-uploader";
 import { useToastStore } from "@/src/stores/toastStore";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -61,17 +57,11 @@ const EMPTY: FormState = {
 // ── Field components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ label }: { label: string }) {
-  return (
-    <Text style={styles.sectionLabel}>{label}</Text>
-  );
+  return <Text style={styles.sectionLabel}>{label}</Text>;
 }
 
 function FieldGroup({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.fieldGroup}>
-      {children}
-    </View>
-  );
+  return <View style={styles.fieldGroup}>{children}</View>;
 }
 
 function FieldRow({
@@ -82,7 +72,7 @@ function FieldRow({
   hasError,
   children,
 }: {
-  icon: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
   iconBg: string;
   label: string;
   required?: boolean;
@@ -92,7 +82,7 @@ function FieldRow({
   return (
     <View style={styles.inputRow}>
       <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
-        <Text style={styles.rowIconEmoji}>{icon}</Text>
+        <Feather name={icon} size={16} color={colors.textPrimary} />
       </View>
       <View style={styles.inputInner}>
         <View style={styles.labelRow}>
@@ -138,15 +128,25 @@ function TextField({
       <TextInput
         value={value}
         onChangeText={onChange}
-        onFocus={() => { setFocused(true); onFocus?.(); }}
-        onBlur={() => { setFocused(false); onBlur?.(); }}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
         keyboardType={keyboardType}
         multiline={multiline}
         style={[
           styles.textInput,
-          focused && { borderWidth: 2, borderColor: colors.primary, borderRadius: radius.lg },
+          focused && {
+            borderWidth: 2,
+            borderColor: colors.primary,
+            borderRadius: radius.lg,
+          },
           multiline && { height: 60, textAlignVertical: "top" as const },
         ]}
         returnKeyType={multiline ? "default" : "next"}
@@ -213,7 +213,10 @@ export default function ProfileSetupScreen() {
 
     const result = await uploadMutation.mutateAsync({ userId, uri });
     if (result.error) showToast("Logo upload failed. Try again.", "error");
-    setForm((prev) => ({ ...prev, logoPublicUrl: result.publicUrl ?? prev.logoPublicUrl }));
+    setForm((prev) => ({
+      ...prev,
+      logoPublicUrl: result.publicUrl ?? prev.logoPublicUrl,
+    }));
     setUploading(false);
   }, [userId, uploadMutation, showToast]);
 
@@ -262,12 +265,12 @@ export default function ProfileSetupScreen() {
   // ── Skip ─────────────────────────────────────────────────────────────────────
   const handleSkip = useCallback(async () => {
     if (!userId) return;
-    
+
     await supabase.from("profiles").upsert({
       id: userId,
       onboarding_complete: false,
     });
-    
+
     router.replace("/(tabs)");
   }, [userId]);
 
@@ -339,7 +342,12 @@ export default function ProfileSetupScreen() {
 
             {isFilled && (
               <View style={styles.welcomeChip}>
-                <Text style={styles.welcomeChipIcon}>👋</Text>
+                <Feather
+                  name="smile"
+                  size={18}
+                  color={colors.success}
+                  style={styles.welcomeChipIcon}
+                />
                 <Text style={styles.welcomeChipText}>
                   Looking good, {firstName}! Almost there.
                 </Text>
@@ -351,7 +359,7 @@ export default function ProfileSetupScreen() {
             <FieldGroup>
               <View style={[styles.requiredGroup, requiredBorder]}>
                 <FieldRow
-                  icon="🏪"
+                  icon="briefcase"
                   iconBg={hasError ? colors.errorBg : colors.primarySoft}
                   label="Business name"
                   required
@@ -370,7 +378,7 @@ export default function ProfileSetupScreen() {
                 </FieldRow>
                 <RowDivider />
                 <FieldRow
-                  icon="📱"
+                  icon="phone"
                   iconBg={hasError ? colors.errorBg : colors.warningBg}
                   label="WhatsApp number"
                   required
@@ -393,7 +401,12 @@ export default function ProfileSetupScreen() {
 
             {hasError && (
               <View style={styles.errorRow}>
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <Feather
+                  name="alert-triangle"
+                  size={12}
+                  color={colors.error}
+                  style={styles.errorIcon}
+                />
                 <Text style={styles.errorText}>
                   Business name and WhatsApp number are required
                 </Text>
@@ -404,7 +417,7 @@ export default function ProfileSetupScreen() {
             <SectionLabel label="Contact & Location" />
             <FieldGroup>
               <FieldRow
-                icon="📞"
+                icon="phone-call"
                 iconBg={colors.surfaceContainer}
                 label="Secondary phone"
               >
@@ -416,11 +429,7 @@ export default function ProfileSetupScreen() {
                 />
               </FieldRow>
               <RowDivider />
-              <FieldRow
-                icon="📍"
-                iconBg={colors.infoBg}
-                label="City"
-              >
+              <FieldRow icon="map-pin" iconBg={colors.infoBg} label="City">
                 <TextField
                   value={form.city}
                   onChange={(v) => set("city", v)}
@@ -429,7 +438,7 @@ export default function ProfileSetupScreen() {
               </FieldRow>
               <RowDivider />
               <FieldRow
-                icon="🏠"
+                icon="home"
                 iconBg={colors.successBg}
                 label="Pickup address"
               >
@@ -446,7 +455,7 @@ export default function ProfileSetupScreen() {
             <SectionLabel label="About" />
             <FieldGroup>
               <FieldRow
-                icon="✏️"
+                icon="edit-2"
                 iconBg={colors.primarySoft}
                 label="Short description"
               >
@@ -463,7 +472,7 @@ export default function ProfileSetupScreen() {
             <SectionLabel label="Social handles" />
             <FieldGroup>
               <FieldRow
-                icon="📸"
+                icon="instagram"
                 iconBg={colors.surfaceContainer}
                 label="Instagram"
               >
@@ -475,7 +484,7 @@ export default function ProfileSetupScreen() {
               </FieldRow>
               <RowDivider />
               <FieldRow
-                icon="🎵"
+                icon="music"
                 iconBg={colors.surfaceContainer}
                 label="TikTok"
               >
@@ -489,7 +498,12 @@ export default function ProfileSetupScreen() {
 
             {!isFilled && (
               <View style={styles.infoNote}>
-                <Text style={styles.infoNoteIcon}>👁️</Text>
+                <Feather
+                  name="eye"
+                  size={16}
+                  color={colors.primary}
+                  style={styles.infoNoteIcon}
+                />
                 <Text style={styles.infoNoteText}>
                   Your{" "}
                   <Text style={{ fontFamily: font.sans.semiBold }}>
@@ -508,7 +522,10 @@ export default function ProfileSetupScreen() {
             <Pressable
               onPress={handleSave}
               disabled={saveMutation.isPending}
-              android_ripple={{ color: "rgba(255,255,255,0.20)", borderless: false }}
+              android_ripple={{
+                color: "rgba(255,255,255,0.20)",
+                borderless: false,
+              }}
               style={styles.saveBtnPressable}
             >
               <LinearGradient
@@ -535,8 +552,7 @@ export default function ProfileSetupScreen() {
             disabled={isFilled}
           >
             <Text style={styles.skipText}>
-              Fill in later?{" "}
-              <Text style={styles.skipLink}>Skip for now</Text>
+              Fill in later? <Text style={styles.skipLink}>Skip for now</Text>
             </Text>
           </Pressable>
         </ScrollView>
@@ -656,7 +672,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 6,
   },
-  welcomeChipIcon: { fontSize: 18 },
+  welcomeChipIcon: { flexShrink: 0 },
   welcomeChipText: {
     fontSize: 13,
     fontFamily: font.sans.semiBold,
@@ -717,7 +733,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  rowIconEmoji: { fontSize: 16 },
   inputInner: { flex: 1 },
   labelRow: {
     marginBottom: 3,
@@ -767,7 +782,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginTop: 2,
   },
-  errorIcon: { fontSize: 12 },
+  errorIcon: { flexShrink: 0 },
   errorText: {
     fontSize: 11,
     fontFamily: font.sans.semiBold,
@@ -786,7 +801,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginTop: 6,
   },
-  infoNoteIcon: { fontSize: 16, flexShrink: 0 },
+  infoNoteIcon: { flexShrink: 0 },
   infoNoteText: {
     fontSize: 11,
     fontFamily: font.sans.regular,

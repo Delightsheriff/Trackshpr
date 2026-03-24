@@ -4,8 +4,8 @@
  * TODO: wire Add Rider / Delete sheet to real API.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useTheme } from "@/src/stores/themeStore";
 import { useDataStore } from "@/src/stores/dataStore";
+import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -30,7 +30,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Riders come from dataStore — shared with add-rider / delete-rider modals.
 
 function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 // ── Swipeable Rider Card ──────────────────────────────────────────────────────
@@ -40,7 +45,13 @@ function SwipeableRiderCard({
   rider,
   colorIdx,
 }: {
-  rider: { id: string; name: string; phone: string; delivered: number; failed: number };
+  rider: {
+    id: string;
+    name: string;
+    phone: string;
+    delivered: number;
+    failed: number;
+  };
   colorIdx: number;
 }) {
   const { colors, isDark } = useTheme();
@@ -48,40 +59,61 @@ function SwipeableRiderCard({
   // Avatar color cycling — computed inside component so they use live tokens
   const avatarColors = [
     { bg: colors.primarySoft, fg: colors.primary },
-    { bg: colors.successBg,   fg: colors.success },
-    { bg: colors.warningBg,   fg: colors.warning },
+    { bg: colors.successBg, fg: colors.success },
+    { bg: colors.warningBg, fg: colors.warning },
   ];
 
   const cardShadow = isDark
-    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
-  const translateX  = useSharedValue(0);
-  const isSwiped    = useSharedValue(false);
+  const translateX = useSharedValue(0);
+  const isSwiped = useSharedValue(false);
   const avatarColor = avatarColors[colorIdx % avatarColors.length];
 
   const handleDelete = () => {
     // snap back first, then open delete sheet
     translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
     isSwiped.value = false;
-    router.push({ pathname: "/(modals)/delete-rider", params: { id: rider.id, name: rider.name } });
+    router.push({
+      pathname: "/(modals)/delete-rider",
+      params: { id: rider.id, name: rider.name },
+    });
   };
 
   const panGesture = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .onUpdate((e) => {
       if (!isSwiped.value) {
-        translateX.value = Math.max(Math.min(e.translationX, 0), SWIPE_THRESHOLD);
+        translateX.value = Math.max(
+          Math.min(e.translationX, 0),
+          SWIPE_THRESHOLD,
+        );
       } else {
         translateX.value = Math.max(
           Math.min(e.translationX + SWIPE_THRESHOLD, 0),
-          SWIPE_THRESHOLD
+          SWIPE_THRESHOLD,
         );
       }
     })
     .onEnd(() => {
       if (translateX.value < SWIPE_THRESHOLD / 2) {
-        translateX.value = withSpring(SWIPE_THRESHOLD, { damping: 20, stiffness: 300 });
+        translateX.value = withSpring(SWIPE_THRESHOLD, {
+          damping: 20,
+          stiffness: 300,
+        });
         isSwiped.value = true;
       } else {
         translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
@@ -101,18 +133,34 @@ function SwipeableRiderCard({
         onPress={handleDelete}
       >
         <Feather name="trash-2" size={20} color="#fff" />
-        <Text style={[styles.deleteLabel, { color: "rgba(255,255,255,0.85)" }]}>Delete</Text>
+        <Text style={[styles.deleteLabel, { color: "rgba(255,255,255,0.85)" }]}>
+          Delete
+        </Text>
       </Pressable>
 
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.riderCard, { backgroundColor: colors.surfaceCard }, cardShadow, cardStyle]}>
+        <Animated.View
+          style={[
+            styles.riderCard,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+            cardStyle,
+          ]}
+        >
           {/* Tap zone to open rider detail */}
           <Pressable
             style={StyleSheet.absoluteFill}
-            onPress={() => router.push({ pathname: "/(screens)/rider-detail", params: { id: rider.id } })}
+            onPress={() =>
+              router.push({
+                pathname: "/(screens)/rider-detail",
+                params: { id: rider.id },
+              })
+            }
           />
           {/* Avatar */}
-          <View style={[styles.riderAvatar, { backgroundColor: avatarColor.bg }]}>
+          <View
+            style={[styles.riderAvatar, { backgroundColor: avatarColor.bg }]}
+          >
             <Text style={[styles.riderAvatarText, { color: avatarColor.fg }]}>
               {initials(rider.name)}
             </Text>
@@ -120,16 +168,37 @@ function SwipeableRiderCard({
 
           {/* Info */}
           <View style={styles.riderBody}>
-            <Text style={[styles.riderName, { color: colors.textPrimary }]}>{rider.name}</Text>
-            <Text style={[styles.riderPhone, { color: colors.textMuted }]}>{rider.phone}</Text>
+            <Text style={[styles.riderName, { color: colors.textPrimary }]}>
+              {rider.name}
+            </Text>
+            <Text style={[styles.riderPhone, { color: colors.textMuted }]}>
+              {rider.phone}
+            </Text>
             <View style={styles.riderStats}>
-              <View style={[styles.statBadge, { backgroundColor: colors.successBg }]}>
+              <View
+                style={[
+                  styles.statBadge,
+                  { backgroundColor: colors.successBg },
+                ]}
+              >
                 <Text style={[styles.statBadgeText, { color: colors.success }]}>
                   {rider.delivered} delivered
                 </Text>
               </View>
-              <View style={[styles.statBadge, { backgroundColor: colors.surfaceContainer }]}>
-                <Text style={[styles.statBadgeText, { color: colors.textSecondary }]}>{rider.failed} failed</Text>
+              <View
+                style={[
+                  styles.statBadge,
+                  { backgroundColor: colors.surfaceContainer },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statBadgeText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {rider.failed} failed
+                </Text>
               </View>
             </View>
           </View>
@@ -143,10 +212,17 @@ function SwipeableRiderCard({
               <Feather name="phone" size={16} color={colors.success} />
             </Pressable>
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: colors.surfaceContainer }]}
+              style={[
+                styles.actionBtn,
+                { backgroundColor: colors.surfaceContainer },
+              ]}
               android_ripple={{ color: colors.textMuted, borderless: false }}
             >
-              <Feather name="more-horizontal" size={16} color={colors.textSecondary} />
+              <Feather
+                name="more-horizontal"
+                size={16}
+                color={colors.textSecondary}
+              />
             </Pressable>
           </View>
         </Animated.View>
@@ -158,21 +234,33 @@ function SwipeableRiderCard({
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function RidersScreen() {
   const { colors, isDark } = useTheme();
-  const insets  = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
-  const riders  = useDataStore((s) => s.riders);
+  const riders = useDataStore((s) => s.riders);
 
   const searchBarShadow = isDark
-    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const filtered = riders.filter(
-    (r) => !query || r.name.toLowerCase().includes(query.toLowerCase())
+    (r) => !query || r.name.toLowerCase().includes(query.toLowerCase()),
   );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -183,12 +271,22 @@ export default function RidersScreen() {
       >
         {/* ── Title ─────────────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
-          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Riders</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>{riders.length} saved · Swipe to delete</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>
+            Riders
+          </Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
+            {riders.length} saved · Swipe to delete
+          </Text>
         </View>
 
         {/* ── Search ────────────────────────────────────────────────────── */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surfaceCard }, searchBarShadow]}>
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: colors.surfaceCard },
+            searchBarShadow,
+          ]}
+        >
           <Feather name="search" size={15} color={colors.textMuted} />
           <TextInput
             value={query}
@@ -208,28 +306,38 @@ export default function RidersScreen() {
         {/* ── Rider list ────────────────────────────────────────────────── */}
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🚴</Text>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No riders found</Text>
+            <Feather
+              name="user"
+              size={36}
+              color={colors.primary}
+              style={styles.emptyIcon}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              No riders found
+            </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              {query ? "Try a different name." : "Save your frequent riders to assign them faster."}
+              {query
+                ? "Try a different name."
+                : "Save your frequent riders to assign them faster."}
             </Text>
           </View>
         ) : (
           filtered.map((rider, i) => (
-            <SwipeableRiderCard
-              key={rider.id}
-              rider={rider}
-              colorIdx={i}
-            />
+            <SwipeableRiderCard key={rider.id} rider={rider} colorIdx={i} />
           ))
         )}
 
         {/* ── Add Rider button ──────────────────────────────────────────── */}
-        <View style={[styles.addBtnShadow, { backgroundColor: colors.primary }]}>
+        <View
+          style={[styles.addBtnShadow, { backgroundColor: colors.primary }]}
+        >
           <Pressable
             onPress={() => router.push("/(modals)/add-rider")}
             style={styles.addBtnPressable}
-            android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+            android_ripple={{
+              color: "rgba(255,255,255,0.2)",
+              borderless: false,
+            }}
           >
             <LinearGradient
               colors={gradients.primary}
@@ -238,7 +346,9 @@ export default function RidersScreen() {
               style={styles.addBtn}
             >
               <Feather name="plus" size={18} color="#fff" />
-              <Text style={[styles.addBtnText, { color: "#fff" }]}>Add Rider</Text>
+              <Text style={[styles.addBtnText, { color: "#fff" }]}>
+                Add Rider
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -408,7 +518,7 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     gap: 8,
   },
-  emptyIcon: { fontSize: 40, marginBottom: 4 },
+  emptyIcon: { marginBottom: 4 },
   emptyTitle: {
     fontSize: 17,
     fontFamily: font.sans.bold,

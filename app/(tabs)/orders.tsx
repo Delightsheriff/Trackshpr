@@ -20,16 +20,46 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Dummy data — TODO: replace with real Supabase query ──────────────────────
 const DUMMY_ORDERS_FULL = [
-  { id: "1", item: "Adire Maxi Dress × 2", customer: "Amara Obi",
-    area: "Lekki",    status: "in_transit" as const, time: "12m" },
-  { id: "2", item: "Ankara Tote Bag",       customer: "Tunde Bello",
-    area: "Yaba",     status: "pending"    as const, time: "34m" },
-  { id: "3", item: "Beaded Necklace Set",   customer: "Chisom Eze",
-    area: "Surulere", status: "delivered"  as const, time: "1h" },
-  { id: "4", item: "Silk Scarf (Red)",      customer: "Bisi Adeyemi",
-    area: "Ikeja",    status: "failed"     as const, time: "3h" },
-  { id: "5", item: "Kente Wrap Skirt",      customer: "Ngozi Obi",
-    area: "VI",       status: "delivered"  as const, time: "4h" },
+  {
+    id: "1",
+    item: "Adire Maxi Dress × 2",
+    customer: "Amara Obi",
+    area: "Lekki",
+    status: "in_transit" as const,
+    time: "12m",
+  },
+  {
+    id: "2",
+    item: "Ankara Tote Bag",
+    customer: "Tunde Bello",
+    area: "Yaba",
+    status: "pending" as const,
+    time: "34m",
+  },
+  {
+    id: "3",
+    item: "Beaded Necklace Set",
+    customer: "Chisom Eze",
+    area: "Surulere",
+    status: "delivered" as const,
+    time: "1h",
+  },
+  {
+    id: "4",
+    item: "Silk Scarf (Red)",
+    customer: "Bisi Adeyemi",
+    area: "Ikeja",
+    status: "failed" as const,
+    time: "3h",
+  },
+  {
+    id: "5",
+    item: "Kente Wrap Skirt",
+    customer: "Ngozi Obi",
+    area: "VI",
+    status: "delivered" as const,
+    time: "4h",
+  },
 ];
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -37,21 +67,41 @@ type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
 
 function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
   return {
-    in_transit: { label: "Transit",   fg: colors.info,    bg: colors.infoBg,    emoji: "📦" },
-    pending:    { label: "Pending",   fg: colors.warning, bg: colors.warningBg, emoji: "🛍️" },
-    delivered:  { label: "Done",      fg: colors.success, bg: colors.successBg, emoji: "✅" },
-    failed:     { label: "Failed",    fg: colors.error,   bg: colors.errorBg,   emoji: "❌" },
+    in_transit: {
+      label: "Transit",
+      fg: colors.info,
+      bg: colors.infoBg,
+      icon: "truck" as const,
+    },
+    pending: {
+      label: "Pending",
+      fg: colors.warning,
+      bg: colors.warningBg,
+      icon: "shopping-bag" as const,
+    },
+    delivered: {
+      label: "Done",
+      fg: colors.success,
+      bg: colors.successBg,
+      icon: "check-circle" as const,
+    },
+    failed: {
+      label: "Failed",
+      fg: colors.error,
+      bg: colors.errorBg,
+      icon: "x-circle" as const,
+    },
   } as const;
 }
 
 type FilterKey = "all" | OrderStatus;
 
 const FILTER_TABS: { key: FilterKey; label: string }[] = [
-  { key: "all",        label: "All" },
-  { key: "pending",    label: "Pending" },
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
   { key: "in_transit", label: "In Transit" },
-  { key: "delivered",  label: "Delivered" },
-  { key: "failed",     label: "Failed" },
+  { key: "delivered", label: "Delivered" },
+  { key: "failed", label: "Failed" },
 ];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -66,30 +116,69 @@ function StatusPill({ status }: { status: OrderStatus }) {
   );
 }
 
-function OrderCard({ id, item, customer, area, status, time }: {
-  id: string; item: string; customer: string; area: string; status: OrderStatus; time: string;
+function OrderCard({
+  id,
+  item,
+  customer,
+  area,
+  status,
+  time,
+}: {
+  id: string;
+  item: string;
+  customer: string;
+  area: string;
+  status: OrderStatus;
+  time: string;
 }) {
   const { colors, isDark } = useTheme();
   const cfg = getStatusMap(colors)[status];
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
   return (
     <Pressable
-      style={[styles.orderCard, { backgroundColor: colors.surfaceCard }, cardShadow]}
-      onPress={() => router.push({ pathname: "/(screens)/order-detail", params: { id } })}
+      style={[
+        styles.orderCard,
+        { backgroundColor: colors.surfaceCard },
+        cardShadow,
+      ]}
+      onPress={() =>
+        router.push({ pathname: "/(screens)/order-detail", params: { id } })
+      }
       android_ripple={{ color: colors.surfaceContainer, borderless: false }}
     >
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
-        <Text style={styles.orderIconEmoji}>{cfg.emoji}</Text>
+        <Feather name={cfg.icon} size={16} color={cfg.fg} />
       </View>
       <View style={styles.orderInfo}>
-        <Text style={[styles.orderName, { color: colors.textPrimary }]} numberOfLines={1}>{item}</Text>
-        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>{customer} · {area}</Text>
+        <Text
+          style={[styles.orderName, { color: colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {item}
+        </Text>
+        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>
+          {customer} · {area}
+        </Text>
       </View>
       <View style={styles.orderRight}>
         <StatusPill status={status} />
-        <Text style={[styles.orderTime, { color: colors.textMuted }]}>{time}</Text>
+        <Text style={[styles.orderTime, { color: colors.textMuted }]}>
+          {time}
+        </Text>
       </View>
     </Pressable>
   );
@@ -99,12 +188,24 @@ function OrderCard({ id, item, customer, area, status, time }: {
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const [query, setQuery]   = useState("");
+  const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const searchBarShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const filtered = DUMMY_ORDERS_FULL.filter((o) => {
     const matchesFilter = filter === "all" || o.status === filter;
@@ -130,12 +231,22 @@ export default function OrdersScreen() {
       >
         {/* ── Page title ────────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
-          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Orders</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>147 total · 18 today</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>
+            Orders
+          </Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
+            147 total · 18 today
+          </Text>
         </View>
 
         {/* ── Search bar ────────────────────────────────────────────────── */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surfaceCard }, searchBarShadow]}>
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: colors.surfaceCard },
+            searchBarShadow,
+          ]}
+        >
           <Feather name="search" size={15} color={colors.textMuted} />
           <TextInput
             value={query}
@@ -166,13 +277,19 @@ export default function OrdersScreen() {
                 onPress={() => setFilter(key)}
                 style={[
                   styles.filterTab,
-                  { backgroundColor: active ? colors.primary : colors.surfaceCard },
+                  {
+                    backgroundColor: active
+                      ? colors.primary
+                      : colors.surfaceCard,
+                  },
                 ]}
               >
-                <Text style={[
-                  styles.filterTabText,
-                  { color: active ? colors.white : colors.textMuted },
-                ]}>
+                <Text
+                  style={[
+                    styles.filterTabText,
+                    { color: active ? colors.white : colors.textMuted },
+                  ]}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -183,7 +300,12 @@ export default function OrdersScreen() {
         {/* ── Order list ────────────────────────────────────────────────── */}
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📋</Text>
+            <Feather
+              name="clipboard"
+              size={36}
+              color={colors.primary}
+              style={styles.emptyIcon}
+            />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
               No {filter === "all" ? "" : filter.replace("_", " ")} orders
             </Text>
@@ -272,7 +394,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  orderIconEmoji: { fontSize: 17 },
   orderInfo: { flex: 1, minWidth: 0 },
   orderName: {
     fontSize: 13,
@@ -317,7 +438,7 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     gap: 8,
   },
-  emptyIcon: { fontSize: 40, marginBottom: 4 },
+  emptyIcon: { marginBottom: 4 },
   emptyTitle: {
     fontSize: 17,
     fontFamily: font.sans.bold,

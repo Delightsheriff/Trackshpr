@@ -6,14 +6,14 @@
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { supabase } from "@/src/lib/supabase";
-import { router } from "expo-router";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Alert } from "react-native";
 import { useCallback, useState } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,18 +36,24 @@ const DUMMY_PROFILE = {
 };
 
 // ── Toggle switch (DS §8.7) ───────────────────────────────────────────────────
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   const { colors } = useTheme();
 
   const progress = useDerivedValue(() =>
-    withTiming(value ? 1 : 0, { duration: 200 })
+    withTiming(value ? 1 : 0, { duration: 200 }),
   );
 
   const trackStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      [colors.surfaceContainer, colors.primary]
+      [colors.surfaceContainer, colors.primary],
     ),
   }));
 
@@ -67,6 +73,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 // ── Setting row ───────────────────────────────────────────────────────────────
 function SettingRow({
   icon,
+  iconColor,
   iconBg,
   label,
   sublabel,
@@ -74,7 +81,8 @@ function SettingRow({
   onPress,
   danger,
 }: {
-  icon: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
+  iconColor?: string;
   iconBg: string;
   label: string;
   sublabel?: string;
@@ -91,19 +99,31 @@ function SettingRow({
       style={styles.settingRow}
     >
       <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
-        <Text style={styles.settingIconEmoji}>{icon}</Text>
+        <Feather
+          name={icon}
+          size={18}
+          color={iconColor ?? colors.textPrimary}
+        />
       </View>
       <View style={styles.settingBody}>
-        <Text style={[styles.settingLabel, { color: danger ? colors.error : colors.textPrimary }]}>
+        <Text
+          style={[
+            styles.settingLabel,
+            { color: danger ? colors.error : colors.textPrimary },
+          ]}
+        >
           {label}
         </Text>
         {sublabel && (
-          <Text style={[styles.settingSubLabel, { color: colors.textMuted }]}>{sublabel}</Text>
+          <Text style={[styles.settingSubLabel, { color: colors.textMuted }]}>
+            {sublabel}
+          </Text>
         )}
       </View>
-      {right ?? (
-        onPress && <Feather name="chevron-right" size={16} color={colors.textMuted} />
-      )}
+      {right ??
+        (onPress && (
+          <Feather name="chevron-right" size={16} color={colors.textMuted} />
+        ))}
     </Pressable>
   );
 }
@@ -111,10 +131,28 @@ function SettingRow({
 function SettingGroup({ children }: { children: React.ReactNode }) {
   const { colors, isDark } = useTheme();
   const groupShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
+      };
   return (
-    <View style={[styles.settingGroup, { backgroundColor: colors.surfaceCard }, groupShadow]}>
+    <View
+      style={[
+        styles.settingGroup,
+        { backgroundColor: colors.surfaceCard },
+        groupShadow,
+      ]}
+    >
       {children}
     </View>
   );
@@ -122,7 +160,11 @@ function SettingGroup({ children }: { children: React.ReactNode }) {
 
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
-  return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
+  return (
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+      {label}
+    </Text>
+  );
 }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
@@ -134,30 +176,42 @@ export default function SettingsScreen() {
   const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = useCallback(async () => {
-    Alert.alert(
-      "Sign out",
-      "Are you sure you want to sign out of Trackshpr?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign out",
-          style: "destructive",
-          onPress: async () => {
-            setSigningOut(true);
-            await supabase.auth.signOut();
-            router.replace("/sign-in");
-          },
+    Alert.alert("Sign out", "Are you sure you want to sign out of Trackshpr?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          setSigningOut(true);
+          await supabase.auth.signOut();
+          router.replace("/sign-in");
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   const profileSectionShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
   const initials = DUMMY_PROFILE.business_name
-    .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -170,12 +224,12 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Profile hero banner ───────────────────────────────────────── */}
-        <View style={{ paddingTop: insets.top }}>
+        <View>
           <LinearGradient
             colors={["#4647D3", "#5354e8", "#6366f1"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.profileBanner}
+            style={[styles.profileBanner, { paddingTop: insets.top }]}
           >
             <View style={styles.bannerOrb1} />
             <View style={styles.bannerOrb2} />
@@ -194,7 +248,10 @@ export default function SettingsScreen() {
                 colors={gradients.avatar}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[styles.profileAvatar, { borderColor: colors.surfaceCard }]}
+                style={[
+                  styles.profileAvatar,
+                  { borderColor: colors.surfaceCard },
+                ]}
               >
                 <Text style={styles.profileAvatarText}>{initials}</Text>
               </LinearGradient>
@@ -205,10 +262,20 @@ export default function SettingsScreen() {
               </Text>
               <View style={styles.profileMetaRow}>
                 <Text style={[styles.profileCity, { color: colors.textMuted }]}>
-                  📍 {DUMMY_PROFILE.city}
+                  <Feather name="map-pin" size={12} color={colors.textMuted} />{" "}
+                  {DUMMY_PROFILE.city}
                 </Text>
-                <View style={[styles.planBadge, { backgroundColor: colors.primarySoft }]}>
-                  <Text style={[styles.planBadgeText, { color: colors.primary }]}>Free plan</Text>
+                <View
+                  style={[
+                    styles.planBadge,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
+                >
+                  <Text
+                    style={[styles.planBadgeText, { color: colors.primary }]}
+                  >
+                    Free plan
+                  </Text>
                 </View>
               </View>
             </View>
@@ -216,16 +283,27 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Upgrade banner ────────────────────────────────────────────── */}
-        <View style={[styles.upgradeBanner, { backgroundColor: colors.primarySoft }]}>
+        <View
+          style={[
+            styles.upgradeBanner,
+            { backgroundColor: colors.primarySoft },
+          ]}
+        >
           <View style={styles.upgradeBannerLeft}>
-            <Text style={[styles.upgradeBannerTitle, { color: colors.primary }]}>
+            <Text
+              style={[styles.upgradeBannerTitle, { color: colors.primary }]}
+            >
               Unlock Trackshpr Pro
             </Text>
-            <Text style={[styles.upgradeBannerSub, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.upgradeBannerSub, { color: colors.textSecondary }]}
+            >
               Unlimited orders, custom branding, priority support
             </Text>
           </View>
-          <View style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}>
+          <View
+            style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}
+          >
             <Text style={styles.upgradeBtnText}>Upgrade</Text>
           </View>
         </View>
@@ -234,23 +312,36 @@ export default function SettingsScreen() {
         <SectionLabel label="Business" />
         <SettingGroup>
           <SettingRow
-            icon="🏪"
+            icon="briefcase"
+            iconColor={colors.primary}
             iconBg={colors.primarySoft}
             label="Business details"
             sublabel="Name, phone, city"
             onPress={() => router.push("/(settings)/business-details")}
           />
-          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
           <SettingRow
-            icon="🎨"
+            icon="sliders"
+            iconColor={colors.warning}
             iconBg={colors.warningBg}
             label="Brand customization"
             sublabel="Logo, colors"
             onPress={() => router.push("/(settings)/brand-customization")}
           />
-          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
           <SettingRow
-            icon="📊"
+            icon="download"
+            iconColor={colors.success}
             iconBg={colors.successBg}
             label="Export history"
             sublabel="Download CSV"
@@ -262,14 +353,21 @@ export default function SettingsScreen() {
         <SectionLabel label="Preferences" />
         <SettingGroup>
           <SettingRow
-            icon="🌙"
+            icon="moon"
+            iconColor={colors.textSecondary}
             iconBg={colors.surfaceContainer}
             label="Dark mode"
             right={<Toggle value={isDark} onChange={toggle} />}
           />
-          <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
           <SettingRow
-            icon="🔔"
+            icon="bell"
+            iconColor={colors.primary}
             iconBg={colors.primarySoft}
             label="Push notifications"
             right={<Toggle value={notifs} onChange={setNotifs} />}
@@ -280,7 +378,8 @@ export default function SettingsScreen() {
         <SectionLabel label="Support" />
         <SettingGroup>
           <SettingRow
-            icon="💬"
+            icon="message-circle"
+            iconColor={colors.info}
             iconBg={colors.infoBg}
             label="Help & support"
             sublabel="Chat with us"
@@ -291,7 +390,8 @@ export default function SettingsScreen() {
         {/* ── Danger zone ───────────────────────────────────────────────── */}
         <SettingGroup>
           <SettingRow
-            icon="🚪"
+            icon="log-out"
+            iconColor={colors.error}
             iconBg={colors.errorBg}
             label="Sign out"
             danger
@@ -300,7 +400,9 @@ export default function SettingsScreen() {
         </SettingGroup>
 
         {/* ── Version ───────────────────────────────────────────────────── */}
-        <Text style={[styles.version, { color: colors.textMuted }]}>v1.0.0</Text>
+        <Text style={[styles.version, { color: colors.textMuted }]}>
+          v1.0.0
+        </Text>
       </ScrollView>
     </View>
   );
@@ -463,7 +565,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  settingIconEmoji: { fontSize: 16 },
   settingBody: { flex: 1 },
   settingLabel: {
     fontSize: 14,

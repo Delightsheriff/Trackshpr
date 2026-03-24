@@ -8,13 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Dummy data — TODO: replace with real Supabase query ──────────────────────
@@ -63,8 +57,20 @@ const ANALYTICS = {
       { total: 68, done: 62 },
     ],
     labels: [
-      "1", "3", "5", "7", "9", "11", "13",
-      "15", "17", "19", "21", "23", "25", "27",
+      "1",
+      "3",
+      "5",
+      "7",
+      "9",
+      "11",
+      "13",
+      "15",
+      "17",
+      "19",
+      "21",
+      "23",
+      "25",
+      "27",
     ],
   },
   "90": {
@@ -77,23 +83,35 @@ const ANALYTICS = {
     failTrend: "↓ 8 from last quarter",
     chart: [
       { total: 120, done: 105 },
-      { total: 95,  done: 80  },
+      { total: 95, done: 80 },
       { total: 110, done: 100 },
       { total: 130, done: 118 },
-      { total: 88,  done: 75  },
+      { total: 88, done: 75 },
       { total: 145, done: 132 },
-      { total: 105, done: 95  },
+      { total: 105, done: 95 },
       { total: 115, done: 102 },
-      { total: 98,  done: 88  },
+      { total: 98, done: 88 },
       { total: 140, done: 128 },
       { total: 125, done: 112 },
-      { total: 108, done: 96  },
+      { total: 108, done: 96 },
       { total: 135, done: 122 },
       { total: 118, done: 105 },
     ],
     labels: [
-      "W1", "W2", "W3", "W4", "W5", "W6", "W7",
-      "W8", "W9", "W10", "W11", "W12", "W13", "W14",
+      "W1",
+      "W2",
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W8",
+      "W9",
+      "W10",
+      "W11",
+      "W12",
+      "W13",
+      "W14",
     ],
   },
 } as const;
@@ -101,7 +119,7 @@ const ANALYTICS = {
 type Period = "7" | "30" | "90";
 
 const PERIOD_TABS: { key: Period; label: string }[] = [
-  { key: "7",  label: "7 days"  },
+  { key: "7", label: "7 days" },
   { key: "30", label: "30 days" },
   { key: "90", label: "90 days" },
 ];
@@ -109,36 +127,71 @@ const PERIOD_TABS: { key: Period; label: string }[] = [
 // ── Rank badge config ─────────────────────────────────────────────────────────
 function rankBadgeColors(
   rank: number,
-  colors: ReturnType<typeof useTheme>["colors"]
+  colors: ReturnType<typeof useTheme>["colors"],
 ): { bg: string; fg: string } {
   if (rank === 1) return { bg: colors.warningBg, fg: colors.warning };
-  if (rank === 2) return { bg: colors.surfaceContainer, fg: colors.textSecondary };
+  if (rank === 2)
+    return { bg: colors.surfaceContainer, fg: colors.textSecondary };
   return { bg: colors.errorBg, fg: colors.error };
 }
 
 // ── Bar Chart ─────────────────────────────────────────────────────────────────
 const BAR_MAX_H = 72;
 
-function BarChart({ data }: { data: typeof ANALYTICS["7"] }) {
+function BarChart({ data }: { data: (typeof ANALYTICS)["7"] }) {
   const { colors, isDark } = useTheme();
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+      };
   const maxVal = Math.max(...data.chart.map((d) => d.total));
 
   return (
-    <View style={[styles.chartCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+    <View
+      style={[
+        styles.chartCard,
+        { backgroundColor: colors.surfaceCard },
+        cardShadow,
+      ]}
+    >
       {/* Header */}
       <View style={styles.chartHeader}>
-        <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>Daily deliveries</Text>
+        <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>
+          Daily deliveries
+        </Text>
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.surfaceContainer }]} />
-            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Total</Text>
+            <View
+              style={[
+                styles.legendDot,
+                { backgroundColor: colors.surfaceContainer },
+              ]}
+            />
+            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>
+              Total
+            </Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.primary, opacity: 0.85 }]} />
-            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>Done</Text>
+            <View
+              style={[
+                styles.legendDot,
+                { backgroundColor: colors.primary, opacity: 0.85 },
+              ]}
+            />
+            <Text style={[styles.legendLabel, { color: colors.textMuted }]}>
+              Done
+            </Text>
           </View>
         </View>
       </View>
@@ -146,8 +199,10 @@ function BarChart({ data }: { data: typeof ANALYTICS["7"] }) {
       {/* Bars */}
       <View style={styles.chartArea}>
         {data.chart.map((d, i) => {
-          const totalH = maxVal > 0 ? Math.max(4, (d.total / maxVal) * BAR_MAX_H) : 4;
-          const doneH  = maxVal > 0 ? Math.max(4, (d.done  / maxVal) * BAR_MAX_H) : 4;
+          const totalH =
+            maxVal > 0 ? Math.max(4, (d.total / maxVal) * BAR_MAX_H) : 4;
+          const doneH =
+            maxVal > 0 ? Math.max(4, (d.done / maxVal) * BAR_MAX_H) : 4;
           return (
             <View key={i} style={styles.barGroup}>
               <View
@@ -159,7 +214,11 @@ function BarChart({ data }: { data: typeof ANALYTICS["7"] }) {
               <View
                 style={[
                   styles.bar,
-                  { height: doneH, backgroundColor: colors.primary, opacity: 0.85 },
+                  {
+                    height: doneH,
+                    backgroundColor: colors.primary,
+                    opacity: 0.85,
+                  },
                 ]}
               />
             </View>
@@ -170,7 +229,10 @@ function BarChart({ data }: { data: typeof ANALYTICS["7"] }) {
       {/* Labels */}
       <View style={styles.chartLabelsRow}>
         {data.labels.map((lbl, i) => (
-          <Text key={i} style={[styles.chartLabel, { color: colors.textMuted }]}>
+          <Text
+            key={i}
+            style={[styles.chartLabel, { color: colors.textMuted }]}
+          >
             {lbl}
           </Text>
         ))}
@@ -204,14 +266,19 @@ function LeaderboardItem({
     "2": { bg: colors.successBg, fg: colors.success },
     "3": { bg: colors.warningBg, fg: colors.warning },
   };
-  const avatarCfg = AVATAR_COLORS[rider.id] ?? { bg: colors.surfaceContainer, fg: colors.textMuted };
+  const avatarCfg = AVATAR_COLORS[rider.id] ?? {
+    bg: colors.surfaceContainer,
+    fg: colors.textMuted,
+  };
 
   return (
     <>
       <View style={styles.lbRow}>
         {/* Rank badge */}
         <View style={[styles.lbRank, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.lbRankText, { color: badge.fg }]}>{rider.rank}</Text>
+          <Text style={[styles.lbRankText, { color: badge.fg }]}>
+            {rider.rank}
+          </Text>
         </View>
 
         {/* Avatar */}
@@ -223,16 +290,29 @@ function LeaderboardItem({
 
         {/* Body */}
         <View style={styles.lbBody}>
-          <Text style={[styles.lbName, { color: colors.textPrimary }]}>{rider.name}</Text>
-          <Text style={[styles.lbMeta, { color: colors.textMuted }]}>{rider.successRate} success rate</Text>
+          <Text style={[styles.lbName, { color: colors.textPrimary }]}>
+            {rider.name}
+          </Text>
+          <Text style={[styles.lbMeta, { color: colors.textMuted }]}>
+            {rider.successRate} success rate
+          </Text>
         </View>
 
         {/* Count */}
-        <Text style={[styles.lbCount, { color: colors.textPrimary }]}>{rider.count}</Text>
+        <Text style={[styles.lbCount, { color: colors.textPrimary }]}>
+          {rider.count}
+        </Text>
       </View>
 
       {/* Separator */}
-      {!isLast && <View style={[styles.lbSeparator, { backgroundColor: colors.surfaceContainer }]} />}
+      {!isLast && (
+        <View
+          style={[
+            styles.lbSeparator,
+            { backgroundColor: colors.surfaceContainer },
+          ]}
+        />
+      )}
     </>
   );
 }
@@ -246,13 +326,46 @@ export default function AnalyticsScreen() {
   const data = ANALYTICS[period];
 
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+      };
 
   const LEADERBOARD: LeaderboardRider[] = [
-    { id: "1", name: "Kunle Adeyemi", initials: "KA", successRate: "95%", count: 42, rank: 1 },
-    { id: "2", name: "Emeka Musa",    initials: "EM", successRate: "97%", count: 28, rank: 2 },
-    { id: "3", name: "Taiwo James",   initials: "TJ", successRate: "83%", count: 15, rank: 3 },
+    {
+      id: "1",
+      name: "Kunle Adeyemi",
+      initials: "KA",
+      successRate: "95%",
+      count: 42,
+      rank: 1,
+    },
+    {
+      id: "2",
+      name: "Emeka Musa",
+      initials: "EM",
+      successRate: "97%",
+      count: 28,
+      rank: 2,
+    },
+    {
+      id: "3",
+      name: "Taiwo James",
+      initials: "TJ",
+      successRate: "83%",
+      count: 15,
+      rank: 3,
+    },
   ];
 
   return (
@@ -260,25 +373,33 @@ export default function AnalyticsScreen() {
       <StatusBar style={isDark ? "light" : "dark"} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + 10 },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable
-          style={[styles.iconBtn, { backgroundColor: colors.surfaceCard }, cardShadow]}
+          style={[
+            styles.iconBtn,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+          ]}
           onPress={() => router.back()}
           hitSlop={8}
         >
           <Feather name="arrow-left" size={18} color={colors.textPrimary} />
         </Pressable>
 
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Analytics</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Analytics
+        </Text>
 
         {/* TODO: open share sheet */}
-        <Pressable style={[styles.iconBtn, { backgroundColor: colors.surfaceCard }, cardShadow]} hitSlop={8}>
-          <Text style={styles.exportEmoji}>📤</Text>
+        <Pressable
+          style={[
+            styles.iconBtn,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+          ]}
+          hitSlop={8}
+        >
+          <Feather name="download" size={16} color={colors.textPrimary} />
         </Pressable>
       </View>
 
@@ -291,7 +412,12 @@ export default function AnalyticsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Period selector ───────────────────────────────────────────────── */}
-        <View style={[styles.periodContainer, { backgroundColor: colors.surfaceContainer }]}>
+        <View
+          style={[
+            styles.periodContainer,
+            { backgroundColor: colors.surfaceContainer },
+          ]}
+        >
           {PERIOD_TABS.map(({ key, label }) => {
             const active = period === key;
             return (
@@ -303,17 +429,31 @@ export default function AnalyticsScreen() {
                     styles.periodTabActive,
                     { backgroundColor: colors.surfaceCard },
                     isDark
-                      ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 1 }
-                      : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 },
+                      ? {
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 4,
+                          elevation: 1,
+                        }
+                      : {
+                          shadowColor: "rgba(48,41,80,1)",
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.08,
+                          shadowRadius: 4,
+                          elevation: 1,
+                        },
                   ],
                 ]}
                 onPress={() => setPeriod(key)}
               >
-                <Text style={[
-                  styles.periodTabText,
-                  { color: colors.textMuted },
-                  active && { color: colors.textPrimary },
-                ]}>
+                <Text
+                  style={[
+                    styles.periodTabText,
+                    { color: colors.textMuted },
+                    active && { color: colors.textPrimary },
+                  ]}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -324,8 +464,16 @@ export default function AnalyticsScreen() {
         {/* ── 2×2 Stat cards ──────────────────────────────────────────────── */}
         <View style={styles.statsGrid}>
           {/* Total Orders */}
-          <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>TOTAL ORDERS</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              TOTAL ORDERS
+            </Text>
             <Text style={[styles.statValue, { color: colors.textPrimary }]}>
               {data.totalOrders}
             </Text>
@@ -335,8 +483,16 @@ export default function AnalyticsScreen() {
           </View>
 
           {/* Success Rate */}
-          <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>SUCCESS RATE</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              SUCCESS RATE
+            </Text>
             <Text style={[styles.statValue, { color: colors.success }]}>
               {data.successRate}%
             </Text>
@@ -346,8 +502,16 @@ export default function AnalyticsScreen() {
           </View>
 
           {/* Avg Delivery Time */}
-          <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>AVG TIME</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              AVG TIME
+            </Text>
             <Text style={[styles.statValue, { color: colors.info }]}>
               {data.avgTime}
             </Text>
@@ -357,8 +521,16 @@ export default function AnalyticsScreen() {
           </View>
 
           {/* Failed Orders */}
-          <View style={[styles.statCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>FAILED</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              FAILED
+            </Text>
             <Text style={[styles.statValue, { color: colors.error }]}>
               {data.failed}
             </Text>
@@ -372,8 +544,16 @@ export default function AnalyticsScreen() {
         <BarChart data={data} />
 
         {/* ── Leaderboard ──────────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TOP RIDERS</Text>
-        <View style={[styles.lbCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+          TOP RIDERS
+        </Text>
+        <View
+          style={[
+            styles.lbCard,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+          ]}
+        >
           {LEADERBOARD.map((rider, i) => (
             <LeaderboardItem
               key={rider.id}
@@ -413,7 +593,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.34,
   },
-  exportEmoji: { fontSize: 16 },
 
   // Scroll
   scroll: {

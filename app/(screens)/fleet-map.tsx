@@ -8,13 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import Animated, {
   useAnimatedStyle,
@@ -70,17 +64,17 @@ const FLEET_RIDERS_RAW = [
   },
 ];
 
-type RiderRaw = typeof FLEET_RIDERS_RAW[0];
+type RiderRaw = (typeof FLEET_RIDERS_RAW)[0];
 
 // ── Status pill sub-component ─────────────────────────────────────────────────
 function Pill({ status }: { status: string }) {
   const { colors } = useTheme();
   const cfg =
     status === "in_transit"
-      ? { bg: colors.infoBg,    fg: colors.info,    label: "Transit"   }
+      ? { bg: colors.infoBg, fg: colors.info, label: "Transit" }
       : status === "delivered"
-      ? { bg: colors.successBg, fg: colors.success, label: "Delivered" }
-      : { bg: colors.warningBg, fg: colors.warning, label: "Pending"   };
+        ? { bg: colors.successBg, fg: colors.success, label: "Delivered" }
+        : { bg: colors.warningBg, fg: colors.warning, label: "Pending" };
 
   return (
     <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
@@ -95,7 +89,10 @@ function StaleBadge() {
   const { colors } = useTheme();
   return (
     <View style={[styles.staleBadge, { backgroundColor: colors.warningBg }]}>
-      <Text style={[styles.staleBadgeText, { color: colors.warning }]}>⚠️ Stale</Text>
+      <Feather name="alert-triangle" size={10} color={colors.warning} />
+      <Text style={[styles.staleBadgeText, { color: colors.warning }]}>
+        Stale
+      </Text>
     </View>
   );
 }
@@ -109,15 +106,23 @@ function PulseDot() {
     pulse.value = withRepeat(
       withSequence(
         withTiming(0.3, { duration: 750 }),
-        withTiming(1, { duration: 750 })
+        withTiming(1, { duration: 750 }),
       ),
-      -1
+      -1,
     );
   }, []);
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
-  return <Animated.View style={[styles.activeDot, { backgroundColor: colors.primary }, pulseStyle]} />;
+  return (
+    <Animated.View
+      style={[
+        styles.activeDot,
+        { backgroundColor: colors.primary },
+        pulseStyle,
+      ]}
+    />
+  );
 }
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
@@ -131,12 +136,36 @@ export default function FleetMapScreen() {
   const fadeBg = isDark ? "rgba(15,14,26,0.5)" : "rgba(250,244,255,0.5)";
 
   const cardShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 4 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 20,
+        elevation: 4,
+      };
 
   const iconBtnShadow = isDark
-    ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 1 }
-    : { shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 1,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.07,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   // Resolve avatar colors from live tokens
   const AVATAR_VARIANTS = {
@@ -151,7 +180,7 @@ export default function FleetMapScreen() {
     avatarFg: AVATAR_VARIANTS[r.avatarVariant].fg,
   }));
 
-  type Rider = typeof FLEET_RIDERS[0];
+  type Rider = (typeof FLEET_RIDERS)[0];
 
   function pinColor(r: Rider): string {
     if (r.stale) return colors.warning;
@@ -159,7 +188,9 @@ export default function FleetMapScreen() {
     return colors.primary;
   }
 
-  const activeCount = FLEET_RIDERS.filter((r) => r.status === "in_transit").length;
+  const activeCount = FLEET_RIDERS.filter(
+    (r) => r.status === "in_transit",
+  ).length;
 
   function selectRider(r: Rider) {
     setSelectedId(r.id);
@@ -170,7 +201,7 @@ export default function FleetMapScreen() {
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       },
-      400
+      400,
     );
   }
 
@@ -200,7 +231,10 @@ export default function FleetMapScreen() {
           >
             <View style={[styles.pinBubble, { backgroundColor: pinColor(r) }]}>
               <View style={styles.pinDot} />
-              <Text style={[styles.pinText, { color: colors.white }]}>🚴 {r.name}</Text>
+              <Feather name="truck" size={10} color={colors.white} />
+              <Text style={[styles.pinText, { color: colors.white }]}>
+                {r.name}
+              </Text>
             </View>
             <View style={[styles.pinTail, { borderTopColor: pinColor(r) }]} />
           </Marker>
@@ -216,18 +250,31 @@ export default function FleetMapScreen() {
       >
         <View style={styles.headerInner}>
           <Pressable
-            style={[styles.iconBtn, { backgroundColor: colors.surfaceCard }, iconBtnShadow]}
+            style={[
+              styles.iconBtn,
+              { backgroundColor: colors.surfaceCard },
+              iconBtnShadow,
+            ]}
             onPress={() => router.back()}
             hitSlop={8}
           >
             <Feather name="arrow-left" size={18} color={colors.textPrimary} />
           </Pressable>
 
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Fleet Map</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Fleet Map
+          </Text>
 
-          <View style={[styles.activeBadge, { backgroundColor: colors.primarySoft }]}>
+          <View
+            style={[
+              styles.activeBadge,
+              { backgroundColor: colors.primarySoft },
+            ]}
+          >
             <PulseDot />
-            <Text style={[styles.activeBadgeText, { color: colors.primary }]}>{activeCount} active</Text>
+            <Text style={[styles.activeBadgeText, { color: colors.primary }]}>
+              {activeCount} active
+            </Text>
           </View>
         </View>
       </View>
@@ -238,7 +285,12 @@ export default function FleetMapScreen() {
         <View style={[styles.fadeStrip, { backgroundColor: fadeBg }]} />
 
         {/* Cards background */}
-        <View style={[styles.cardsBackground, { paddingBottom: insets.bottom + 8, backgroundColor: overlayBg }]}>
+        <View
+          style={[
+            styles.cardsBackground,
+            { paddingBottom: insets.bottom + 8, backgroundColor: overlayBg },
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -253,7 +305,10 @@ export default function FleetMapScreen() {
                     styles.fleetCard,
                     { backgroundColor: colors.surfaceCard },
                     cardShadow,
-                    isSelected && { borderWidth: 2, borderColor: colors.primary },
+                    isSelected && {
+                      borderWidth: 2,
+                      borderColor: colors.primary,
+                    },
                   ]}
                   onPress={() => selectRider(r)}
                 >
@@ -261,12 +316,23 @@ export default function FleetMapScreen() {
                   <View style={styles.fleetCardTop}>
                     <View style={styles.fleetCardLeft}>
                       {/* Avatar */}
-                      <View style={[styles.cardAvatar, { backgroundColor: r.avatarBg }]}>
-                        <Text style={[styles.cardAvatarText, { color: r.avatarFg }]}>
+                      <View
+                        style={[
+                          styles.cardAvatar,
+                          { backgroundColor: r.avatarBg },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.cardAvatarText, { color: r.avatarFg }]}
+                        >
                           {r.initials}
                         </Text>
                       </View>
-                      <Text style={[styles.cardName, { color: colors.textPrimary }]}>{r.name}</Text>
+                      <Text
+                        style={[styles.cardName, { color: colors.textPrimary }]}
+                      >
+                        {r.name}
+                      </Text>
                     </View>
 
                     {/* Status or stale */}
@@ -274,16 +340,33 @@ export default function FleetMapScreen() {
                   </View>
 
                   {/* Item */}
-                  <Text style={[styles.cardItem, { color: colors.textMuted }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.cardItem, { color: colors.textMuted }]}
+                    numberOfLines={1}
+                  >
                     {r.item}
                   </Text>
 
                   {/* Bottom row */}
                   <View style={styles.fleetCardBottom}>
-                    <Text style={[styles.cardDest, { color: colors.textMuted }]} numberOfLines={1}>
-                      📍 {r.dest}
+                    <View style={styles.cardDestRow}>
+                      <Feather
+                        name="map-pin"
+                        size={11}
+                        color={colors.textMuted}
+                      />
+                      <Text
+                        style={[styles.cardDest, { color: colors.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {r.dest}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.cardTime, { color: colors.textMuted }]}
+                    >
+                      {r.time}
                     </Text>
-                    <Text style={[styles.cardTime, { color: colors.textMuted }]}>{r.time}</Text>
                   </View>
                 </Pressable>
               );
@@ -413,11 +496,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  cardDestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flex: 1,
+    marginRight: 4,
+  },
   cardDest: {
     fontSize: 11,
     fontFamily: font.sans.regular,
     flex: 1,
-    marginRight: 4,
   },
   cardTime: {
     fontSize: 10,
@@ -449,6 +538,9 @@ const styles = StyleSheet.create({
 
   // Stale badge
   staleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     borderRadius: radius.full,
     paddingVertical: 3,
     paddingHorizontal: 7,

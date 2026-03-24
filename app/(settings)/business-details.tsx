@@ -33,16 +33,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // ── Dummy data — TODO: replace with real Supabase session ────────────────────
 const DUMMY_PROFILE = {
   business_name: "Zara's Closet",
-  phone:         "0803 456 7890",
-  city:          "Lagos",
-  description:   "Premium fashion delivered across Lagos",
-  logo_url:      null as string | null,
+  phone: "0803 456 7890",
+  city: "Lagos",
+  description: "Premium fashion delivered across Lagos",
+  logo_url: null as string | null,
 };
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
-  return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
+  return (
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+      {label}
+    </Text>
+  );
 }
 
 // ── Form input ────────────────────────────────────────────────────────────────
@@ -72,28 +76,45 @@ function FormInput({
   const showError = hasError && !focused;
 
   const fieldShadow = isDark
-    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const fieldBg = focused ? colors.surfaceCard : colors.surfaceContainer;
   const borderColor = showError
     ? colors.error
     : focused
-    ? colors.primary
-    : "transparent";
+      ? colors.primary
+      : "transparent";
 
   return (
     <View>
-      <View style={[
-        styles.inputField,
-        { backgroundColor: fieldBg, borderColor },
-        !focused && !showError && fieldShadow,
-      ]}>
-        <Text style={[
-          styles.inputLabel,
-          { color: showError ? colors.error : colors.textMuted },
-        ]}>
-          {label}{showError ? " — required" : ""}
+      <View
+        style={[
+          styles.inputField,
+          { backgroundColor: fieldBg, borderColor },
+          !focused && !showError && fieldShadow,
+        ]}
+      >
+        <Text
+          style={[
+            styles.inputLabel,
+            { color: showError ? colors.error : colors.textMuted },
+          ]}
+        >
+          {label}
+          {showError ? " — required" : ""}
         </Text>
         <TextInput
           value={value}
@@ -113,11 +134,15 @@ function FormInput({
           returnKeyType={multiline ? "default" : "next"}
         />
         {maxLength !== undefined && (
-          <Text style={[styles.charCount, { color: colors.textMuted }]}>{value.length} / {maxLength}</Text>
+          <Text style={[styles.charCount, { color: colors.textMuted }]}>
+            {value.length} / {maxLength}
+          </Text>
         )}
       </View>
       {showError && errorMsg ? (
-        <Text style={[styles.errorMsg, { color: colors.error }]}>⚠️ {errorMsg}</Text>
+        <Text style={[styles.errorMsg, { color: colors.error }]}>
+          {errorMsg}
+        </Text>
       ) : null}
     </View>
   );
@@ -129,26 +154,50 @@ export default function BusinessDetailsScreen() {
   const insets = useSafeAreaInsets();
 
   const [businessName, setBusinessName] = useState(DUMMY_PROFILE.business_name);
-  const [phone,        setPhone]        = useState(DUMMY_PROFILE.phone);
-  const [city,         setCity]         = useState(DUMMY_PROFILE.city);
-  const [description,  setDescription]  = useState(DUMMY_PROFILE.description);
-  const [logoUri,      setLogoUri]      = useState<string | null>(DUMMY_PROFILE.logo_url);
-  const [nameErr,      setNameErr]      = useState(false);
-  const [phoneErr,     setPhoneErr]     = useState(false);
-  const [saved,        setSaved]        = useState(false);
+  const [phone, setPhone] = useState(DUMMY_PROFILE.phone);
+  const [city, setCity] = useState(DUMMY_PROFILE.city);
+  const [description, setDescription] = useState(DUMMY_PROFILE.description);
+  const [logoUri, setLogoUri] = useState<string | null>(DUMMY_PROFILE.logo_url);
+  const [nameErr, setNameErr] = useState(false);
+  const [phoneErr, setPhoneErr] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const bannerY   = useSharedValue(-40);
-  const bannerOp  = useSharedValue(0);
+  const bannerY = useSharedValue(-40);
+  const bannerOp = useSharedValue(0);
 
   const hasErrors = nameErr || phoneErr;
 
   const cardShadow = isDark
-    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const backBtnShadow = isDark
-    ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
-    : { shadowColor: 'rgba(48,41,80,1)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 };
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 1,
+      };
 
   const handlePickLogo = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -165,9 +214,9 @@ export default function BusinessDetailsScreen() {
   };
 
   const showBanner = () => {
-    bannerY.value  = -40;
+    bannerY.value = -40;
     bannerOp.value = 0;
-    bannerY.value  = withSpring(0, { damping: 22, stiffness: 320 });
+    bannerY.value = withSpring(0, { damping: 22, stiffness: 320 });
     bannerOp.value = withTiming(1, { duration: 250 });
     setTimeout(() => {
       bannerOp.value = withTiming(0, { duration: 200 });
@@ -175,7 +224,7 @@ export default function BusinessDetailsScreen() {
   };
 
   const handleSave = () => {
-    const nameOk  = businessName.trim().length > 0;
+    const nameOk = businessName.trim().length > 0;
     const phoneOk = phone.trim().length > 0;
     setNameErr(!nameOk);
     setPhoneErr(!phoneOk);
@@ -187,24 +236,35 @@ export default function BusinessDetailsScreen() {
   };
 
   const bannerStyle = useAnimatedStyle(() => ({
-    opacity:   bannerOp.value,
+    opacity: bannerOp.value,
     transform: [{ translateY: bannerY.value }],
   }));
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: colors.surface }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top, backgroundColor: colors.surface },
+      ]}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: colors.surfaceCard }]}>
         <Pressable
           onPress={() => router.back()}
-          style={[styles.backBtn, { backgroundColor: colors.surfaceContainer }, backBtnShadow]}
+          style={[
+            styles.backBtn,
+            { backgroundColor: colors.surfaceContainer },
+            backBtnShadow,
+          ]}
           android_ripple={{ color: colors.surfaceContainer, borderless: false }}
         >
           <Feather name="arrow-left" size={18} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Business Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Business Details
+        </Text>
         <Pressable
           onPress={handleSave}
           style={[
@@ -212,21 +272,35 @@ export default function BusinessDetailsScreen() {
             { backgroundColor: saved ? colors.successBg : colors.primarySoft },
             hasErrors && { opacity: 0.4 },
           ]}
-          android_ripple={{ color: saved ? colors.successBg : colors.primarySoft, borderless: false }}
+          android_ripple={{
+            color: saved ? colors.successBg : colors.primarySoft,
+            borderless: false,
+          }}
         >
-          <Text style={[styles.headerSaveText, { color: saved ? colors.success : colors.primary }]}>
-            {saved ? "Saved ✓" : "Save"}
+          <Text
+            style={[
+              styles.headerSaveText,
+              { color: saved ? colors.success : colors.primary },
+            ]}
+          >
+            {saved ? "Saved" : "Save"}
           </Text>
         </Pressable>
       </View>
 
       {/* ── Saved banner ── */}
       <Animated.View
-        style={[styles.savedBanner, { backgroundColor: colors.successBg }, bannerStyle]}
+        style={[
+          styles.savedBanner,
+          { backgroundColor: colors.successBg },
+          bannerStyle,
+        ]}
         pointerEvents="none"
       >
-        <Text style={styles.savedBannerIcon}>✅</Text>
-        <Text style={[styles.savedBannerText, { color: colors.success }]}>Business details saved successfully</Text>
+        <Feather name="check-circle" size={16} color={colors.success} />
+        <Text style={[styles.savedBannerText, { color: colors.success }]}>
+          Business details saved successfully
+        </Text>
       </Animated.View>
 
       {/* ── Form ── */}
@@ -235,34 +309,61 @@ export default function BusinessDetailsScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: insets.bottom + 40 },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-
           {/* Logo upload card */}
-          <View style={[styles.logoCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <View style={[
-              styles.logoPreview,
-              logoUri
-                ? styles.logoPreviewFilled
-                : [styles.logoPreviewEmpty, { backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainer }],
-            ]}>
-              {logoUri
-                ? <Image source={{ uri: logoUri }} style={styles.logoImage} />
-                : <Text style={styles.logoEmoji}>🏪</Text>
-              }
-              <View style={[
-                styles.logoBadge,
-                { borderColor: colors.surfaceCard },
-                logoUri ? { backgroundColor: colors.success } : { backgroundColor: colors.primary },
-              ]}>
-                <Text style={[styles.logoBadgeText, { color: "#fff" }]}>{logoUri ? "✓" : "+"}</Text>
+          <View
+            style={[
+              styles.logoCard,
+              { backgroundColor: colors.surfaceCard },
+              cardShadow,
+            ]}
+          >
+            <View
+              style={[
+                styles.logoPreview,
+                logoUri
+                  ? styles.logoPreviewFilled
+                  : [
+                      styles.logoPreviewEmpty,
+                      {
+                        backgroundColor: colors.surfaceContainer,
+                        borderColor: colors.surfaceContainer,
+                      },
+                    ],
+              ]}
+            >
+              {logoUri ? (
+                <Image source={{ uri: logoUri }} style={styles.logoImage} />
+              ) : (
+                <Feather name="briefcase" size={24} color={colors.textMuted} />
+              )}
+              <View
+                style={[
+                  styles.logoBadge,
+                  { borderColor: colors.surfaceCard },
+                  logoUri
+                    ? { backgroundColor: colors.success }
+                    : { backgroundColor: colors.primary },
+                ]}
+              >
+                <Feather
+                  name={logoUri ? "check" : "plus"}
+                  size={11}
+                  color="#fff"
+                />
               </View>
             </View>
 
             <View style={styles.logoInfo}>
-              <Text style={[styles.logoTitle, { color: colors.textPrimary }]}>Business logo</Text>
+              <Text style={[styles.logoTitle, { color: colors.textPrimary }]}>
+                Business logo
+              </Text>
               <Text style={[styles.logoSub, { color: colors.textMuted }]}>
                 {logoUri
                   ? "Looking great. This shows on all tracking pages."
@@ -271,20 +372,44 @@ export default function BusinessDetailsScreen() {
               <View style={styles.logoActions}>
                 <Pressable
                   onPress={handlePickLogo}
-                  style={[styles.logoBtnPrimary, { backgroundColor: colors.primarySoft }]}
-                  android_ripple={{ color: colors.primarySoft, borderless: false }}
+                  style={[
+                    styles.logoBtnPrimary,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
+                  android_ripple={{
+                    color: colors.primarySoft,
+                    borderless: false,
+                  }}
                 >
-                  <Text style={[styles.logoBtnPrimaryText, { color: colors.primary }]}>
+                  <Text
+                    style={[
+                      styles.logoBtnPrimaryText,
+                      { color: colors.primary },
+                    ]}
+                  >
                     {logoUri ? "Change photo" : "Upload photo"}
                   </Text>
                 </Pressable>
                 {logoUri ? (
                   <Pressable
                     onPress={() => setLogoUri(null)}
-                    style={[styles.logoBtnDanger, { backgroundColor: colors.errorBg }]}
-                    android_ripple={{ color: colors.errorBg, borderless: false }}
+                    style={[
+                      styles.logoBtnDanger,
+                      { backgroundColor: colors.errorBg },
+                    ]}
+                    android_ripple={{
+                      color: colors.errorBg,
+                      borderless: false,
+                    }}
                   >
-                    <Text style={[styles.logoBtnDangerText, { color: colors.error }]}>Remove</Text>
+                    <Text
+                      style={[
+                        styles.logoBtnDangerText,
+                        { color: colors.error },
+                      ]}
+                    >
+                      Remove
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -297,7 +422,10 @@ export default function BusinessDetailsScreen() {
           <FormInput
             label="Business name"
             value={businessName}
-            onChange={(v) => { setBusinessName(v); if (v.trim()) setNameErr(false); }}
+            onChange={(v) => {
+              setBusinessName(v);
+              if (v.trim()) setNameErr(false);
+            }}
             placeholder="e.g. Zara's Closet"
             hasError={nameErr}
             errorMsg="Business name cannot be empty"
@@ -306,7 +434,10 @@ export default function BusinessDetailsScreen() {
           <FormInput
             label="WhatsApp number"
             value={phone}
-            onChange={(v) => { setPhone(v); if (v.trim()) setPhoneErr(false); }}
+            onChange={(v) => {
+              setPhone(v);
+              if (v.trim()) setPhoneErr(false);
+            }}
             placeholder="0800 000 0000"
             keyboardType="phone-pad"
             hasError={phoneErr}
@@ -333,23 +464,40 @@ export default function BusinessDetailsScreen() {
           />
 
           {/* Info card */}
-          <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
-            <Text style={styles.infoCardIcon}>👁️</Text>
-            <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
-              Your{" "}
-              <Text style={styles.bold}>business name</Text>,{" "}
+          <View
+            style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}
+          >
+            <Feather
+              name="eye"
+              size={16}
+              color={colors.primary}
+              style={styles.infoCardIcon}
+            />
+            <Text
+              style={[styles.infoCardText, { color: colors.textSecondary }]}
+            >
+              Your <Text style={styles.bold}>business name</Text>,{" "}
               <Text style={styles.bold}>logo</Text> and{" "}
-              <Text style={styles.bold}>description</Text>{" "}
-              appear on every customer tracking page you share.
+              <Text style={styles.bold}>description</Text> appear on every
+              customer tracking page you share.
             </Text>
           </View>
 
           {/* Save button */}
-          <View style={[styles.saveShadow, { backgroundColor: colors.primary }, hasErrors && styles.saveShadowDim]}>
+          <View
+            style={[
+              styles.saveShadow,
+              { backgroundColor: colors.primary },
+              hasErrors && styles.saveShadowDim,
+            ]}
+          >
             <Pressable
               onPress={handleSave}
               style={styles.savePressable}
-              android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+              android_ripple={{
+                color: "rgba(255,255,255,0.2)",
+                borderless: false,
+              }}
             >
               <LinearGradient
                 colors={gradients.primary}
@@ -357,11 +505,12 @@ export default function BusinessDetailsScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.saveBtn}
               >
-                <Text style={[styles.saveBtnText, { color: "#fff" }]}>Save Changes</Text>
+                <Text style={[styles.saveBtnText, { color: "#fff" }]}>
+                  Save Changes
+                </Text>
               </LinearGradient>
             </Pressable>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -382,9 +531,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   backBtn: {
-    width: 34, height: 34,
+    width: 34,
+    height: 34,
     borderRadius: 11,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   headerTitle: {
@@ -417,7 +568,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 14,
   },
-  savedBannerIcon: { fontSize: 16 },
   savedBannerText: {
     fontSize: 13,
     fontFamily: font.sans.semiBold,
@@ -452,9 +602,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   logoPreview: {
-    width: 64, height: 64,
+    width: 64,
+    height: 64,
     borderRadius: 20,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
     position: "relative",
   },
@@ -466,16 +618,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logoImage: {
-    width: 64, height: 64,
+    width: 64,
+    height: 64,
     borderRadius: 20,
   },
-  logoEmoji: { fontSize: 28 },
   logoBadge: {
     position: "absolute",
-    bottom: -4, right: -4,
-    width: 20, height: 20,
+    bottom: -4,
+    right: -4,
+    width: 20,
+    height: 20,
     borderRadius: 7,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
   },
   logoBadgeText: {
@@ -569,7 +724,7 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingHorizontal: 14,
   },
-  infoCardIcon: { fontSize: 16, marginTop: 1 },
+  infoCardIcon: { marginTop: 1 },
   infoCardText: {
     flex: 1,
     fontSize: 12,

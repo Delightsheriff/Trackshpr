@@ -32,7 +32,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -42,16 +47,20 @@ function StepDots({ step }: { step: 1 | 2 | 3 }) {
   return (
     <View style={sd.row}>
       {dots.map((n) => {
-        const isDone   = n < step;
+        const isDone = n < step;
         const isActive = n === step;
         return (
           <View
             key={n}
             style={[
               sd.dot,
-              isActive  && { width: 24, backgroundColor: colors.primary },
-              isDone    && { width: 8, backgroundColor: colors.success },
-              !isActive && !isDone && { width: 8, backgroundColor: colors.surfaceContainer },
+              isActive && { width: 24, backgroundColor: colors.primary },
+              isDone && { width: 8, backgroundColor: colors.success },
+              !isActive &&
+                !isDone && {
+                  width: 8,
+                  backgroundColor: colors.surfaceContainer,
+                },
             ]}
           />
         );
@@ -60,7 +69,12 @@ function StepDots({ step }: { step: 1 | 2 | 3 }) {
   );
 }
 const sd = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, justifyContent: "center", paddingVertical: 10 },
+  row: {
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
   dot: { height: 4, borderRadius: 2 },
 });
 
@@ -81,31 +95,79 @@ function FormHeader({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 const fh = StyleSheet.create({
-  row:    { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: layout.screenPaddingH, paddingBottom: 14 },
-  backBtn:{ width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center",
-            shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  title:  { fontSize: 17, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: -0.34 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: layout.screenPaddingH,
+    paddingBottom: 14,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+  },
 });
 
 // ── Shared input ──────────────────────────────────────────────────────────────
 function FieldInput({
-  label, value, onChange, placeholder, keyboardType, prefix, multiline, optional,
+  label,
+  value,
+  onChange,
+  placeholder,
+  keyboardType,
+  prefix,
+  multiline,
+  optional,
 }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
-  keyboardType?: "default" | "numeric" | "phone-pad"; prefix?: string; multiline?: boolean; optional?: boolean;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "numeric" | "phone-pad";
+  prefix?: string;
+  multiline?: boolean;
+  optional?: boolean;
 }) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
-    <View style={[
-      fi.wrap,
-      { backgroundColor: colors.surfaceCard, borderColor: focused ? colors.primary : "transparent" },
-    ]}>
+    <View
+      style={[
+        fi.wrap,
+        {
+          backgroundColor: colors.surfaceCard,
+          borderColor: focused ? colors.primary : "transparent",
+        },
+      ]}
+    >
       <Text style={[fi.label, { color: colors.textMuted }]}>
-        {label}{optional ? <Text style={{ color: colors.textMuted }}> · Optional</Text> : ""}
+        {label}
+        {optional ? (
+          <Text style={{ color: colors.textMuted }}> · Optional</Text>
+        ) : (
+          ""
+        )}
       </Text>
       <View style={fi.inputRow}>
-        {prefix && <Text style={[fi.prefix, { color: colors.textSecondary }]}>{prefix}</Text>}
+        {prefix && (
+          <Text style={[fi.prefix, { color: colors.textSecondary }]}>
+            {prefix}
+          </Text>
+        )}
         <TextInput
           value={value}
           onChangeText={onChange}
@@ -123,26 +185,69 @@ function FieldInput({
   );
 }
 const fi = StyleSheet.create({
-  wrap:     { borderRadius: radius.lg, padding: layout.cardPadding, borderWidth: 2,
-              shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
+  wrap: {
+    borderRadius: radius.lg,
+    padding: layout.cardPadding,
+    borderWidth: 2,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
   inputRow: { flexDirection: "row", alignItems: "center" },
-  label:    { fontSize: 10, fontFamily: font.sans.semiBold, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 },
-  prefix:   { fontSize: 14, fontFamily: font.sans.semiBold, marginRight: 4 },
-  input:    { flex: 1, fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "500", padding: 0 },
+  label: {
+    fontSize: 10,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  prefix: { fontSize: 14, fontFamily: font.sans.semiBold, marginRight: 4 },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "500",
+    padding: 0,
+  },
 });
 
 // ── Submit button ─────────────────────────────────────────────────────────────
-function SubmitBtn({ label, onPress, disabled, loading, success }: {
-  label: string; onPress: () => void; disabled?: boolean; loading?: boolean; success?: boolean;
+function SubmitBtn({
+  label,
+  onPress,
+  disabled,
+  loading,
+  success,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  success?: boolean;
 }) {
   const { colors } = useTheme();
   return (
-    <View style={[
-      sb.shadow,
-      { backgroundColor: disabled ? colors.surfaceContainer : (success ? colors.success : colors.primary),
-        shadowColor: disabled ? "transparent" : (success ? colors.success : colors.primary),
-        shadowOpacity: disabled ? 0 : (success ? 0.30 : 0.35) },
-    ]}>
+    <View
+      style={[
+        sb.shadow,
+        {
+          backgroundColor: disabled
+            ? colors.surfaceContainer
+            : success
+              ? colors.success
+              : colors.primary,
+          shadowColor: disabled
+            ? "transparent"
+            : success
+              ? colors.success
+              : colors.primary,
+          shadowOpacity: disabled ? 0 : success ? 0.3 : 0.35,
+        },
+      ]}
+    >
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
@@ -150,32 +255,61 @@ function SubmitBtn({ label, onPress, disabled, loading, success }: {
         style={sb.pressable}
       >
         <LinearGradient
-          colors={success ? gradients.success : (disabled ? [colors.surfaceContainer, colors.surfaceContainer] : gradients.primary)}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          colors={
+            success
+              ? gradients.success
+              : disabled
+                ? [colors.surfaceContainer, colors.surfaceContainer]
+                : gradients.primary
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={sb.btn}
         >
-          {loading
-            ? <ActivityIndicator color="white" size="small" />
-            : <Text style={[sb.text, disabled && { color: colors.textMuted }]}>{label}</Text>
-          }
+          {loading ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Text style={[sb.text, disabled && { color: colors.textMuted }]}>
+              {label}
+            </Text>
+          )}
         </LinearGradient>
       </Pressable>
     </View>
   );
 }
 const sb = StyleSheet.create({
-  shadow:   { borderRadius: radius.full, marginHorizontal: layout.screenPaddingH, marginTop: 8,
-              shadowOffset: { width: 0, height: 8 }, shadowRadius: 24, elevation: 8 },
-  pressable:{ borderRadius: radius.full, overflow: "hidden" },
-  btn:      { borderRadius: radius.full, paddingVertical: 15, alignItems: "center", justifyContent: "center", minHeight: 50 },
-  text:     { fontSize: 15, fontFamily: font.sans.bold, fontWeight: "700", color: "white" },
+  shadow: {
+    borderRadius: radius.full,
+    marginHorizontal: layout.screenPaddingH,
+    marginTop: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  pressable: { borderRadius: radius.full, overflow: "hidden" },
+  btn: {
+    borderRadius: radius.full,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 50,
+  },
+  text: {
+    fontSize: 15,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    color: "white",
+  },
 });
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
   return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+      {label}
+    </Text>
   );
 }
 
@@ -186,20 +320,22 @@ export default function NewDeliveryScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [sending, setSending] = useState(false);
 
-  const draft         = useOrderStore((s) => s.draft);
-  const setItem       = useOrderStore((s) => s.setItem);
-  const setDeliveryFee= useOrderStore((s) => s.setDeliveryFee);
-  const setNotes      = useOrderStore((s) => s.setNotes);
-  const setPhotoUri   = useOrderStore((s) => s.setPhotoUri);
-  const setDirectPhone= useOrderStore((s) => s.setDirectPhone);
-  const resetDraft    = useOrderStore((s) => s.reset);
+  const draft = useOrderStore((s) => s.draft);
+  const setItem = useOrderStore((s) => s.setItem);
+  const setDeliveryFee = useOrderStore((s) => s.setDeliveryFee);
+  const setNotes = useOrderStore((s) => s.setNotes);
+  const setPhotoUri = useOrderStore((s) => s.setPhotoUri);
+  const setDirectPhone = useOrderStore((s) => s.setDirectPhone);
+  const resetDraft = useOrderStore((s) => s.reset);
 
-  const addOrder  = useDataStore((s) => s.addOrder);
+  const addOrder = useDataStore((s) => s.addOrder);
   const showToast = useToastStore((s) => s.show);
 
   const handleBack = () => {
-    if (step === 1) { resetDraft(); router.back(); }
-    else setStep((s) => (s - 1) as 1 | 2 | 3);
+    if (step === 1) {
+      resetDraft();
+      router.back();
+    } else setStep((s) => (s - 1) as 1 | 2 | 3);
   };
 
   const pickPhoto = useCallback(async () => {
@@ -229,29 +365,38 @@ export default function NewDeliveryScreen() {
     addOrder({
       item: draft.item,
       customer: draft.customer?.name ?? "Unknown",
-      area: draft.customer?.city ?? draft.customer?.address.split(",").pop()?.trim() ?? "—",
+      area:
+        draft.customer?.city ??
+        draft.customer?.address.split(",").pop()?.trim() ??
+        "—",
       status: "pending",
       riderId: draft.rider?.id,
       riderName: draft.rider?.name,
       deliveryFee: draft.deliveryFee,
     });
-    showToast("Delivery created! Links sent via WhatsApp 📲", "success");
+    showToast("Delivery created! Links sent via WhatsApp", "success");
     resetDraft();
     router.dismissAll();
   };
 
   const riders = useDataStore((s) => s.riders);
-  const riderCanProceed = !!draft.rider || draft.directPhone.trim().length >= 10;
+  const riderCanProceed =
+    !!draft.rider || draft.directPhone.trim().length >= 10;
 
   // Avatar colors are theme-aware via color tokens
   const AVATAR_COLORS = [
     { bg: colors.primarySoft, fg: colors.primary },
-    { bg: colors.successBg,   fg: colors.success },
-    { bg: colors.warningBg,   fg: colors.warning },
+    { bg: colors.successBg, fg: colors.success },
+    { bg: colors.warningBg, fg: colors.warning },
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.root,
+        { backgroundColor: colors.surface, paddingTop: insets.top },
+      ]}
+    >
       <StatusBar style={isDark ? "light" : "dark"} />
 
       {/* ── Step 1: Item Details ──────────────────────────────────── */}
@@ -259,30 +404,70 @@ export default function NewDeliveryScreen() {
         <>
           <FormHeader title="New Delivery" onBack={handleBack} />
           <StepDots step={1} />
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.formBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              contentContainerStyle={styles.formBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <SectionLabel label="Item details" />
-              <FieldInput label="Item description" value={draft.item} onChange={setItem} placeholder="e.g. Adire Maxi Dress × 2" />
-              <FieldInput label="Delivery fee" value={draft.deliveryFee} onChange={setDeliveryFee} placeholder="0" keyboardType="numeric" prefix="₦" optional />
-              <FieldInput label="Notes for rider" value={draft.notes} onChange={setNotes} placeholder="e.g. Call customer on arrival" optional multiline />
+              <FieldInput
+                label="Item description"
+                value={draft.item}
+                onChange={setItem}
+                placeholder="e.g. Adire Maxi Dress × 2"
+              />
+              <FieldInput
+                label="Delivery fee"
+                value={draft.deliveryFee}
+                onChange={setDeliveryFee}
+                placeholder="0"
+                keyboardType="numeric"
+                prefix="₦"
+                optional
+              />
+              <FieldInput
+                label="Notes for rider"
+                value={draft.notes}
+                onChange={setNotes}
+                placeholder="e.g. Call customer on arrival"
+                optional
+                multiline
+              />
 
               {/* Photo upload */}
               <Pressable
                 onPress={pickPhoto}
-                style={[styles.photoCard, { backgroundColor: colors.surfaceCard }]}
+                style={[
+                  styles.photoCard,
+                  { backgroundColor: colors.surfaceCard },
+                ]}
               >
                 {draft.photoUri ? (
-                  <Image source={{ uri: draft.photoUri }} style={styles.photoPreview} />
+                  <Image
+                    source={{ uri: draft.photoUri }}
+                    style={styles.photoPreview}
+                  />
                 ) : (
-                  <View style={[styles.photoIconWrap, { backgroundColor: colors.primarySoft }]}>
-                    <Text style={styles.photoIcon}>📸</Text>
+                  <View
+                    style={[
+                      styles.photoIconWrap,
+                      { backgroundColor: colors.primarySoft },
+                    ]}
+                  >
+                    <Feather name="camera" size={20} color={colors.primary} />
                   </View>
                 )}
                 <View>
                   <Text style={[styles.photoLabel, { color: colors.primary }]}>
                     {draft.photoUri ? "Change item photo" : "Add item photo"}
                   </Text>
-                  <Text style={[styles.photoSub, { color: colors.textMuted }]}>Evidence if dispute arises</Text>
+                  <Text style={[styles.photoSub, { color: colors.textMuted }]}>
+                    Evidence if dispute arises
+                  </Text>
                 </View>
               </Pressable>
 
@@ -291,29 +476,57 @@ export default function NewDeliveryScreen() {
               {/* Customer selector */}
               <Pressable
                 onPress={() => router.push("/(modals)/select-customer")}
-                style={[styles.selectorField, { backgroundColor: colors.surfaceCard }]}
+                style={[
+                  styles.selectorField,
+                  { backgroundColor: colors.surfaceCard },
+                ]}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[fi.label, { color: colors.textMuted }]}>Customer name & address</Text>
+                  <Text style={[fi.label, { color: colors.textMuted }]}>
+                    Customer name & address
+                  </Text>
                   {draft.customer ? (
                     <>
-                      <Text style={[styles.selectorValue, { color: colors.textPrimary }]}>{draft.customer.name}</Text>
-                      <Text style={[styles.selectorSub, { color: colors.textMuted }]}>{draft.customer.address}</Text>
+                      <Text
+                        style={[
+                          styles.selectorValue,
+                          { color: colors.textPrimary },
+                        ]}
+                      >
+                        {draft.customer.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.selectorSub,
+                          { color: colors.textMuted },
+                        ]}
+                      >
+                        {draft.customer.address}
+                      </Text>
                     </>
                   ) : (
-                    <Text style={[styles.selectorPlaceholder, { color: colors.textMuted }]}>
+                    <Text
+                      style={[
+                        styles.selectorPlaceholder,
+                        { color: colors.textMuted },
+                      ]}
+                    >
                       Search address book or type new
                     </Text>
                   )}
                 </View>
-                <Text style={styles.selectorIcon}>👤</Text>
+                <Feather name="user" size={18} color={colors.textMuted} />
               </Pressable>
 
               <View style={{ height: 8 }} />
             </ScrollView>
           </KeyboardAvoidingView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
-            <SubmitBtn label="Next — Assign Rider →" onPress={handleStep1Next} disabled={!draft.item.trim()} />
+            <SubmitBtn
+              label="Next — Assign Rider →"
+              onPress={handleStep1Next}
+              disabled={!draft.item.trim()}
+            />
           </View>
         </>
       )}
@@ -323,10 +536,22 @@ export default function NewDeliveryScreen() {
         <>
           <FormHeader title="Assign Rider" onBack={handleBack} />
           <StepDots step={2} />
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.formBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <ScrollView
+              contentContainerStyle={styles.formBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <SectionLabel label="Saved riders" />
-              <View style={[styles.riderSelectCard, { backgroundColor: colors.surfaceCard }]}>
+              <View
+                style={[
+                  styles.riderSelectCard,
+                  { backgroundColor: colors.surfaceCard },
+                ]}
+              >
                 {riders.map((r, i) => {
                   const selected = draft.rider?.id === r.id;
                   const ac = AVATAR_COLORS[i % AVATAR_COLORS.length];
@@ -334,20 +559,54 @@ export default function NewDeliveryScreen() {
                     <Pressable
                       key={r.id}
                       onPress={() => useOrderStore.getState().setRider(r)}
-                      style={[styles.riderSelItem, selected && { backgroundColor: colors.primarySoft }]}
+                      style={[
+                        styles.riderSelItem,
+                        selected && { backgroundColor: colors.primarySoft },
+                      ]}
                     >
-                      <View style={[styles.riderSelAvatar, { backgroundColor: ac.bg }]}>
-                        <Text style={[styles.riderSelAvatarText, { color: ac.fg }]}>{initials(r.name)}</Text>
+                      <View
+                        style={[
+                          styles.riderSelAvatar,
+                          { backgroundColor: ac.bg },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.riderSelAvatarText, { color: ac.fg }]}
+                        >
+                          {initials(r.name)}
+                        </Text>
                       </View>
                       <View style={styles.riderSelInfo}>
-                        <Text style={[styles.riderSelName, { color: colors.textPrimary }]}>{r.name}</Text>
-                        <Text style={[styles.riderSelMeta, { color: colors.textMuted }]}>{r.delivered} deliveries · {r.phone}</Text>
+                        <Text
+                          style={[
+                            styles.riderSelName,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {r.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.riderSelMeta,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {r.delivered} deliveries · {r.phone}
+                        </Text>
                       </View>
-                      <View style={[
-                        styles.radioDot,
-                        { borderColor: selected ? colors.primary : colors.surfaceContainer,
-                          backgroundColor: selected ? colors.primary : "transparent" },
-                      ]}>
+                      <View
+                        style={[
+                          styles.radioDot,
+                          {
+                            borderColor: selected
+                              ? colors.primary
+                              : colors.surfaceContainer,
+                            backgroundColor: selected
+                              ? colors.primary
+                              : "transparent",
+                          },
+                        ]}
+                      >
                         {selected && <View style={styles.radioDotInner} />}
                       </View>
                     </Pressable>
@@ -356,20 +615,42 @@ export default function NewDeliveryScreen() {
                 {/* Add new rider row */}
                 <Pressable
                   onPress={() => router.push("/(modals)/add-rider")}
-                  style={[styles.addRiderRow, { borderTopColor: colors.surfaceContainer }]}
+                  style={[
+                    styles.addRiderRow,
+                    { borderTopColor: colors.surfaceContainer },
+                  ]}
                 >
-                  <View style={[styles.addRiderPlus, { backgroundColor: colors.primarySoft }]}>
+                  <View
+                    style={[
+                      styles.addRiderPlus,
+                      { backgroundColor: colors.primarySoft },
+                    ]}
+                  >
                     <Feather name="plus" size={18} color={colors.primary} />
                   </View>
-                  <Text style={[styles.addRiderTxt, { color: colors.primary }]}>Add a new rider</Text>
+                  <Text style={[styles.addRiderTxt, { color: colors.primary }]}>
+                    Add a new rider
+                  </Text>
                 </Pressable>
               </View>
 
               {/* OR divider */}
               <View style={styles.orRow}>
-                <View style={[styles.orLine, { backgroundColor: colors.surfaceContainer }]} />
-                <Text style={[styles.orText, { color: colors.textMuted }]}>or</Text>
-                <View style={[styles.orLine, { backgroundColor: colors.surfaceContainer }]} />
+                <View
+                  style={[
+                    styles.orLine,
+                    { backgroundColor: colors.surfaceContainer },
+                  ]}
+                />
+                <Text style={[styles.orText, { color: colors.textMuted }]}>
+                  or
+                </Text>
+                <View
+                  style={[
+                    styles.orLine,
+                    { backgroundColor: colors.surfaceContainer },
+                  ]}
+                />
               </View>
 
               {/* Direct phone input */}
@@ -384,7 +665,11 @@ export default function NewDeliveryScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
-            <SubmitBtn label="Review & Send →" onPress={handleStep2Next} disabled={!riderCanProceed} />
+            <SubmitBtn
+              label="Review & Send →"
+              onPress={handleStep2Next}
+              disabled={!riderCanProceed}
+            />
           </View>
         </>
       )}
@@ -394,49 +679,101 @@ export default function NewDeliveryScreen() {
         <>
           <FormHeader title="Confirm Order" onBack={handleBack} />
           <StepDots step={3} />
-          <ScrollView contentContainerStyle={styles.formBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.formBody}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Summary card */}
-            <View style={[styles.summaryCard, { backgroundColor: colors.surfaceCard }]}>
-              <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>Order Summary</Text>
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: colors.surfaceCard },
+              ]}
+            >
+              <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>
+                Order Summary
+              </Text>
               {[
-                { label: "Item",     value: draft.item || "—" },
+                { label: "Item", value: draft.item || "—" },
                 { label: "Customer", value: draft.customer?.name ?? "—" },
-                { label: "Address",  value: draft.customer?.address ?? "—" },
-                { label: "Rider",    value: (draft.rider?.name ?? draft.directPhone) || "—" },
-                { label: "Amount",   value: draft.deliveryFee ? `₦${draft.deliveryFee}` : "—", isAmount: true },
+                { label: "Address", value: draft.customer?.address ?? "—" },
+                {
+                  label: "Rider",
+                  value: (draft.rider?.name ?? draft.directPhone) || "—",
+                },
+                {
+                  label: "Amount",
+                  value: draft.deliveryFee ? `₦${draft.deliveryFee}` : "—",
+                  isAmount: true,
+                },
               ].map(({ label, value, isAmount }, idx, arr) => (
                 <View
                   key={label}
                   style={[
                     styles.summaryRow,
-                    idx < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.surfaceContainer },
+                    idx < arr.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.surfaceContainer,
+                    },
                   ]}
                 >
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{label}</Text>
-                  <Text style={[
-                    styles.summaryValue,
-                    { color: colors.textPrimary },
-                    isAmount && { fontSize: 15, fontFamily: font.mono.medium, color: colors.success },
-                  ]}>{value}</Text>
+                  <Text
+                    style={[styles.summaryLabel, { color: colors.textMuted }]}
+                  >
+                    {label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.summaryValue,
+                      { color: colors.textPrimary },
+                      isAmount && {
+                        fontSize: 15,
+                        fontFamily: font.mono.medium,
+                        color: colors.success,
+                      },
+                    ]}
+                  >
+                    {value}
+                  </Text>
                 </View>
               ))}
             </View>
 
             {/* WhatsApp notice */}
-            <View style={[styles.waCard, { backgroundColor: colors.successBg }]}>
-              <Text style={styles.waIcon}>📲</Text>
+            <View
+              style={[styles.waCard, { backgroundColor: colors.successBg }]}
+            >
+              <Feather
+                name="message-circle"
+                size={18}
+                color={colors.success}
+                style={styles.waIcon}
+              />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.waTitle, { color: colors.success }]}>WhatsApp links sent automatically</Text>
-                <Text style={[styles.waSub, { color: isDark ? colors.textSecondary : colors.success }]}>
+                <Text style={[styles.waTitle, { color: colors.success }]}>
+                  WhatsApp links sent automatically
+                </Text>
+                <Text
+                  style={[
+                    styles.waSub,
+                    { color: isDark ? colors.textSecondary : colors.success },
+                  ]}
+                >
                   {draft.rider?.name ?? "Rider"} gets a rider link.{" "}
-                  {draft.customer?.name ?? "Customer"} gets a tracking link. Both via WhatsApp.
+                  {draft.customer?.name ?? "Customer"} gets a tracking link.
+                  Both via WhatsApp.
                 </Text>
               </View>
             </View>
             <View style={{ height: 8 }} />
           </ScrollView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
-            <SubmitBtn label="🚀  Send Delivery" onPress={handleSend} loading={sending} success />
+            <SubmitBtn
+              label="Send Delivery"
+              onPress={handleSend}
+              loading={sending}
+              success
+            />
           </View>
         </>
       )}
@@ -445,52 +782,193 @@ export default function NewDeliveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:               { flex: 1 },
-  formBody:           { paddingHorizontal: layout.screenPaddingH, gap: 12, paddingBottom: 16 },
-  ctaRow:             { paddingTop: 4 },
-  sectionLabel:       { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: -4, marginTop: 4 },
+  root: { flex: 1 },
+  formBody: {
+    paddingHorizontal: layout.screenPaddingH,
+    gap: 12,
+    paddingBottom: 16,
+  },
+  ctaRow: { paddingTop: 4 },
+  sectionLabel: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: -4,
+    marginTop: 4,
+  },
   // Photo
-  photoCard:          { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: radius.lg, padding: layout.cardPadding,
-                        shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
-  photoIconWrap:      { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  photoIcon:          { fontSize: 20 },
-  photoPreview:       { width: 44, height: 44, borderRadius: 12, flexShrink: 0 },
-  photoLabel:         { fontSize: 13, fontFamily: font.sans.semiBold, fontWeight: "600" },
-  photoSub:           { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
+  photoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.lg,
+    padding: layout.cardPadding,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  photoIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  photoPreview: { width: 44, height: 44, borderRadius: 12, flexShrink: 0 },
+  photoLabel: {
+    fontSize: 13,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  photoSub: { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
   // Customer selector
-  selectorField:      { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.lg, padding: layout.cardPadding,
-                        shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
-  selectorValue:      { fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "500" },
-  selectorSub:        { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
-  selectorPlaceholder:{ fontSize: 14, fontFamily: font.sans.regular },
-  selectorIcon:       { fontSize: 18 },
+  selectorField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: radius.lg,
+    padding: layout.cardPadding,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  selectorValue: {
+    fontSize: 14,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "500",
+  },
+  selectorSub: { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
+  selectorPlaceholder: { fontSize: 14, fontFamily: font.sans.regular },
   // Rider select
-  riderSelectCard:    { borderRadius: radius.lg, overflow: "hidden",
-                        shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
-  riderSelItem:       { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, paddingHorizontal: 14 },
-  riderSelAvatar:     { width: 38, height: 38, borderRadius: radius.full, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  riderSelAvatarText: { fontSize: 13, fontFamily: font.sans.bold, fontWeight: "700" },
-  riderSelInfo:       { flex: 1 },
-  riderSelName:       { fontSize: 13, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: -0.13 },
-  riderSelMeta:       { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
-  radioDot:           { width: 20, height: 20, borderRadius: radius.full, borderWidth: 2, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  radioDotInner:      { width: 7, height: 7, borderRadius: radius.full, backgroundColor: "white" },
-  addRiderRow:        { flexDirection: "row", alignItems: "center", gap: 10, padding: 11, paddingHorizontal: 14, borderTopWidth: 1 },
-  addRiderPlus:       { width: 38, height: 38, borderRadius: radius.full, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  addRiderTxt:        { fontSize: 13, fontFamily: font.sans.semiBold, fontWeight: "600" },
-  orRow:              { flexDirection: "row", alignItems: "center", gap: 8 },
-  orLine:             { flex: 1, height: 1 },
-  orText:             { fontSize: 11, fontFamily: font.sans.semiBold },
+  riderSelectCard: {
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  riderSelItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    paddingHorizontal: 14,
+  },
+  riderSelAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  riderSelAvatarText: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
+  riderSelInfo: { flex: 1 },
+  riderSelName: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.13,
+  },
+  riderSelMeta: { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
+  radioDot: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  radioDotInner: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+    backgroundColor: "white",
+  },
+  addRiderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 11,
+    paddingHorizontal: 14,
+    borderTopWidth: 1,
+  },
+  addRiderPlus: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  addRiderTxt: {
+    fontSize: 13,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  orRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  orLine: { flex: 1, height: 1 },
+  orText: { fontSize: 11, fontFamily: font.sans.semiBold },
   // Summary
-  summaryCard:        { borderRadius: radius.xl, padding: 16,
-                        shadowColor: "rgba(48,41,80,1)", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  summaryTitle:       { fontSize: 11, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 12 },
-  summaryRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 9 },
-  summaryLabel:       { fontSize: 12, fontFamily: font.sans.regular },
-  summaryValue:       { fontSize: 13, fontFamily: font.sans.semiBold, fontWeight: "600", textAlign: "right", maxWidth: "55%" },
+  summaryCard: {
+    borderRadius: radius.xl,
+    padding: 16,
+    shadowColor: "rgba(48,41,80,1)",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 11,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 9,
+  },
+  summaryLabel: { fontSize: 12, fontFamily: font.sans.regular },
+  summaryValue: {
+    fontSize: 13,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    textAlign: "right",
+    maxWidth: "55%",
+  },
   // WhatsApp card
-  waCard:             { flexDirection: "row", gap: 10, borderRadius: 14, padding: 12, paddingHorizontal: 14 },
-  waIcon:             { fontSize: 18, flexShrink: 0 },
-  waTitle:            { fontSize: 12, fontFamily: font.sans.bold, fontWeight: "700", marginBottom: 2 },
-  waSub:              { fontSize: 11, fontFamily: font.sans.regular, lineHeight: 15.4 },
+  waCard: {
+    flexDirection: "row",
+    gap: 10,
+    borderRadius: 14,
+    padding: 12,
+    paddingHorizontal: 14,
+  },
+  waIcon: { flexShrink: 0 },
+  waTitle: {
+    fontSize: 12,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  waSub: { fontSize: 11, fontFamily: font.sans.regular, lineHeight: 15.4 },
 });

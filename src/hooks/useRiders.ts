@@ -7,6 +7,7 @@ import {
   fetchRider,
   fetchRiders,
   insertRider,
+  updateRider,
 } from "@/src/lib/supabaseQueries";
 import { queryKeys } from "@/src/lib/queryKeys";
 
@@ -37,6 +38,28 @@ export function useAddRider(sellerId: string | null) {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.riders(sellerId ?? ""),
+      });
+    },
+  });
+}
+
+export function useUpdateRider(sellerId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      riderId,
+      data,
+    }: {
+      riderId: string;
+      data: { name: string; phone: string; notes?: string | null };
+    }) => updateRider(riderId, data),
+    onSuccess: (_updated, { riderId }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.riders(sellerId ?? ""),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.rider(riderId),
       });
     },
   });

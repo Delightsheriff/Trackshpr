@@ -91,6 +91,14 @@ export default function RiderDetailScreen() {
     );
   }
 
+  function handleEdit() {
+    if (!rider) return;
+    router.push({
+      pathname: "/(modals)/edit-rider",
+      params: { id: rider.id },
+    });
+  }
+
   function handleRemove() {
     if (!rider) return;
     router.push({
@@ -183,6 +191,12 @@ export default function RiderDetailScreen() {
               <View style={styles.heroActionContent}>
                 <Feather name="message-circle" size={12} color={colors.white} />
                 <Text style={[styles.heroActionText, { color: colors.white }]}>WhatsApp</Text>
+              </View>
+            </Pressable>
+            <Pressable style={styles.heroActionBtn} onPress={handleEdit}>
+              <View style={styles.heroActionContent}>
+                <Feather name="edit-2" size={12} color={colors.white} />
+                <Text style={[styles.heroActionText, { color: colors.white }]}>Edit</Text>
               </View>
             </Pressable>
             <Pressable

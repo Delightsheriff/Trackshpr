@@ -47,6 +47,7 @@ export default function RootLayout() {
             <Stack.Screen name="(screens)/rider-link" />
             <Stack.Screen name="(screens)/track-link" />
             <Stack.Screen name="(modals)/add-rider" options={{ presentation: "transparentModal" }} />
+            <Stack.Screen name="(modals)/edit-rider" options={{ presentation: "transparentModal" }} />
             <Stack.Screen name="(modals)/delete-rider" options={{ presentation: "transparentModal" }} />
             <Stack.Screen name="(modals)/add-customer" options={{ presentation: "transparentModal" }} />
             <Stack.Screen name="(modals)/delete-customer" options={{ presentation: "transparentModal" }} />

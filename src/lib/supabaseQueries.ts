@@ -133,6 +133,21 @@ export async function fetchRider(riderId: string): Promise<Rider> {
   return data as unknown as Rider;
 }
 
+export async function updateRider(
+  riderId: string,
+  payload: { name: string; phone: string; notes?: string | null },
+): Promise<Rider> {
+  const { data, error } = await supabase
+    .from("riders")
+    .update(payload)
+    .eq("id", riderId)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error("Failed to update rider");
+  return data as unknown as Rider;
+}
+
 export async function insertRider(payload: {
   seller_id: string;
   name: string;

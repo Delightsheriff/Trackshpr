@@ -7,7 +7,7 @@ export type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
 export function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
   return {
     in_transit: {
-      label: "In Transit",
+      label: "Transit",
       fg: colors.info,
       bg: colors.infoBg,
       icon: "truck" as const,
@@ -19,7 +19,7 @@ export function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
       icon: "shopping-bag" as const,
     },
     delivered: {
-      label: "Delivered",
+      label: "Done",
       fg: colors.success,
       bg: colors.successBg,
       icon: "check-circle" as const,

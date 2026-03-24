@@ -1,18 +1,21 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useTheme } from "@/src/stores/themeStore";
 import { radius, font, layout } from "@/src/constants/tokens";
 import { OrderStatus, getStatusMap } from "./home-types";
 import { StatusPill } from "./status-pill";
 
 export function OrderCard({
+  id,
   item,
   customer,
   area,
   status,
   time,
 }: {
+  id: string;
   item: string;
   customer: string;
   area: string;
@@ -38,12 +41,16 @@ export function OrderCard({
       };
       
   return (
-    <View
+    <Pressable
       style={[
         styles.orderCard,
         { backgroundColor: colors.surfaceCard },
         cardShadow,
       ]}
+      onPress={() =>
+        router.push({ pathname: "/(screens)/order-detail", params: { id } })
+      }
+      android_ripple={{ color: colors.surfaceContainer, borderless: false }}
     >
       <View style={[styles.orderIcon, { backgroundColor: cfg.bg }]}>
         <Feather name={cfg.icon} size={16} color={cfg.fg} />
@@ -65,7 +72,7 @@ export function OrderCard({
           {time}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

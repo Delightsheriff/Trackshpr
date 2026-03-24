@@ -2,465 +2,36 @@
  * Order Detail screen — shows order status hero, progress steps, map (in_transit),
  * action buttons, order details, magic links, photo strip, and delivery timeline.
  * DS §8.1, §8.4, §8.8 — Feather icons, DM Sans / DM Mono fonts.
- * TODO: replace DUMMY_ORDERS with real Supabase query by id.
+ * TODO: replace DUMMY_ORDERS_DETAIL with real Supabase query by id.
  */
-import { font, layout, radius } from "@/src/constants/tokens";
-import { useTheme } from "@/src/stores/themeStore";
+import React from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Share } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { router, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import {
-  Linking,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/src/stores/themeStore";
+import { layout, radius, font } from "@/src/constants/tokens";
 
-// ── Dummy data — TODO: replace with real Supabase query ──────────────────────
-const DUMMY_ORDERS = [
-  {
-    id: "1",
-    orderId: "TRK-2847",
-    item: "Adire Maxi Dress × 2",
-    customer: "Amara Obi",
-    customerPhone: "0801 234 5678",
-    address: "14 Admiralty Way, Lekki Phase 1",
-    rider: "Kunle Adeyemi",
-    riderPhone: "0803 456 7890",
-    amount: 35000,
-    status: "in_transit" as const,
-    riderToken: "a1b2c3d4",
-    customerToken: "e5f6g7h8",
-    createdAt: "10:58 AM",
-    pickedUpAt: "11:34 AM",
-    pickedUpLocation: "Yaba, Lagos",
-    failureReason: null as string | null,
-    deliveredAt: null as string | null,
-    failedAt: null as string | null,
-    elapsedLabel: "12m ago",
-  },
-  {
-    id: "2",
-    orderId: "TRK-2831",
-    item: "Beaded Necklace Set",
-    customer: "Chisom Eze",
-    customerPhone: "0812 111 2233",
-    address: "5 Bode Thomas, Surulere",
-    rider: "Emeka Musa",
-    riderPhone: "0812 345 6789",
-    amount: 18500,
-    status: "delivered" as const,
-    riderToken: "b2c3d4e5",
-    customerToken: "f6g7h8i9",
-    createdAt: "10:48 AM",
-    pickedUpAt: "11:02 AM",
-    deliveredAt: "12:26 PM",
-    failureReason: null,
-    failedAt: null,
-    pickedUpLocation: "Yaba, Lagos",
-    elapsedLabel: "1h 24m total",
-  },
-  {
-    id: "3",
-    orderId: "TRK-2819",
-    item: "Silk Scarf (Red)",
-    customer: "Bisi Adeyemi",
-    customerPhone: "0705 432 1098",
-    address: "10 Allen Ave, Ikeja",
-    rider: "Taiwo James",
-    riderPhone: "0701 234 5678",
-    amount: 22000,
-    status: "failed" as const,
-    riderToken: "c3d4e5f6",
-    customerToken: "g7h8i9j0",
-    createdAt: "9:14 AM",
-    pickedUpAt: "9:48 AM",
-    failedAt: "10:55 AM",
-    failureReason: "Customer not available",
-    deliveredAt: null,
-    pickedUpLocation: "Yaba, Lagos",
-    elapsedLabel: "3h ago",
-  },
-];
+// Components
+import { StatusPill } from "@/src/components/home/status-pill";
+import { Order, DUMMY_ORDERS_DETAIL } from "@/src/components/orders/order-types";
+import { ProgressSteps, Step } from "@/src/components/orders/progress-steps";
+import { DetailRow } from "@/src/components/orders/detail-row";
+import { TimelineItem } from "@/src/components/orders/timeline-item";
+import { ActionBtn } from "@/src/components/orders/action-btn";
+import { MapSection } from "@/src/components/orders/map-section";
+import { MagicLinkCard } from "@/src/components/orders/magic-link-card";
 
-type Order = (typeof DUMMY_ORDERS)[0];
+import { callPhone, copyLink, formatAmount } from "@/src/utils/helpers";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function callPhone(phone: string) {
-  Linking.openURL("tel:" + phone.replace(/\s/g, ""));
-}
-
-function copyLink(url: string) {
-  Share.share({ message: url });
-}
-
-function formatAmount(n: number) {
-  return "₦" + n.toLocaleString("en-NG");
-}
-
-// ── Status Pill ──────────────────────────────────────────────────────────────
-function StatusPill({
-  label,
-  fg,
-  bg,
-}: {
-  label: string;
-  fg: string;
-  bg: string;
-}) {
-  return (
-    <View style={[styles.pill, { backgroundColor: bg }]}>
-      <View style={[styles.pillDot, { backgroundColor: fg }]} />
-      <Text style={[styles.pillText, { color: fg }]}>{label}</Text>
-    </View>
-  );
-}
-
-// ── Progress Steps ────────────────────────────────────────────────────────────
-type StepState = "done" | "active" | "pending";
-
-interface Step {
-  label: string;
-  state: StepState;
-  icon: string;
-}
-
-function ProgressSteps({
-  steps,
-  lineColor,
-  lineWidth,
-}: {
-  steps: Step[];
-  lineColor: string;
-  lineWidth: `${number}%`;
-}) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.progressContainer}>
-      {/* Background track */}
-      <View
-        style={[
-          styles.progressTrackBg,
-          { backgroundColor: colors.surfaceContainer },
-        ]}
-      />
-      {/* Filled track */}
-      <View
-        style={[
-          styles.progressTrackFill,
-          { backgroundColor: lineColor, width: lineWidth },
-        ]}
-      />
-      {steps.map((step, i) => {
-        const isDone = step.state === "done";
-        const isActive = step.state === "active";
-        return (
-          <View key={i} style={styles.progressStep}>
-            <View
-              style={[
-                styles.progressDot,
-                isDone
-                  ? {
-                      backgroundColor: colors.success,
-                      borderColor: colors.success,
-                    }
-                  : isActive
-                    ? {
-                        backgroundColor: colors.primarySoft,
-                        borderColor: colors.primary,
-                      }
-                    : {
-                        backgroundColor: colors.surfaceCard,
-                        borderColor: colors.surfaceContainer,
-                      },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.progressDotText,
-                  isDone
-                    ? { color: colors.white }
-                    : isActive
-                      ? { color: colors.primary }
-                      : { color: colors.textMuted },
-                ]}
-              >
-                {isDone ? "✓" : step.icon}
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.progressLabel,
-                isDone
-                  ? {
-                      color: colors.success,
-                      fontFamily: font.sans.bold,
-                      fontWeight: "600",
-                    }
-                  : isActive
-                    ? {
-                        color: colors.primary,
-                        fontFamily: font.sans.bold,
-                        fontWeight: "600",
-                      }
-                    : {
-                        color: colors.textMuted,
-                        fontFamily: font.sans.regular,
-                      },
-              ]}
-            >
-              {step.label}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// ── Detail Row ────────────────────────────────────────────────────────────────
-function DetailRow({
-  label,
-  value,
-  valueStyle,
-  mono,
-  separator,
-}: {
-  label: string;
-  value: string;
-  valueStyle?: object;
-  mono?: boolean;
-  separator?: boolean;
-}) {
-  const { colors } = useTheme();
-  return (
-    <>
-      <View style={styles.detailRow}>
-        <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
-          {label}
-        </Text>
-        <Text
-          style={[
-            mono ? styles.detailValueMono : styles.detailValue,
-            { color: colors.textPrimary },
-            valueStyle,
-          ]}
-        >
-          {value}
-        </Text>
-      </View>
-      {separator && (
-        <View
-          style={[
-            styles.detailSep,
-            { backgroundColor: colors.surfaceContainer },
-          ]}
-        />
-      )}
-    </>
-  );
-}
-
-// ── Timeline Item ─────────────────────────────────────────────────────────────
-type TLState = "done" | "active" | "error";
-type TagType = "gps" | "photo" | null;
-
-function TimelineItem({
-  state,
-  event,
-  meta,
-  tagType,
-  tagLabel,
-  hasLine,
-  lineColor,
-}: {
-  state: TLState;
-  event: string;
-  meta: string;
-  tagType?: TagType;
-  tagLabel?: string;
-  hasLine?: boolean;
-  lineColor?: string;
-}) {
-  const { colors } = useTheme();
-  const isDone = state === "done";
-  const isError = state === "error";
-
-  return (
-    <View style={styles.tlItem}>
-      {/* Spine */}
-      <View style={styles.tlSpine}>
-        <View
-          style={[
-            styles.tlDot,
-            isDone
-              ? {
-                  backgroundColor: colors.successBg,
-                  borderColor: colors.success,
-                }
-              : isError
-                ? { backgroundColor: colors.errorBg, borderColor: colors.error }
-                : {
-                    backgroundColor: colors.primarySoft,
-                    borderColor: colors.primary,
-                  },
-          ]}
-        >
-          {isDone ? (
-            <Feather name="check" size={11} color={colors.success} />
-          ) : isError ? (
-            <Feather name="x" size={11} color={colors.error} />
-          ) : (
-            <Feather name="truck" size={11} color={colors.primary} />
-          )}
-        </View>
-        {hasLine && (
-          <View
-            style={[
-              styles.tlLine,
-              { backgroundColor: lineColor ?? colors.surfaceContainer },
-            ]}
-          />
-        )}
-      </View>
-
-      {/* Body */}
-      <View style={styles.tlBody}>
-        <Text
-          style={[
-            styles.tlEvent,
-            { color: colors.textPrimary },
-            isError && { color: colors.error },
-          ]}
-        >
-          {event}
-        </Text>
-        <Text style={[styles.tlMeta, { color: colors.textMuted }]}>{meta}</Text>
-        {tagType && tagLabel && (
-          <View
-            style={[
-              styles.tlTag,
-              tagType === "gps"
-                ? { backgroundColor: colors.infoBg }
-                : { backgroundColor: colors.warningBg },
-            ]}
-          >
-            <Text
-              style={[
-                styles.tlTagText,
-                tagType === "gps"
-                  ? { color: colors.info }
-                  : { color: colors.warning },
-              ]}
-            >
-              {tagLabel}
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-// ── Action Button ─────────────────────────────────────────────────────────────
-function ActionBtn({
-  icon,
-  label,
-  bg,
-  fg,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Feather>["name"];
-  label: string;
-  bg: string;
-  fg: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.actionBtn, { backgroundColor: bg }]}
-      onPress={onPress}
-      android_ripple={{ color: fg, borderless: false }}
-    >
-      <Feather name={icon} size={16} color={fg} />
-      <Text style={[styles.actionBtnLabel, { color: fg }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// ── Map Placeholder (fallback if react-native-maps unavailable) ──────────────
-function MapSection({ riderName }: { riderName: string }) {
-  const { colors, isDark } = useTheme();
-  // Try to import MapView — if not available, show fallback
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const {
-      default: MapView,
-      Marker,
-      PROVIDER_DEFAULT,
-    } = require("react-native-maps");
-    return (
-      <View
-        style={[
-          styles.mapContainer,
-          { backgroundColor: colors.surfaceContainer },
-        ]}
-      >
-        <MapView
-          style={styles.mapView}
-          provider={PROVIDER_DEFAULT}
-          initialRegion={{
-            latitude: 6.455,
-            longitude: 3.3841,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-        >
-          <Marker
-            coordinate={{ latitude: 6.455, longitude: 3.3841 }}
-            title={`Rider: ${riderName}`}
-          />
-        </MapView>
-        <View
-          style={[styles.mapLabel, { backgroundColor: colors.surfaceCard }]}
-        >
-          <Text style={[styles.mapLabelText, { color: colors.textMuted }]}>
-            Last known location
-          </Text>
-        </View>
-      </View>
-    );
-  } catch {
-    return (
-      <View
-        style={[
-          styles.mapContainer,
-          styles.mapFallback,
-          { backgroundColor: colors.surfaceContainer },
-        ]}
-      >
-        <View style={styles.mapFallbackRow}>
-          <Feather name="map-pin" size={12} color={colors.textMuted} />
-          <Text style={[styles.mapFallbackText, { color: colors.textMuted }]}>
-            Map loading...
-          </Text>
-        </View>
-      </View>
-    );
-  }
-}
-
-// ── Screen ────────────────────────────────────────────────────────────────────
 export default function OrderDetailScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const order: Order = DUMMY_ORDERS.find((o) => o.id === id) ?? DUMMY_ORDERS[0];
+  const order: Order =
+    DUMMY_ORDERS_DETAIL.find((o) => o.id === id) ?? DUMMY_ORDERS_DETAIL[0];
 
   const isTransit = order.status === "in_transit";
   const isDelivered = order.status === "delivered";
@@ -482,14 +53,12 @@ export default function OrderDetailScreen() {
         elevation: 2,
       };
 
-  // ── Status hero config ───────────────────────────────────────────────────
   const heroBg = isTransit
     ? colors.surfaceCard
     : isDelivered
       ? colors.successBg
       : colors.errorBg;
 
-  // ── Progress steps config ────────────────────────────────────────────────
   const progressSteps: Step[] = isTransit
     ? [
         { label: "Confirmed", state: "done", icon: "1" },
@@ -524,7 +93,6 @@ export default function OrderDetailScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Inline Header ───────────────────────────────────────────── */}
         <View style={styles.header}>
           <Pressable
             style={[
@@ -554,33 +122,13 @@ export default function OrderDetailScreen() {
           </Pressable>
         </View>
 
-        {/* ── Status Hero Card ─────────────────────────────────────────── */}
         <View
           style={[styles.heroCard, { backgroundColor: heroBg }, cardShadow]}
         >
-          {/* Status row */}
           <View style={styles.heroStatusRow}>
-            {isTransit && (
-              <StatusPill
-                label="In Transit"
-                fg={colors.info}
-                bg={colors.infoBg}
-              />
-            )}
-            {isDelivered && (
-              <StatusPill
-                label="Delivered"
-                fg={colors.success}
-                bg={colors.successBg}
-              />
-            )}
-            {isFailed && (
-              <StatusPill
-                label="Failed"
-                fg={colors.error}
-                bg={colors.errorBg}
-              />
-            )}
+            {isTransit && <StatusPill status="in_transit" />}
+            {isDelivered && <StatusPill status="delivered" />}
+            {isFailed && <StatusPill status="failed" />}
             <Text
               style={[
                 styles.heroElapsed,
@@ -595,24 +143,20 @@ export default function OrderDetailScreen() {
             </Text>
           </View>
 
-          {/* Item name */}
           <Text style={[styles.heroItemName, { color: colors.textPrimary }]}>
             {order.item}
           </Text>
 
-          {/* Address */}
           <Text style={[styles.heroAddress, { color: colors.textMuted }]}>
             {order.address}
           </Text>
 
-          {/* Progress steps */}
           <ProgressSteps
             steps={progressSteps}
             lineColor={progressLineColor}
             lineWidth={progressLineWidth}
           />
 
-          {/* Failed: failure reason box */}
           {isFailed && order.failureReason && (
             <View
               style={[styles.failureBox, { backgroundColor: colors.errorBg }]}
@@ -638,7 +182,6 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {/* ── Failed: Retry CTA ────────────────────────────────────────── */}
         {isFailed && (
           <View
             style={[
@@ -670,7 +213,6 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {/* ── Action Buttons ───────────────────────────────────────────── */}
         <View style={styles.actionRow}>
           {isTransit && (
             <>
@@ -766,14 +308,12 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {/* ── Map (in_transit only) ────────────────────────────────────── */}
         {isTransit && (
           <>
             <MapSection riderName={order.rider} />
           </>
         )}
 
-        {/* ── Order Details Card ───────────────────────────────────────── */}
         <View
           style={[
             styles.detailsCard,
@@ -860,113 +400,8 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {/* ── Magic Links (in_transit + failed) ───────────────────────── */}
-        {(isTransit || isFailed) && (
-          <>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Magic Links
-            </Text>
-            <View
-              style={[
-                styles.magicCard,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              {/* Rider row */}
-              <View style={styles.magicRow}>
-                <View
-                  style={[
-                    styles.magicIcon,
-                    { backgroundColor: colors.primarySoft },
-                  ]}
-                >
-                  <Feather name="truck" size={14} color={colors.primary} />
-                </View>
-                <View style={styles.magicBody}>
-                  <Text
-                    style={[
-                      styles.magicRowLabel,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    Rider link
-                  </Text>
-                  <Text
-                    style={[styles.magicUrl, { color: colors.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    trk.sh/rider/{order.riderToken}
-                  </Text>
-                </View>
-                <Pressable
-                  style={[
-                    styles.copyBtn,
-                    { backgroundColor: colors.primarySoft },
-                  ]}
-                  onPress={() =>
-                    copyLink("https://trk.sh/rider/" + order.riderToken)
-                  }
-                >
-                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>
-                    Copy
-                  </Text>
-                </Pressable>
-              </View>
+        {(isTransit || isFailed) && <MagicLinkCard order={order} />}
 
-              {/* Separator */}
-              <View
-                style={[
-                  styles.detailSep,
-                  { backgroundColor: colors.surfaceContainer },
-                ]}
-              />
-
-              {/* Customer row */}
-              <View style={styles.magicRow}>
-                <View
-                  style={[
-                    styles.magicIcon,
-                    { backgroundColor: colors.successBg },
-                  ]}
-                >
-                  <Feather name="user" size={14} color={colors.success} />
-                </View>
-                <View style={styles.magicBody}>
-                  <Text
-                    style={[
-                      styles.magicRowLabel,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    Customer tracking link
-                  </Text>
-                  <Text
-                    style={[styles.magicUrl, { color: colors.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    trk.sh/track/{order.customerToken}
-                  </Text>
-                </View>
-                <Pressable
-                  style={[
-                    styles.copyBtn,
-                    { backgroundColor: colors.primarySoft },
-                  ]}
-                  onPress={() =>
-                    copyLink("https://trk.sh/track/" + order.customerToken)
-                  }
-                >
-                  <Text style={[styles.copyBtnText, { color: colors.primary }]}>
-                    Copy
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* ── Photo Strip (in_transit only) ───────────────────────────── */}
         {isTransit && (
           <>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -1011,7 +446,6 @@ export default function OrderDetailScreen() {
           </>
         )}
 
-        {/* ── Timeline ─────────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
           {isDelivered ? "Delivery timeline" : "Timeline"}
         </Text>
@@ -1109,7 +543,6 @@ export default function OrderDetailScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
@@ -1193,55 +626,6 @@ const styles = StyleSheet.create({
     lineHeight: 15.4,
   },
 
-  // Progress steps
-  progressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    position: "relative",
-    marginBottom: 8,
-  },
-  progressTrackBg: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    right: 10,
-    height: 2,
-    zIndex: 0,
-  },
-  progressTrackFill: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    height: 2,
-    zIndex: 1,
-    borderRadius: 2,
-  },
-  progressStep: {
-    flex: 1,
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-    zIndex: 2,
-  },
-  progressDot: {
-    width: 20,
-    height: 20,
-    borderRadius: radius.full,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  progressDotText: {
-    fontSize: 9,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
-  progressLabel: {
-    fontSize: 9,
-    textAlign: "center",
-    fontWeight: "500",
-  },
-
   // Retry CTA
   retryShadowWrap: {
     marginHorizontal: layout.screenPaddingH,
@@ -1273,63 +657,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  // Action buttons row
+  // Action buttons row (container)
   actionRow: {
     flexDirection: "row",
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 14,
     gap: 8,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 5,
-  },
-  actionBtnLabel: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-
-  // Map
-  mapContainer: {
-    marginHorizontal: layout.screenPaddingH,
-    marginBottom: 14,
-    borderRadius: 16,
-    overflow: "hidden",
-    height: 130,
-    position: "relative",
-  },
-  mapView: { flex: 1 },
-  mapFallback: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mapFallbackText: {
-    fontSize: 14,
-    fontFamily: font.sans.regular,
-  },
-  mapFallbackRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  mapLabel: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    borderRadius: 6,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  mapLabelText: {
-    fontSize: 9,
-    fontFamily: font.sans.regular,
   },
 
   // Details card
@@ -1339,33 +672,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     paddingVertical: 4,
     paddingHorizontal: 16,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 10,
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontFamily: font.sans.regular,
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 13,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "right",
-  },
-  detailValueMono: {
-    fontSize: 13,
-    fontFamily: font.mono.regular,
-    flex: 1,
-    textAlign: "right",
-  },
-  detailSep: {
-    height: 1,
   },
 
   // Section label
@@ -1377,52 +683,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     paddingHorizontal: layout.screenPaddingH,
     marginBottom: 10,
-  },
-
-  // Magic links card
-  magicCard: {
-    marginHorizontal: layout.screenPaddingH,
-    marginBottom: 14,
-    borderRadius: 16,
-    padding: 12,
-    paddingHorizontal: 14,
-  },
-  magicRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 4,
-  },
-  magicIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  magicBody: { flex: 1, minWidth: 0 },
-  magicRowLabel: {
-    fontSize: 12,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  magicUrl: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
-    maxWidth: 160,
-  },
-  copyBtn: {
-    borderRadius: radius.full,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    flexShrink: 0,
-  },
-  copyBtnText: {
-    fontSize: 11,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
   },
 
   // Photo strip
@@ -1458,75 +718,5 @@ const styles = StyleSheet.create({
   timeline: {
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 20,
-  },
-  tlItem: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  tlSpine: {
-    width: 24,
-    alignItems: "center",
-  },
-  tlDot: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tlDotText: {
-    fontSize: 10,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
-  tlLine: {
-    width: 1.5,
-    height: 16,
-    marginTop: 2,
-  },
-  tlBody: {
-    flex: 1,
-    paddingBottom: 14,
-  },
-  tlEvent: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  tlMeta: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
-  },
-  tlTag: {
-    alignSelf: "flex-start",
-    borderRadius: radius.full,
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    marginTop: 4,
-  },
-  tlTagText: {
-    fontSize: 9,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
-
-  // Status pill
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 3,
-    paddingHorizontal: 9,
-    borderRadius: radius.full,
-    gap: 4,
-  },
-  pillDot: { width: 5, height: 5, borderRadius: radius.full },
-  pillText: {
-    fontSize: 10,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-    textTransform: "uppercase",
   },
 });

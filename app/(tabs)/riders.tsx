@@ -69,7 +69,7 @@ export default function RidersScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: insets.top + layout.screenPaddingTop },
+          { paddingTop: insets.top + layout.screenPaddingTop, paddingBottom: 96 },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -138,31 +138,26 @@ export default function RidersScreen() {
           ))
         )}
 
-        {/* ── Add Rider button ──────────────────────────────────────────── */}
-        <View
-          style={[styles.addBtnShadow, { backgroundColor: colors.primary }]}
-        >
-          <Pressable
-            onPress={() => router.push("/(modals)/add-rider")}
-            style={styles.addBtnPressable}
-            android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
-          >
-            <LinearGradient
-              colors={gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.addBtn}
-            >
-              <Feather name="plus" size={18} color="#fff" />
-              <Text style={[styles.addBtnText, { color: "#fff" }]}>
-                Add Rider
-              </Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-
-        <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* ── FAB — always visible above the tab bar ────────────────────── */}
+      <View style={[styles.fab, { shadowColor: colors.primary }]}>
+        <Pressable
+          onPress={() => router.push("/(modals)/add-rider")}
+          style={styles.fabPressable}
+          android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+        >
+          <LinearGradient
+            colors={gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Feather name="plus" size={18} color="#fff" />
+            <Text style={styles.fabText}>Add Rider</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -202,31 +197,34 @@ const styles = StyleSheet.create({
     margin: 0,
   },
 
-  addBtnShadow: {
+  fab: {
+    position: "absolute",
+    bottom: 16,
+    left: layout.screenPaddingH,
+    right: layout.screenPaddingH,
     borderRadius: radius.full,
-    marginTop: 6,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
     elevation: 8,
   },
-  addBtnPressable: {
+  fabPressable: {
     borderRadius: radius.full,
     overflow: "hidden",
   },
-  addBtn: {
+  fabGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     borderRadius: radius.full,
-    paddingVertical: 13,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
   },
-  addBtnText: {
-    fontSize: 14,
+  fabText: {
+    fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    color: "#fff",
   },
 
   emptyState: {

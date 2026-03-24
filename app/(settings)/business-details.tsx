@@ -379,11 +379,12 @@ export default function BusinessDetailsScreen() {
             >
               {logoUri ? (
                 <Image
-                  key={profile?.updated_at ?? logoUri}
-                  source={{ uri: logoUri }}
+                  source={{
+                    uri: logoUri.startsWith("https://") && profile?.updated_at
+                      ? `${logoUri}?v=${new Date(profile.updated_at).getTime()}`
+                      : logoUri,
+                  }}
                   style={styles.logoImage}
-                  className="w-full h-full"
-                  // contentFit="cover"
                   contentFit="cover"
                 />
               ) : (

@@ -218,8 +218,9 @@ export default function SettingsScreen() {
             <View style={styles.profileAvatarWrap}>
               {profile?.logo_url ? (
                 <Image
-                  key={profile.updated_at}
-                  source={{ uri: profile.logo_url }}
+                  source={{
+                    uri: `${profile.logo_url}?v=${new Date(profile.updated_at).getTime()}`,
+                  }}
                   style={[
                     styles.profileAvatar,
                     styles.profileAvatarImg,

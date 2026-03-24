@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { Session } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
 
 export type AuthStatus =
   | "loading"
@@ -15,41 +16,58 @@ export function useAuthState() {
   useEffect(() => {
     let mounted = true;
 
+    function setStatusIfMounted(nextStatus: AuthStatus) {
+      if (!mounted) return;
+
+      setStatus((prevStatus) =>
+        prevStatus === nextStatus ? prevStatus : nextStatus,
+      );
+    }
+
+    async function resolveFromSession(session: Session | null) {
+      if (!session) {
+        const seen = await AsyncStorage.getItem("onboarding_seen");
+        setStatusIfMounted(seen === "true" ? "unauthenticated" : "onboarding");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (!profile || !profile.onboarding_complete) {
+        setStatusIfMounted("profile_incomplete");
+      } else {
+        setStatusIfMounted("authenticated");
+      }
+    }
+
     async function resolve() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-          const seen = await AsyncStorage.getItem("onboarding_seen");
-
-          if (!mounted) return;
-
-          setStatus(seen === "true" ? "unauthenticated" : "onboarding");
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_complete")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (!mounted) return;
-
-        if (!profile || !profile.onboarding_complete) {
-          setStatus("profile_incomplete");
-        } else {
-          setStatus("authenticated");
-        }
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        await resolveFromSession(session);
       } catch {
-        if (mounted) setStatus("unauthenticated");
+        setStatusIfMounted("unauthenticated");
       }
     }
 
     resolve();
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void resolveFromSession(session).catch(() => {
+        setStatusIfMounted("unauthenticated");
+      });
+    });
+
     return () => {
       mounted = false;
+      subscription.unsubscribe();
     };
   }, []);
 

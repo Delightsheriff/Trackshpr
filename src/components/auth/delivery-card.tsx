@@ -3,6 +3,7 @@
  * Matches the HTML reference exactly — blink animation owned internally.
  */
 import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -65,7 +66,7 @@ export default function DeliveryCard() {
         </View>
         {/* Rider bubble — positioned at 65% */}
         <View style={styles.riderBubble}>
-          <Text style={{ fontSize: 11 }}>🚴</Text>
+          <Feather name="truck" size={12} color="#4647D3" />
         </View>
       </View>
 

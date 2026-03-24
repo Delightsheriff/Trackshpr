@@ -12,6 +12,7 @@ import {
   shadows,
   type as t,
 } from "@/src/constants/tokens";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -32,43 +33,47 @@ type TimelineStatus = "done" | "active" | "pending";
 
 interface TimelineItem {
   status: TimelineStatus;
-  icon: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   meta: string;
-  tag?: { label: string; variant: "proof" | "live" };
+  tag?: {
+    label: string;
+    variant: "proof" | "live";
+    icon: React.ComponentProps<typeof Feather>["name"];
+  };
 }
 
 const TIMELINE: TimelineItem[] = [
   {
     status: "done",
-    icon: "✓",
+    icon: "check",
     label: "Order Created",
     meta: "Today · 11:02 AM",
-    tag: { label: "📸 Item photo saved", variant: "proof" },
+    tag: { label: "Item photo saved", variant: "proof", icon: "camera" },
   },
   {
     status: "done",
-    icon: "✓",
+    icon: "check",
     label: "Rider Picked Up",
     meta: "Today · 11:34 AM · Yaba, Lagos",
-    tag: { label: "📍 GPS logged", variant: "proof" },
+    tag: { label: "GPS logged", variant: "proof", icon: "map-pin" },
   },
   {
     status: "active",
-    icon: "🚴",
+    icon: "truck",
     label: "In Transit",
     meta: "Now · En route to Lekki",
-    tag: { label: "● Live updating", variant: "live" },
+    tag: { label: "Live updating", variant: "live", icon: "activity" },
   },
   {
     status: "pending",
-    icon: "○",
+    icon: "circle",
     label: "Delivered",
     meta: "Waiting...",
   },
   {
     status: "pending",
-    icon: "○",
+    icon: "circle",
     label: "Confirmed by Customer",
     meta: "Waiting...",
   },
@@ -106,10 +111,10 @@ function metaColor(status: TimelineStatus) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function TimelineDot({ status }: { status: TimelineStatus }) {
-  const dc = dotColors(status);
+function TimelineDot({ item }: { item: TimelineItem }) {
+  const dc = dotColors(item.status);
 
-  if (status === "active") {
+  if (item.status === "active") {
     return (
       <LinearGradient
         colors={gradients.primary as unknown as [string, string]}
@@ -117,7 +122,7 @@ function TimelineDot({ status }: { status: TimelineStatus }) {
         end={{ x: 1, y: 1 }}
         style={[styles.dot, { ...shadows.fab }]}
       >
-        <Text style={{ fontSize: 12 }}>🚴</Text>
+        <Feather name={item.icon} size={13} color={colors.white} />
       </LinearGradient>
     );
   }
@@ -135,14 +140,18 @@ function TimelineDot({ status }: { status: TimelineStatus }) {
         },
       ]}
     >
-      <Text
-        style={{
-          fontSize: status === "done" ? 11 : 10,
-          color: onboardingColors.tlLabelDone,
-        }}
-      >
-        {status === "done" ? "✓" : "○"}
-      </Text>
+      {item.status === "done" ? (
+        <Feather name={item.icon} size={11} color={onboardingColors.tlLabelDone} />
+      ) : (
+        <View
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: radius.full,
+            backgroundColor: onboardingColors.tlLabelPending,
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -177,6 +186,7 @@ function TagBadge({ tag }: { tag: NonNullable<TimelineItem["tag"]> }) {
         borderColor: border,
       }}
     >
+      <Feather name={tag.icon} size={10} color={text} />
       <Text
         style={[
           t.capsSm,
@@ -334,7 +344,7 @@ export default function SlideThree({ isActive }: SlideProps) {
             style={[{ flexDirection: "row", gap: 16 }, itemAnims[i]]}
           >
             <View style={{ alignItems: "center", width: 28, flexShrink: 0 }}>
-              <TimelineDot status={item.status} />
+              <TimelineDot item={item} />
               {i < TIMELINE.length - 1 && (
                 <View
                   style={{

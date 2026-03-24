@@ -7,15 +7,18 @@
  *  - Button: real 4-colour Google G logo, pill shape, subtle shadow
  *  - Entrance: staggered fadeUp animation (matches HTML keyframe)
  */
-import SignInHero from "@/src/components/auth/sign-in-hero";
 import GoogleIcon from "@/src/components/auth/google-icon";
+import SignInHero from "@/src/components/auth/sign-in-hero";
 import { colors, font, radius, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import MaskedView from "@react-native-masked-view/masked-view";
+import { useMutation } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Pressable,
@@ -34,6 +37,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const ONBOARDING_SEEN_KEY = "onboarding_seen";
 
 // ── Gradient headline text ─────────────────────────────────────────────────────
 
@@ -153,6 +158,15 @@ export default function SignInScreen() {
     signIn.mutate(undefined);
   }, [signIn]);
 
+  const handleResetOnboarding = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(ONBOARDING_SEEN_KEY);
+      router.replace("/onboarding");
+    } catch {
+      showToast("Could not reset onboarding. Please try again.");
+    }
+  }, [showToast]);
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" translucent />
@@ -216,6 +230,14 @@ export default function SignInScreen() {
             <Text style={styles.legalLink}>Terms of Service</Text>
             {"\n"}and <Text style={styles.legalLink}>Privacy Policy</Text>
           </Text>
+          {__DEV__ && (
+            <Pressable
+              onPress={handleResetOnboarding}
+              style={styles.devResetBtn}
+            >
+              <Text style={styles.devResetText}>Reset onboarding (dev)</Text>
+            </Pressable>
+          )}
         </Animated.View>
       </View>
 
@@ -224,10 +246,12 @@ export default function SignInScreen() {
         <Animated.View
           style={[styles.toast, { top: insets.top + 16 }, toastStyle]}
         >
-          <Text style={[t.bodySm, { color: colors.error }]}>
-            ❌{"  "}
-            {toastMsg}
-          </Text>
+          <View style={styles.toastRow}>
+            <Feather name="alert-circle" size={14} color={colors.error} />
+            <Text style={[t.bodySm, { color: colors.error, flex: 1 }]}>
+              {toastMsg}
+            </Text>
+          </View>
         </Animated.View>
       )}
     </View>
@@ -341,6 +365,19 @@ const styles = StyleSheet.create({
     color: "#4647D3",
     fontWeight: "500",
   },
+  devResetBtn: {
+    alignSelf: "center",
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  devResetText: {
+    fontSize: 11,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    color: "#5E5680",
+    textDecorationLine: "underline",
+  },
 
   // Toast
   toast: {
@@ -352,5 +389,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     zIndex: 100,
+  },
+  toastRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 });

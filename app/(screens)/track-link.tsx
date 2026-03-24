@@ -3,10 +3,17 @@
  * Always light mode (DS §8.1 — customer web pages are always light).
  * DS §8.4, §8.8 — DM Sans / DM Mono fonts, token colors only.
  */
-import { colors, font, gradients, layout, radius } from "@/src/constants/tokens";
+import {
+  colors,
+  font,
+  gradients,
+  layout,
+  radius,
+} from "@/src/constants/tokens";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
 import {
   Linking,
   Pressable,
@@ -15,6 +22,7 @@ import {
   Text,
   View,
 } from "react-native";
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -22,9 +30,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Status = "pending" | "picked_up" | "in_transit" | "delivered";
@@ -52,10 +58,17 @@ const ORDER = {
   sellerName: "Zara's Closet",
   sellerPhone: "08034567890",
   pickedUpAt: "11:34 AM",
-  locationPings: [{ lat: 6.455, lng: 3.384, time: "11:52 AM" }] as LocationPing[],
+  locationPings: [
+    { lat: 6.455, lng: 3.384, time: "11:52 AM" },
+  ] as LocationPing[],
   events: [
     { label: "Order confirmed", time: "10:58 AM", done: true },
-    { label: "Rider picked up", time: "11:34 AM", done: true, gps: "Yaba, Lagos" },
+    {
+      label: "Rider picked up",
+      time: "11:34 AM",
+      done: true,
+      gps: "Yaba, Lagos",
+    },
     { label: "In transit", time: "Now", done: false },
   ] as OrderEvent[],
 };
@@ -82,7 +95,7 @@ function getStatusHeadline(status: Status): string {
 
 function getStepState(
   stepIndex: number,
-  status: Status
+  status: Status,
 ): "done" | "active" | "pending" {
   // 0=Confirmed, 1=Picked Up, 2=Transit, 3=Delivered
   if (status === "pending") {
@@ -114,10 +127,10 @@ function BlinkingDot() {
   opacity.value = withRepeat(
     withSequence(
       withTiming(0.3, { duration: 750 }),
-      withTiming(1, { duration: 750 })
+      withTiming(1, { duration: 750 }),
     ),
     -1,
-    false
+    false,
   );
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.View style={[ss.blinkDot, animStyle]} />;
@@ -137,7 +150,12 @@ function StatusPill({ status }: { status: Status }) {
       <View
         style={[
           ss.pill,
-          { backgroundColor: colors.infoBg, flexDirection: "row", alignItems: "center", gap: 5 },
+          {
+            backgroundColor: colors.infoBg,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+          },
         ]}
       >
         <BlinkingDot />
@@ -163,7 +181,13 @@ function StepDot({ state }: StepDotProps) {
   if (state === "done") {
     return (
       <View style={[ss.stepDot, { backgroundColor: colors.successBg }]}>
-        <Text style={{ fontSize: 11, color: colors.success, fontFamily: font.sans.bold }}>
+        <Text
+          style={{
+            fontSize: 11,
+            color: colors.success,
+            fontFamily: font.sans.bold,
+          }}
+        >
           ✓
         </Text>
       </View>
@@ -185,7 +209,9 @@ function StepDot({ state }: StepDotProps) {
       </View>
     );
   }
-  return <View style={[ss.stepDot, { backgroundColor: colors.surfaceContainer }]} />;
+  return (
+    <View style={[ss.stepDot, { backgroundColor: colors.surfaceContainer }]} />
+  );
 }
 
 const STEP_LABELS = ["Confirmed", "Picked Up", "Transit", "Delivered"];
@@ -253,20 +279,41 @@ function EventRow({ event, isLast, index, total }: EventRowProps) {
 
   let dotBg = event.done ? colors.successBg : colors.primarySoft;
   let dotContent: React.ReactNode = event.done ? (
-    <Text style={{ fontSize: 10, color: colors.success, fontFamily: font.sans.bold }}>✓</Text>
+    <Text
+      style={{
+        fontSize: 10,
+        color: colors.success,
+        fontFamily: font.sans.bold,
+      }}
+    >
+      ✓
+    </Text>
   ) : (
-    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+    <View
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.primary,
+      }}
+    />
   );
 
   return (
     <View style={ss.eventRow}>
       <View style={ss.eventDotCol}>
-        <View style={[ss.eventDot, { backgroundColor: dotBg }]}>{dotContent}</View>
+        <View style={[ss.eventDot, { backgroundColor: dotBg }]}>
+          {dotContent}
+        </View>
         {!isLast && (
           <View
             style={[
               ss.eventConnector,
-              { backgroundColor: event.done ? colors.successBg : colors.surfaceContainer },
+              {
+                backgroundColor: event.done
+                  ? colors.successBg
+                  : colors.surfaceContainer,
+              },
             ]}
           />
         )}
@@ -275,9 +322,7 @@ function EventRow({ event, isLast, index, total }: EventRowProps) {
         <Text style={ss.eventLabel}>{event.label}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={ss.eventTime}>{event.time}</Text>
-          {event.gps ? (
-            <Text style={ss.eventGps}>📍 {event.gps}</Text>
-          ) : null}
+          {event.gps ? <Text style={ss.eventGps}>📍 {event.gps}</Text> : null}
         </View>
       </View>
     </View>
@@ -294,7 +339,15 @@ interface DetailRowProps {
   valueBg?: string;
   last?: boolean;
 }
-function DetailRow({ label, value, mono, valueColor, valueFontSize, valueBg, last }: DetailRowProps) {
+function DetailRow({
+  label,
+  value,
+  mono,
+  valueColor,
+  valueFontSize,
+  valueBg,
+  last,
+}: DetailRowProps) {
   return (
     <View style={[ss.detailRow, !last && ss.detailRowBorder]}>
       <Text style={ss.detailLabel}>{label}</Text>
@@ -407,7 +460,9 @@ export default function TrackLinkScreen() {
             </View>
 
             {/* Contextual headline */}
-            <Text style={ss.heroHeadline}>{getStatusHeadline(order.status)}</Text>
+            <Text style={ss.heroHeadline}>
+              {getStatusHeadline(order.status)}
+            </Text>
 
             {/* Delivering to address */}
             <View style={ss.heroAddressRow}>
@@ -471,11 +526,7 @@ export default function TrackLinkScreen() {
         {/* ── Detail Card ───────────────────────────────────────────────── */}
         <View style={ss.detailCard}>
           <DetailRow label="Item" value={order.item} />
-          <DetailRow
-            label="Picked up at"
-            value={order.pickedUpAt}
-            mono
-          />
+          <DetailRow label="Picked up at" value={order.pickedUpAt} mono />
           <DetailRow
             label="Amount to pay"
             value={formatAmount(order.amount)}

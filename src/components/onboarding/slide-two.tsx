@@ -4,11 +4,13 @@
  */
 import {
   colors,
+  font,
   layout,
   radius,
   shadows,
   type as t,
 } from "@/src/constants/tokens";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
@@ -26,42 +28,46 @@ import type { SlideProps } from "./types";
 // ── Data ─────────────────────────────────────────────────────────────────────
 
 interface Actor {
-  emoji: string;
-  name: string;
-  desc: string;
-  badgeLabel: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
+  title: string;
+  meta: string;
+  statusLabel: string;
   iconBg: string;
-  badgeBg: string;
-  badgeText: string;
+  iconFg: string;
+  statusBg: string;
+  statusFg: string;
 }
 
 const ACTORS: Actor[] = [
   {
-    emoji: "🏪",
-    name: "You — the Seller",
-    desc: "Create a delivery in under 60 seconds",
-    badgeLabel: "App",
+    icon: "briefcase",
+    title: "Seller creates order",
+    meta: "Item, customer, rider assigned",
+    statusLabel: "Created",
     iconBg: colors.primarySoft,
-    badgeBg: colors.primarySoft,
-    badgeText: colors.primary,
+    iconFg: colors.primary,
+    statusBg: colors.infoBg,
+    statusFg: colors.info,
   },
   {
-    emoji: "🚴",
-    name: "Your Rider",
-    desc: "Gets a WhatsApp link — no app needed",
-    badgeLabel: "Link",
+    icon: "truck",
+    title: "Rider in transit",
+    meta: "Live location updates shared",
+    statusLabel: "Transit",
     iconBg: colors.warningBg,
-    badgeBg: colors.warningBg,
-    badgeText: colors.warning,
+    iconFg: colors.warning,
+    statusBg: colors.warningBg,
+    statusFg: colors.warning,
   },
   {
-    emoji: "👤",
-    name: "Your Customer",
-    desc: "Tracks live — stops messaging you",
-    badgeLabel: "Tracks",
+    icon: "check-circle",
+    title: "Customer sees delivered",
+    meta: "Proof and timeline visible",
+    statusLabel: "Done",
     iconBg: colors.successBg,
-    badgeBg: colors.successBg,
-    badgeText: colors.success,
+    iconFg: colors.success,
+    statusBg: colors.successBg,
+    statusFg: colors.success,
   },
 ];
 
@@ -75,49 +81,82 @@ function ActorCard({ actor }: { actor: Actor }) {
     <View
       style={{
         backgroundColor: colors.surfaceCard,
-        borderRadius: radius.card,
+        borderRadius: radius.xl,
         padding: layout.cardPadding,
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         flexDirection: "row",
         alignItems: "center",
-        gap: 14,
-        ...shadows.actorCard,
+        gap: 12,
+        ...shadows.card,
       }}
     >
       <View
         style={{
-          width: 48,
-          height: 48,
-          borderRadius: 16,
+          width: 42,
+          height: 42,
+          borderRadius: radius.lg,
           backgroundColor: actor.iconBg,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 22 }}>{actor.emoji}</Text>
+        <Feather name={actor.icon} size={16} color={actor.iconFg} />
       </View>
 
       <View style={{ flex: 1 }}>
         <Text
-          style={[t.labelMd, { color: colors.textPrimary, marginBottom: 2 }]}
+          style={{
+            fontSize: 13,
+            fontFamily: font.sans.bold,
+            fontWeight: "700",
+            letterSpacing: -0.13,
+            color: colors.textPrimary,
+            marginBottom: 2,
+          }}
         >
-          {actor.name}
+          {actor.title}
         </Text>
-        <Text style={[t.bodySm, { color: colors.textMuted, lineHeight: 17 }]}>
-          {actor.desc}
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: font.sans.regular,
+            color: colors.textMuted,
+          }}
+        >
+          {actor.meta}
         </Text>
       </View>
 
       <View
         style={{
-          paddingHorizontal: 10,
-          paddingVertical: 4,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          paddingHorizontal: 9,
+          paddingVertical: 3,
           borderRadius: radius.full,
-          backgroundColor: actor.badgeBg,
+          backgroundColor: actor.statusBg,
         }}
       >
-        <Text style={[t.labelXs, { color: actor.badgeText }]}>
-          {actor.badgeLabel}
+        <View
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: radius.full,
+            backgroundColor: actor.statusFg,
+          }}
+        />
+        <Text
+          style={{
+            fontSize: 10,
+            fontFamily: font.sans.bold,
+            fontWeight: "700",
+            letterSpacing: 0.2,
+            textTransform: "uppercase",
+            color: actor.statusFg,
+          }}
+        >
+          {actor.statusLabel}
         </Text>
       </View>
     </View>
@@ -220,7 +259,7 @@ export default function SlideTwo({ isActive }: SlideProps) {
         }}
       >
         {ACTORS.map((actor, i) => (
-          <View key={actor.name}>
+          <View key={`${actor.statusLabel}-${i}`}>
             <Animated.View style={cardAnims[i]}>
               <ActorCard actor={actor} />
             </Animated.View>
@@ -333,8 +372,8 @@ export default function SlideTwo({ isActive }: SlideProps) {
         </Text>
 
         <Text style={[t.bodyMd, { color: colors.textMuted, lineHeight: 22 }]}>
-          Seller creates. Rider taps. Customer tracks. Two magic links do
-          everything.
+          Same card language as your dashboard: clear status, clear owner, clear
+          next step.
         </Text>
       </Animated.View>
     </View>

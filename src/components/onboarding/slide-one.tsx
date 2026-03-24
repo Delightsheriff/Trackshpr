@@ -10,6 +10,7 @@ import {
   radius,
   type as t,
 } from "@/src/constants/tokens";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -40,31 +41,31 @@ const BUBBLES: Bubble[] = [
   {
     side: "left",
     variant: "customer",
-    text: "😤 Where is my order?? It's been 2 hours",
+    text: "Hi, my order has not arrived yet. Any update?",
     time: "2:14 PM",
   },
   {
     side: "right",
     variant: "seller",
-    text: "Let me check with the rider...",
+    text: "I am checking with the rider now.",
     time: "2:17 PM",
   },
   {
     side: "left",
     variant: "stressed",
-    text: "🚨 I already paid ₦35,000! Where is my bag?",
+    text: "I already paid N35,000 and still have no update.",
     time: "2:31 PM",
   },
   {
     side: "right",
     variant: "seller",
-    text: "I can't reach the rider, so sorry 😭",
+    text: "I cannot reach the rider right now. Sorry about this.",
     time: "2:44 PM",
   },
   {
     side: "left",
     variant: "stressed",
-    text: "💀 This is the last time I order from you",
+    text: "Please cancel this. I cannot keep waiting.",
     time: "3:02 PM",
   },
 ];
@@ -321,7 +322,7 @@ export default function SlideOne({ isActive }: SlideProps) {
             stampAnim,
           ]}
         >
-          <Text style={{ fontSize: 20 }}>💸</Text>
+          <Feather name="alert-triangle" size={20} color="#FCA5A5" />
         </Animated.View>
       </View>
 
@@ -393,8 +394,8 @@ export default function SlideOne({ isActive }: SlideProps) {
             marginBottom: 10,
           }}
         >
-          Every missed delivery{"\n"}costs you a{" "}
-          <Text style={{ color: onboardingColors.accentPurple }}>customer</Text>
+          No delivery updates{"\n"}means lost{" "}
+          <Text style={{ color: onboardingColors.accentPurple }}>trust</Text>
         </Text>
 
         <Text
@@ -403,8 +404,8 @@ export default function SlideOne({ isActive }: SlideProps) {
             { color: onboardingColors.subDark, lineHeight: 22 },
           ]}
         >
-          &quot;Where is my order?&quot; is the most expensive message in social
-          commerce. Trackshpr ends it.
+          Customers should not have to chase updates. Trackshpr gives real-time
+          visibility from dispatch to delivery.
         </Text>
       </Animated.View>
     </View>

@@ -5,24 +5,26 @@
  */
 import { font, gradients, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
+import Feather from "@expo/vector-icons/Feather";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs, router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabRoute = "index" | "orders" | "riders" | "settings";
+type TabIcon = "home" | "package" | "user" | "settings" | "plus";
 
 const VISUAL_TABS: {
   routeName: TabRoute | "fab";
-  emoji: string;
+  icon: TabIcon;
   label: string;
   isFab?: boolean;
 }[] = [
-  { routeName: "index", emoji: "🏠", label: "Home" },
-  { routeName: "orders", emoji: "📦", label: "Orders" },
-  { routeName: "fab", emoji: "➕", label: "", isFab: true },
-  { routeName: "riders", emoji: "🚴", label: "Riders" },
-  { routeName: "settings", emoji: "⚙️", label: "Settings" },
+  { routeName: "index", icon: "home", label: "Home" },
+  { routeName: "orders", icon: "package", label: "Orders" },
+  { routeName: "fab", icon: "plus", label: "", isFab: true },
+  { routeName: "riders", icon: "user", label: "Riders" },
+  { routeName: "settings", icon: "settings", label: "Settings" },
 ];
 
 function CustomTabBar({
@@ -36,7 +38,7 @@ function CustomTabBar({
   const { colors } = useTheme();
 
   // Height = 68px visible nav area + device safe area below home indicator
-  const barHeight     = 68 + insets.bottom;
+  const barHeight = 68 + insets.bottom;
   const paddingBottom = insets.bottom + 6;
 
   return (
@@ -52,14 +54,25 @@ function CustomTabBar({
       ]}
     >
       {VISUAL_TABS.map((tab) => {
-          if (tab.isFab) {
-            return (
-              <View key={tab.label} style={styles.fabWrap}>
+        if (tab.isFab) {
+          return (
+            <View key={tab.label} style={styles.fabWrap}>
               {/* Outer wrapper carries elevation so Android renders rounded shadow */}
-              <View style={styles.fabShadow}>
+              <View
+                style={[
+                  styles.fabShadow,
+                  {
+                    backgroundColor: colors.primary,
+                    shadowColor: colors.primary,
+                  },
+                ]}
+              >
                 <Pressable
                   onPress={() => router.push("/(modals)/new-delivery")}
-                  android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+                  android_ripple={{
+                    color: "rgba(255,255,255,0.2)",
+                    borderless: false,
+                  }}
                   style={styles.fabPressable}
                 >
                   <LinearGradient
@@ -68,7 +81,7 @@ function CustomTabBar({
                     end={{ x: 1, y: 1 }}
                     style={styles.fab}
                   >
-                    <Text style={styles.fabEmoji}>➕</Text>
+                    <Feather name={tab.icon} size={24} color={colors.white} />
                   </LinearGradient>
                 </Pressable>
               </View>
@@ -76,23 +89,38 @@ function CustomTabBar({
           );
         }
 
-        const routeIndex = state.routes.findIndex(r => r.name === tab.routeName);
+        const routeIndex = state.routes.findIndex(
+          (r) => r.name === tab.routeName,
+        );
         const isActive = routeIndex === state.index;
 
         return (
           <Pressable
             key={tab.label}
-            onPress={() => tab.routeName !== "fab" && navigation.navigate(tab.routeName)}
+            onPress={() =>
+              tab.routeName !== "fab" && navigation.navigate(tab.routeName)
+            }
             style={styles.tabItem}
             android_ripple={{ color: colors.primarySoft, borderless: true }}
           >
-            <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>
-              {tab.emoji}
-            </Text>
-            <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.textMuted }]}>
+            <Feather
+              name={tab.icon}
+              size={22}
+              color={isActive ? colors.primary : colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.tabLabel,
+                { color: isActive ? colors.primary : colors.textMuted },
+              ]}
+            >
               {tab.label}
             </Text>
-            {isActive && <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />}
+            {isActive && (
+              <View
+                style={[styles.activeDot, { backgroundColor: colors.primary }]}
+              />
+            )}
           </Pressable>
         );
       })}
@@ -106,8 +134,8 @@ const styles = StyleSheet.create({
     // height set inline: 68 + insets.bottom
     // paddingBottom set inline: insets.bottom + 6
     // Content (icons) sits centred in the 68px visible zone
-    alignItems: "flex-start",   // align from top of content area, not centre
-    paddingTop: 10,             // ~10px from border to icons — matches HTML spec 8px
+    alignItems: "flex-start", // align from top of content area, not centre
+    paddingTop: 10, // ~10px from border to icons — matches HTML spec 8px
     borderTopWidth: 1,
     paddingHorizontal: 8,
   },
@@ -115,17 +143,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     gap: 3,
-  },
-  tabEmoji: {
-    fontSize: 20,
-    opacity: 0.45,
-  },
-  tabEmojiActive: {
-    opacity: 1,
-  },
-  fabEmoji: {
-    fontSize: 20,
-    color: "#FFFFFF",
   },
   tabLabel: {
     fontSize: 9,
@@ -174,12 +191,14 @@ const styles = StyleSheet.create({
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <CustomTabBar {...(props as Parameters<typeof CustomTabBar>[0])} />}
+      tabBar={(props) => (
+        <CustomTabBar {...(props as Parameters<typeof CustomTabBar>[0])} />
+      )}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index"    options={{ title: "Home" }} />
-      <Tabs.Screen name="orders"   options={{ title: "Orders" }} />
-      <Tabs.Screen name="riders"   options={{ title: "Riders" }} />
+      <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen name="orders" options={{ title: "Orders" }} />
+      <Tabs.Screen name="riders" options={{ title: "Riders" }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
     </Tabs>
   );

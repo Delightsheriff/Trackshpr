@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingHorizontal: layout.screenPaddingH,
-    paddingBottom: 14,
+    paddingBottom: 8,
     paddingTop: 10,
   },
   backBtn: {

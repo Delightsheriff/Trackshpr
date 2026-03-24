@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
 import { supabase } from "@/src/lib/supabase";
 import { fetchProfile } from "@/src/lib/supabaseQueries";
+import { useSession } from "@/src/hooks/useSession";
+import { useProfile } from "@/src/hooks/useProfile";
 import { useTheme } from "@/src/stores/themeStore";
 import { layout, font } from "@/src/constants/tokens";
 
@@ -24,6 +26,11 @@ import { IncompleteProfileBanner } from "@/src/components/home/incomplete-profil
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+
+  const { userId } = useSession();
+  const { data: profile } = useProfile(userId);
+  const businessName = profile?.business_name ?? "";
+  const initial = businessName.charAt(0).toUpperCase() || "?";
 
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const isFocused = useIsFocused();
@@ -65,7 +72,12 @@ export default function HomeScreen() {
         {profileIncomplete && <IncompleteProfileBanner />}
 
         {/* ── Header ───────────────────────────────────────────────── */}
-        <HomeHeader />
+        <HomeHeader
+          businessName={businessName}
+          initial={initial}
+          logoUrl={profile?.logo_url}
+          updatedAt={profile?.updated_at}
+        />
 
         {/* ── Hero stat card ────────────────────────────────────────────── */}
         <HeroStatCard />

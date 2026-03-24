@@ -1,12 +1,24 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/src/stores/themeStore";
-import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { font, gradients, layout } from "@/src/constants/tokens";
 import { greeting } from "./home-types";
 
-export function HomeHeader({ businessName = "Zara's Closet", initial = "Z" }: { businessName?: string, initial?: string }) {
+export function HomeHeader({
+  businessName = "",
+  initial = "?",
+  logoUrl,
+  updatedAt,
+}: {
+  businessName?: string;
+  initial?: string;
+  logoUrl?: string | null;
+  updatedAt?: string | null;
+}) {
   const { colors } = useTheme();
+  const cacheBuster = updatedAt ? new Date(updatedAt).getTime() : 0;
 
   return (
     <View style={styles.header}>
@@ -18,7 +30,13 @@ export function HomeHeader({ businessName = "Zara's Closet", initial = "Z" }: { 
           {businessName}
         </Text>
       </View>
-      <View style={styles.avatarWrap}>
+      {logoUrl ? (
+        <Image
+          source={{ uri: `${logoUrl}?v=${cacheBuster}` }}
+          style={styles.avatar}
+          contentFit="cover"
+        />
+      ) : (
         <LinearGradient
           colors={gradients.avatar}
           start={{ x: 0, y: 0 }}
@@ -27,8 +45,7 @@ export function HomeHeader({ businessName = "Zara's Closet", initial = "Z" }: { 
         >
           <Text style={styles.avatarInitial}>{initial}</Text>
         </LinearGradient>
-        <View style={[styles.notifDot, { borderColor: colors.surface }]} />
-      </View>
+      )}
     </View>
   );
 }
@@ -52,7 +69,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.6,
   },
-  avatarWrap: { position: "relative" },
   avatar: {
     width: 42,
     height: 42,
@@ -65,15 +81,5 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     color: "#FFFFFF",
-  },
-  notifDot: {
-    position: "absolute",
-    top: -3,
-    right: -3,
-    width: 10,
-    height: 10,
-    borderRadius: radius.full,
-    backgroundColor: "#DC2626",
-    borderWidth: 2,
   },
 });

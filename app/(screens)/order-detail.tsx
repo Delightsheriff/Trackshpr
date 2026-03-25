@@ -770,9 +770,11 @@ const styles = StyleSheet.create({
   // Action buttons row (container)
   actionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 14,
-    gap: 8,
+    gap: 10,
+    justifyContent: "space-between",
   },
 
   // Details card

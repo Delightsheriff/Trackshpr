@@ -94,7 +94,7 @@ export function MagicLinkCard({ order }: { order: Order }) {
               { backgroundColor: colors.successBg },
             ]}
           >
-            <Feather name="user" size={14} color={colors.success} />
+            <Feather name="navigation" size={14} color={colors.success} />
           </View>
           <View style={styles.magicBody}>
             <Text

@@ -337,7 +337,8 @@ export default function NewDeliveryScreen() {
   const createOrder = useCreateOrder(userId);
 
   const draft = useOrderStore((s) => s.draft);
-  const setPhotoUri = useOrderStore((s) => s.setPhotoUri);
+  const addPhotoUri = useOrderStore((s) => s.addPhotoUri);
+  const removePhotoUri = useOrderStore((s) => s.removePhotoUri);
   const setDirectPhone = useOrderStore((s) => s.setDirectPhone);
   const resetDraft = useOrderStore((s) => s.reset);
 
@@ -363,11 +364,12 @@ export default function NewDeliveryScreen() {
       mediaTypes: ["images"],
       quality: 0.8,
       base64: false,
+      allowsMultipleSelection: true,
     });
-    if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+    if (!result.canceled) {
+      result.assets.forEach((asset) => addPhotoUri(asset.uri));
     }
-  }, []);
+  }, [addPhotoUri]);
 
   const handleStep1Next = handleSubmit((values) => {
     setStep1Values(values);
@@ -485,38 +487,40 @@ export default function NewDeliveryScreen() {
                 )}
               />
 
-              {/* Photo upload */}
-              <Pressable
-                onPress={pickPhoto}
-                style={[
-                  styles.photoCard,
-                  { backgroundColor: colors.surfaceCard },
-                ]}
+              {/* Photo strip */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.photoStrip}
+                keyboardShouldPersistTaps="handled"
               >
-                {draft.photoUri ? (
-                  <Image
-                    source={{ uri: draft.photoUri }}
-                    style={styles.photoPreview}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.photoIconWrap,
-                      { backgroundColor: colors.primarySoft },
-                    ]}
+                {draft.photoUris.map((uri) => (
+                  <Pressable
+                    key={uri}
+                    onPress={() => removePhotoUri(uri)}
+                    style={styles.photoThumbWrap}
                   >
-                    <Feather name="camera" size={20} color={colors.primary} />
+                    <Image source={{ uri }} style={styles.photoThumb} />
+                    <View style={styles.photoRemove}>
+                      <Feather name="x" size={10} color="#fff" />
+                    </View>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={pickPhoto}
+                  style={[styles.photoAddBtn, { backgroundColor: colors.surfaceCard }]}
+                >
+                  <View style={[styles.photoAddIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Feather name="camera" size={18} color={colors.primary} />
                   </View>
-                )}
-                <View>
-                  <Text style={[styles.photoLabel, { color: colors.primary }]}>
-                    {draft.photoUri ? "Change item photo" : "Add item photo"}
+                  <Text style={[styles.photoAddLabel, { color: colors.primary }]}>
+                    {draft.photoUris.length === 0 ? "Add photos" : "Add more"}
                   </Text>
-                  <Text style={[styles.photoSub, { color: colors.textMuted }]}>
-                    Evidence if dispute arises
+                  <Text style={[styles.photoAddSub, { color: colors.textMuted }]}>
+                    Tap to select
                   </Text>
-                </View>
-              </Pressable>
+                </Pressable>
+              </ScrollView>
 
               <SectionLabel label="Customer" />
 
@@ -852,34 +856,48 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginLeft: 4,
   },
-  // Photo
-  photoCard: {
+  // Photo strip
+  photoStrip: {
     flexDirection: "row",
+    gap: 10,
+    paddingRight: 4,
+  },
+  photoThumbWrap: { position: "relative" },
+  photoThumb: { width: 72, height: 72, borderRadius: 14 },
+  photoRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
-    gap: 12,
-    borderRadius: radius.lg,
-    padding: layout.cardPadding,
+    justifyContent: "center",
+  },
+  photoAddBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
     shadowColor: "rgba(48,41,80,1)",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 1,
   },
-  photoIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  photoAddIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
+    marginBottom: 1,
   },
-  photoPreview: { width: 44, height: 44, borderRadius: 12, flexShrink: 0 },
-  photoLabel: {
-    fontSize: 13,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
-  },
-  photoSub: { fontSize: 11, fontFamily: font.sans.regular, marginTop: 1 },
+  photoAddLabel: { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700" },
+  photoAddSub: { fontSize: 9, fontFamily: font.sans.regular },
   // Customer selector
   selectorField: {
     flexDirection: "row",

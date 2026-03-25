@@ -253,6 +253,48 @@ export default function OrderDetailScreen() {
         )}
 
         <View style={styles.actionRow}>
+          {isPending && (
+            <>
+              <ActionBtn
+                icon="link"
+                label="Rider link"
+                bg={colors.primarySoft}
+                fg={colors.primary}
+                onPress={() =>
+                  copyLink("https://trk.sh/rider/" + order.riderToken)
+                }
+              />
+              <ActionBtn
+                icon="send"
+                label="Share tracking"
+                bg={colors.infoBg}
+                fg={colors.info}
+                onPress={() =>
+                  Share.share({
+                    message: "https://trk.sh/track/" + order.customerToken,
+                  })
+                }
+              />
+              {order.riderPhone !== "—" && (
+                <ActionBtn
+                  icon="phone"
+                  label="Call rider"
+                  bg={colors.successBg}
+                  fg={colors.success}
+                  onPress={() => callPhone(order.riderPhone)}
+                />
+              )}
+              {order.customerPhone !== "—" && (
+                <ActionBtn
+                  icon="phone"
+                  label="Call customer"
+                  bg={colors.warningBg}
+                  fg={colors.warning}
+                  onPress={() => callPhone(order.customerPhone)}
+                />
+              )}
+            </>
+          )}
           {isTransit && (
             <>
               <ActionBtn
@@ -460,7 +502,7 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {(isTransit || isFailed) && <MagicLinkCard order={order} />}
+        {(isPending || isTransit || isFailed) && <MagicLinkCard order={order} />}
 
         {isTransit && (
           <>

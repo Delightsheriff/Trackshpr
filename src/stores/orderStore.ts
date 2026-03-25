@@ -8,7 +8,7 @@ interface OrderDraft {
   item: string;
   deliveryFee: string;
   notes: string;
-  photoUri: string | null;
+  photoUris: string[];
   customer: Customer | null;
   rider: Rider | null;
   directPhone: string;
@@ -19,7 +19,8 @@ interface OrderStoreState {
   setItem: (v: string) => void;
   setDeliveryFee: (v: string) => void;
   setNotes: (v: string) => void;
-  setPhotoUri: (v: string | null) => void;
+  addPhotoUri: (v: string) => void;
+  removePhotoUri: (uri: string) => void;
   setCustomer: (v: Customer | null) => void;
   setRider: (v: Rider | null) => void;
   setDirectPhone: (v: string) => void;
@@ -28,7 +29,7 @@ interface OrderStoreState {
 
 const EMPTY: OrderDraft = {
   item: "", deliveryFee: "", notes: "",
-  photoUri: null, customer: null, rider: null, directPhone: "",
+  photoUris: [], customer: null, rider: null, directPhone: "",
 };
 
 export const useOrderStore = create<OrderStoreState>((set) => ({
@@ -36,7 +37,8 @@ export const useOrderStore = create<OrderStoreState>((set) => ({
   setItem:         (item)        => set((s) => ({ draft: { ...s.draft, item } })),
   setDeliveryFee:  (deliveryFee) => set((s) => ({ draft: { ...s.draft, deliveryFee } })),
   setNotes:        (notes)       => set((s) => ({ draft: { ...s.draft, notes } })),
-  setPhotoUri:     (photoUri)    => set((s) => ({ draft: { ...s.draft, photoUri } })),
+  addPhotoUri:     (uri)         => set((s) => ({ draft: { ...s.draft, photoUris: [...s.draft.photoUris, uri] } })),
+  removePhotoUri:  (uri)         => set((s) => ({ draft: { ...s.draft, photoUris: s.draft.photoUris.filter((u) => u !== uri) } })),
   setCustomer:     (customer)    => set((s) => ({ draft: { ...s.draft, customer } })),
   setRider:        (rider)       => set((s) => ({ draft: { ...s.draft, rider, directPhone: rider ? "" : s.draft.directPhone } })),
   setDirectPhone:  (directPhone) => set((s) => ({ draft: { ...s.draft, directPhone, rider: directPhone ? null : s.draft.rider } })),

@@ -2,10 +2,11 @@
  * Home / Dashboard tab (DS §8.1, §8.4).
  */
 import React, { useEffect, useState } from "react";
-import { View, ScrollView, StyleSheet, Text } from "react-native";
+import { View, ScrollView, StyleSheet, Text, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
+import { router } from "expo-router";
 import { supabase } from "@/src/lib/supabase";
 import { fetchProfile } from "@/src/lib/supabaseQueries";
 import { useSession } from "@/src/hooks/useSession";
@@ -177,9 +178,11 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
             Active Orders
           </Text>
-          <Text style={[styles.sectionLink, { color: colors.primary }]}>
-            See all
-          </Text>
+          <Pressable onPress={() => router.navigate("/(tabs)/orders")} hitSlop={8}>
+            <Text style={[styles.sectionLink, { color: colors.primary }]}>
+              See all
+            </Text>
+          </Pressable>
         </View>
 
         {ordersLoading ? (

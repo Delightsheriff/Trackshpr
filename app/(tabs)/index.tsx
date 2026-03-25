@@ -11,7 +11,7 @@ import { fetchProfile } from "@/src/lib/supabaseQueries";
 import { useSession } from "@/src/hooks/useSession";
 import { useProfile } from "@/src/hooks/useProfile";
 import { useTheme } from "@/src/stores/themeStore";
-import { layout, font } from "@/src/constants/tokens";
+import { layout, font, radius } from "@/src/constants/tokens";
 
 // Extracted Components
 import { HomeHeader } from "@/src/components/home/home-header";
@@ -23,6 +23,72 @@ import { IncompleteProfileBanner } from "@/src/components/home/incomplete-profil
 import { useOrders } from "@/src/hooks/useOrders";
 import { formatRelativeTime } from "@/src/utils/helpers";
 
+// ── Skeletons ──────────────────────────────────────────────────────────────────
+function HeroSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
+  return (
+    <View style={[sk.heroCard, { backgroundColor: colors.surfaceContainer }]}>
+      <View style={sk.heroLeft}>
+        <View style={[sk.heroLabel, { backgroundColor: colors.surfaceHighlight }]} />
+        <View style={[sk.heroNum, { backgroundColor: colors.surfaceHighlight }]} />
+        <View style={[sk.heroSub, { backgroundColor: colors.surfaceHighlight }]} />
+      </View>
+      <View style={[sk.heroIcon, { backgroundColor: colors.surfaceHighlight }]} />
+    </View>
+  );
+}
+
+function MiniStatSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
+  return (
+    <View style={sk.miniRow}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[sk.miniCard, { backgroundColor: colors.surfaceCard }]}>
+          <View style={[sk.miniLabel, { backgroundColor: colors.surfaceContainer }]} />
+          <View style={[sk.miniNum, { backgroundColor: colors.surfaceContainer }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function OrderCardSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
+  return (
+    <View style={[sk.orderCard, { backgroundColor: colors.surfaceCard }]}>
+      <View style={[sk.orderIcon, { backgroundColor: colors.surfaceContainer }]} />
+      <View style={sk.orderBody}>
+        <View style={[sk.orderLine, { backgroundColor: colors.surfaceContainer, width: "60%" }]} />
+        <View style={[sk.orderLine, { backgroundColor: colors.surfaceContainer, width: "38%", marginTop: 6 }]} />
+      </View>
+      <View style={sk.orderRight}>
+        <View style={[sk.orderPill, { backgroundColor: colors.surfaceContainer }]} />
+        <View style={[sk.orderTime, { backgroundColor: colors.surfaceContainer }]} />
+      </View>
+    </View>
+  );
+}
+
+const sk = StyleSheet.create({
+  // Hero
+  heroCard: { borderRadius: radius.card, padding: 18, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  heroLeft: { gap: 8 },
+  heroLabel: { height: 10, width: 110, borderRadius: 5 },
+  heroNum: { height: 38, width: 56, borderRadius: 8 },
+  heroSub: { height: 9, width: 72, borderRadius: 4 },
+  heroIcon: { width: 52, height: 52, borderRadius: radius.full },
+  // Mini stats
+  miniRow: { flexDirection: "row", gap: 8, marginBottom: layout.sectionGap },
+  miniCard: { flex: 1, borderRadius: 16, padding: 12, paddingHorizontal: 10 },
+  miniLabel: { height: 9, width: 28, borderRadius: 4, marginBottom: 10 },
+  miniNum: { height: 24, width: 24, borderRadius: 6 },
+  // Order card
+  orderCard: { flexDirection: "row", alignItems: "center", borderRadius: radius.xl, padding: layout.cardPadding, gap: 12, marginBottom: layout.listGap },
+  orderIcon: { width: 42, height: 42, borderRadius: radius.lg, flexShrink: 0 },
+  orderBody: { flex: 1 },
+  orderLine: { height: 12, borderRadius: 6 },
+  orderRight: { alignItems: "flex-end", gap: 5, flexShrink: 0 },
+  orderPill: { height: 20, width: 64, borderRadius: radius.full },
+  orderTime: { height: 9, width: 30, borderRadius: 4 },
+});
+
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -30,7 +96,7 @@ export default function HomeScreen() {
 
   const { userId } = useSession();
   const { data: profile } = useProfile(userId);
-  const { data: orders = [] } = useOrders(userId);
+  const { data: orders = [], isLoading: ordersLoading } = useOrders(userId);
   const businessName = profile?.business_name ?? "";
   const initial = businessName.charAt(0).toUpperCase() || "?";
 
@@ -90,10 +156,18 @@ export default function HomeScreen() {
         />
 
         {/* ── Hero stat card ────────────────────────────────────────────── */}
-        <HeroStatCard total={statsTotal} />
+        {ordersLoading ? (
+          <HeroSkeleton colors={colors} />
+        ) : (
+          <HeroStatCard total={statsTotal} />
+        )}
 
         {/* ── Mini stat row ─────────────────────────────────────────────── */}
-        <MiniStatRow delivered={statsDelivered} inTransit={statsInTransit} failed={statsFailed} />
+        {ordersLoading ? (
+          <MiniStatSkeleton colors={colors} />
+        ) : (
+          <MiniStatRow delivered={statsDelivered} inTransit={statsInTransit} failed={statsFailed} />
+        )}
 
         {/* ── Quick actions ─────────────────────────────────────────────── */}
         <QuickActionsRow />
@@ -108,17 +182,25 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {recentOrders.map((o) => (
-          <OrderCard
-            key={o.id}
-            id={o.id}
-            item={o.item}
-            customer={o.customer_name ?? "Unknown"}
-            area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
-            status={o.status}
-            time={formatRelativeTime(o.created_at)}
-          />
-        ))}
+        {ordersLoading ? (
+          <>
+            <OrderCardSkeleton colors={colors} />
+            <OrderCardSkeleton colors={colors} />
+            <OrderCardSkeleton colors={colors} />
+          </>
+        ) : (
+          recentOrders.map((o) => (
+            <OrderCard
+              key={o.id}
+              id={o.id}
+              item={o.item}
+              customer={o.customer_name ?? "Unknown"}
+              area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
+              status={o.status}
+              time={formatRelativeTime(o.created_at)}
+            />
+          ))
+        )}
 
         <View style={{ height: 16 }} />
       </ScrollView>

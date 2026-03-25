@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrders } from "@/src/hooks/useOrders";
 import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
-import { font, layout } from "@/src/constants/tokens";
+import { font, layout, radius } from "@/src/constants/tokens";
 import { formatRelativeTime } from "@/src/utils/helpers";
 
 // Shared Components
@@ -20,12 +20,38 @@ import { OrderSearchBar } from "@/src/components/orders/order-search-bar";
 import { OrderFilterTabs } from "@/src/components/orders/order-filter-tabs";
 import { OrderEmptyState } from "@/src/components/orders/order-empty-state";
 
+// ── Skeleton ───────────────────────────────────────────────────────────────────
+function OrderCardSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
+  return (
+    <View style={[sk.card, { backgroundColor: colors.surfaceCard }]}>
+      <View style={[sk.icon, { backgroundColor: colors.surfaceContainer }]} />
+      <View style={sk.body}>
+        <View style={[sk.line, { backgroundColor: colors.surfaceContainer, width: "60%" }]} />
+        <View style={[sk.line, { backgroundColor: colors.surfaceContainer, width: "38%", marginTop: 6 }]} />
+      </View>
+      <View style={sk.right}>
+        <View style={[sk.pill, { backgroundColor: colors.surfaceContainer }]} />
+        <View style={[sk.time, { backgroundColor: colors.surfaceContainer }]} />
+      </View>
+    </View>
+  );
+}
+const sk = StyleSheet.create({
+  card: { flexDirection: "row", alignItems: "center", borderRadius: radius.xl, padding: layout.cardPadding, gap: 12, marginBottom: layout.listGap },
+  icon: { width: 42, height: 42, borderRadius: radius.lg, flexShrink: 0 },
+  body: { flex: 1 },
+  line: { height: 12, borderRadius: 6 },
+  right: { alignItems: "flex-end", gap: 5, flexShrink: 0 },
+  pill: { height: 20, width: 64, borderRadius: radius.full },
+  time: { height: 9, width: 30, borderRadius: 4 },
+});
+
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { userId } = useSession();
-  const { data: orders = [] } = useOrders(userId);
+  const { data: orders = [], isLoading } = useOrders(userId);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
 
@@ -57,7 +83,7 @@ export default function OrdersScreen() {
             Orders
           </Text>
           <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
-            {orders.length} total
+            {isLoading ? "Loading…" : `${orders.length} total`}
           </Text>
         </View>
 
@@ -68,7 +94,14 @@ export default function OrdersScreen() {
         <OrderFilterTabs filter={filter} setFilter={setFilter} />
 
         {/* ── Order list ────────────────────────────────────────────────── */}
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <>
+            <OrderCardSkeleton colors={colors} />
+            <OrderCardSkeleton colors={colors} />
+            <OrderCardSkeleton colors={colors} />
+            <OrderCardSkeleton colors={colors} />
+          </>
+        ) : filtered.length === 0 ? (
           <OrderEmptyState filter={filter} />
         ) : (
           filtered.map((o) => (

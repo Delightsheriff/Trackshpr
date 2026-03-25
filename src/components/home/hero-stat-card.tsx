@@ -3,9 +3,8 @@ import { View, Text, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { font, radius } from "@/src/constants/tokens";
-import { DUMMY_STATS } from "./home-types";
 
-export function HeroStatCard() {
+export function HeroStatCard({ total = 0 }: { total?: number }) {
   return (
     <View style={styles.heroCardShadow}>
       <LinearGradient
@@ -18,8 +17,8 @@ export function HeroStatCard() {
         <View style={styles.heroOrb2} />
         <View style={styles.heroLeft}>
           <Text style={styles.heroLabel}>Today&apos;s Deliveries</Text>
-          <Text style={styles.heroNum}>{DUMMY_STATS.total}</Text>
-          <Text style={styles.heroSub}>↑ 3 more than yesterday</Text>
+          <Text style={styles.heroNum}>{total}</Text>
+          <Text style={styles.heroSub}>Today's total</Text>
         </View>
         <View style={styles.heroIconWrap}>
           <Feather name="truck" size={22} color="#FFFFFF" />

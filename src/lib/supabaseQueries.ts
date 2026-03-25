@@ -12,7 +12,7 @@ import {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type OrderStatus = "pending" | "picked_up" | "in_transit" | "delivered" | "failed";
+export type OrderStatus = "pending" | "in_transit" | "delivered" | "failed";
 
 export interface Profile {
   id: string;
@@ -45,33 +45,34 @@ export interface Rider {
 
 export interface Customer {
   id: string;
-  seller_id: string;
-  label: string | null;
-  customer_name: string;
-  customer_phone: string;
-  address: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
   city: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Order {
   id: string;
-  seller_id: string;
-  rider_id: string | null;
-  rider_token: string;
-  customer_token: string;
-  customer_name: string;
-  customer_phone: string;
-  delivery_address: string;
-  item_description: string;
+  user_id: string;
+  item: string;
+  delivery_fee: number | null;
   notes: string | null;
+  photo_url: string | null;
   status: OrderStatus;
-  seller_photo_url: string | null;
-  proof_photo_url: string | null;
-  nudge_sent: boolean;
+  customer_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  delivery_address: string | null;
+  city: string | null;
+  rider_id: string | null;
+  rider_name: string | null;
+  rider_phone: string | null;
+  direct_phone: string | null;
   created_at: string;
   updated_at: string;
-  delivered_at: string | null;
 }
 
 // ── Profile ─────────────────────────────────────────────────────────────────
@@ -89,15 +90,41 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 
 // ── Orders ─────────────────────────────────────────────────────────────────
 
-export async function fetchOrders(sellerId: string): Promise<Order[]> {
+export async function fetchOrders(userId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
-    .eq("seller_id", sellerId)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Failed to fetch orders");
   return (data ?? []) as Order[];
+}
+
+export async function insertOrder(payload: {
+  user_id: string;
+  item: string;
+  delivery_fee?: number | null;
+  notes?: string | null;
+  photo_url?: string | null;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  delivery_address?: string | null;
+  city?: string | null;
+  rider_id?: string | null;
+  rider_name?: string | null;
+  rider_phone?: string | null;
+  direct_phone?: string | null;
+}): Promise<Order> {
+  const { data, error } = await supabase
+    .from("orders")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Failed to create order");
+  return data as Order;
 }
 
 export async function fetchOrder(orderId: string): Promise<Order> {
@@ -171,23 +198,40 @@ export async function deleteRider(riderId: string): Promise<void> {
   if (error) throw new Error("Failed to delete rider");
 }
 
-// ── Customers (address_book) ───────────────────────────────────────────────
+// ── Customers ─────────────────────────────────────────────────────────────────
 
-export async function fetchCustomers(sellerId: string): Promise<Customer[]> {
+export async function fetchCustomers(userId: string): Promise<Customer[]> {
   const { data, error } = await supabase
-    .from("address_book")
+    .from("customers")
     .select("*")
-    .eq("seller_id", sellerId)
-    .order("customer_name");
+    .eq("user_id", userId)
+    .order("name");
 
   if (error) throw new Error("Failed to fetch customers");
   return (data ?? []) as Customer[];
 }
 
+export async function insertCustomer(payload: {
+  user_id: string;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+}): Promise<Customer> {
+  const { data, error } = await supabase
+    .from("customers")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Failed to save customer");
+  return data as Customer;
+}
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 export async function fetchAnalytics(
-  sellerId: string,
+  userId: string,
   period: string,
 ): Promise<{
   total: number;
@@ -216,7 +260,7 @@ export async function fetchAnalytics(
   const { data, error } = await supabase
     .from("orders")
     .select("status")
-    .eq("seller_id", sellerId)
+    .eq("user_id", userId)
     .gte("created_at", fromDate.toISOString());
 
   if (error) throw new Error("Failed to fetch analytics");

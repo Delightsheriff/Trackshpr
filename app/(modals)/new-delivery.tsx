@@ -3,13 +3,17 @@
  * Step 1: Item details + customer selection
  * Step 2: Rider assignment
  * Step 3: Confirm & send
- * TODO: replace dummy data and addOrder with real Supabase insert.
  */
+import { zodResolver } from "@hookform/resolvers/zod";
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { useCreateOrder } from "@/src/hooks/useOrders";
+import { useRiders } from "@/src/hooks/useRiders";
+import { useSession } from "@/src/hooks/useSession";
 import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -313,6 +317,14 @@ function SectionLabel({ label }: { label: string }) {
   );
 }
 
+// ── Validation ────────────────────────────────────────────────────────────────
+const step1Schema = z.object({
+  item: z.string().min(1, "Item description is required"),
+  deliveryFee: z.string().optional(),
+  notes: z.string().optional(),
+});
+type Step1Values = z.infer<typeof step1Schema>;
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function NewDeliveryScreen() {
   const { colors, isDark } = useTheme();
@@ -320,16 +332,24 @@ export default function NewDeliveryScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [sending, setSending] = useState(false);
 
+  const { userId } = useSession();
+  const { data: riders = [] } = useRiders(userId);
+  const createOrder = useCreateOrder(userId);
+
   const draft = useOrderStore((s) => s.draft);
-  const setItem = useOrderStore((s) => s.setItem);
-  const setDeliveryFee = useOrderStore((s) => s.setDeliveryFee);
-  const setNotes = useOrderStore((s) => s.setNotes);
   const setPhotoUri = useOrderStore((s) => s.setPhotoUri);
   const setDirectPhone = useOrderStore((s) => s.setDirectPhone);
   const resetDraft = useOrderStore((s) => s.reset);
 
-  const addOrder = useDataStore((s) => s.addOrder);
+  const { control, handleSubmit, formState: { errors } } = useForm<Step1Values>({
+    resolver: zodResolver(step1Schema),
+    defaultValues: { item: draft.item, deliveryFee: draft.deliveryFee, notes: draft.notes },
+  });
+
   const showToast = useToastStore((s) => s.show);
+
+  // Captured step-1 values after validation
+  const [step1Values, setStep1Values] = useState<Step1Values>({ item: "", deliveryFee: "", notes: "" });
 
   const handleBack = () => {
     if (step === 1) {
@@ -340,7 +360,7 @@ export default function NewDeliveryScreen() {
 
   const pickPhoto = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.8,
       base64: false,
     });
@@ -349,10 +369,10 @@ export default function NewDeliveryScreen() {
     }
   }, []);
 
-  const handleStep1Next = () => {
-    if (!draft.item.trim()) return;
+  const handleStep1Next = handleSubmit((values) => {
+    setStep1Values(values);
     setStep(2);
-  };
+  });
 
   const handleStep2Next = () => {
     if (!draft.rider && !draft.directPhone.trim()) return;
@@ -361,25 +381,31 @@ export default function NewDeliveryScreen() {
 
   const handleSend = async () => {
     setSending(true);
-    await new Promise((r) => setTimeout(r, 800));
-    addOrder({
-      item: draft.item,
-      customer: draft.customer?.name ?? "Unknown",
-      area:
-        draft.customer?.city ??
-        draft.customer?.address.split(",").pop()?.trim() ??
-        "—",
-      status: "pending",
-      riderId: draft.rider?.id,
-      riderName: draft.rider?.name,
-      deliveryFee: draft.deliveryFee,
-    });
-    showToast("Delivery created! Links sent via WhatsApp", "success");
-    resetDraft();
-    router.dismissAll();
+    try {
+      const order = await createOrder.mutateAsync({
+        item: step1Values.item,
+        delivery_fee: step1Values.deliveryFee ? parseFloat(step1Values.deliveryFee) : null,
+        notes: step1Values.notes || null,
+        customer_id: draft.customer?.id ?? null,
+        customer_name: draft.customer?.name ?? null,
+        customer_phone: draft.customer?.phone ?? null,
+        delivery_address: draft.customer?.address ?? null,
+        city: draft.customer?.city ?? null,
+        rider_id: draft.rider?.id ?? null,
+        rider_name: draft.rider?.name ?? null,
+        rider_phone: draft.rider?.phone ?? null,
+        direct_phone: draft.directPhone || null,
+      });
+      showToast("Order created!", "success");
+      resetDraft();
+      router.dismissAll();
+      router.push({ pathname: "/(screens)/order-detail", params: { id: order.id } });
+    } catch {
+      showToast("Failed to create order", "error");
+      setSending(false);
+    }
   };
 
-  const riders = useDataStore((s) => s.riders);
   const riderCanProceed =
     !!draft.rider || draft.directPhone.trim().length >= 10;
 
@@ -414,28 +440,49 @@ export default function NewDeliveryScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <SectionLabel label="Item details" />
-              <FieldInput
-                label="Item description"
-                value={draft.item}
-                onChange={setItem}
-                placeholder="e.g. Adire Maxi Dress × 2"
+              <Controller
+                control={control}
+                name="item"
+                render={({ field: { value, onChange } }) => (
+                  <FieldInput
+                    label="Item description"
+                    value={value}
+                    onChange={onChange}
+                    placeholder="e.g. Adire Maxi Dress × 2"
+                  />
+                )}
               />
-              <FieldInput
-                label="Delivery fee"
-                value={draft.deliveryFee}
-                onChange={setDeliveryFee}
-                placeholder="0"
-                keyboardType="numeric"
-                prefix="₦"
-                optional
+              {errors.item && (
+                <Text style={[styles.fieldError, { color: colors.error }]}>{errors.item.message}</Text>
+              )}
+              <Controller
+                control={control}
+                name="deliveryFee"
+                render={({ field: { value, onChange } }) => (
+                  <FieldInput
+                    label="Delivery fee"
+                    value={value ? Number(value).toLocaleString("en-NG") : ""}
+                    onChange={(text) => onChange(text.replace(/,/g, "").replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    keyboardType="numeric"
+                    prefix="₦"
+                    optional
+                  />
+                )}
               />
-              <FieldInput
-                label="Notes for rider"
-                value={draft.notes}
-                onChange={setNotes}
-                placeholder="e.g. Call customer on arrival"
-                optional
-                multiline
+              <Controller
+                control={control}
+                name="notes"
+                render={({ field: { value, onChange } }) => (
+                  <FieldInput
+                    label="Notes for rider"
+                    value={value ?? ""}
+                    onChange={onChange}
+                    placeholder="e.g. Call customer on arrival"
+                    optional
+                    multiline
+                  />
+                )}
               />
 
               {/* Photo upload */}
@@ -523,9 +570,8 @@ export default function NewDeliveryScreen() {
           </KeyboardAvoidingView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
             <SubmitBtn
-              label="Next — Assign Rider →"
+              label="Assign Rider"
               onPress={handleStep1Next}
-              disabled={!draft.item.trim()}
             />
           </View>
         </>
@@ -694,7 +740,7 @@ export default function NewDeliveryScreen() {
                 Order Summary
               </Text>
               {[
-                { label: "Item", value: draft.item || "—" },
+                { label: "Item", value: step1Values.item || "—" },
                 { label: "Customer", value: draft.customer?.name ?? "—" },
                 { label: "Address", value: draft.customer?.address ?? "—" },
                 {
@@ -703,7 +749,9 @@ export default function NewDeliveryScreen() {
                 },
                 {
                   label: "Amount",
-                  value: draft.deliveryFee ? `₦${draft.deliveryFee}` : "—",
+                  value: step1Values.deliveryFee
+                    ? `₦${Number(step1Values.deliveryFee).toLocaleString("en-NG")}`
+                    : "—",
                   isAmount: true,
                 },
               ].map(({ label, value, isAmount }, idx, arr) => (
@@ -797,6 +845,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: -4,
     marginTop: 4,
+  },
+  fieldError: {
+    fontSize: 11,
+    fontFamily: font.sans.semiBold,
+    marginTop: -6,
+    marginLeft: 4,
   },
   // Photo
   photoCard: {

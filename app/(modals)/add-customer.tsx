@@ -2,13 +2,17 @@
  * Add Customer bottom sheet.
  * TODO: replace addCustomer with Supabase insert.
  */
+import { zodResolver } from "@hookform/resolvers/zod";
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { useAddCustomer } from "@/src/hooks/useCustomers";
+import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,18 +47,26 @@ const si = StyleSheet.create({
   input:  { fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "500", padding: 0 },
 });
 
+const customerSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  phone: z.string().min(10, "Enter a valid phone number"),
+  address: z.string().min(1, "Address is required"),
+  city: z.string().optional(),
+});
+type CustomerValues = z.infer<typeof customerSchema>;
+
 export default function AddCustomerSheet() {
   const { colors, isDark } = useTheme();
   const insets      = useSafeAreaInsets();
   const sheetRef    = useRef<BottomSheet>(null);
-  const addCustomer = useDataStore((s) => s.addCustomer);
+  const { userId }  = useSession();
+  const addCustomer = useAddCustomer(userId);
   const showToast   = useToastStore((s) => s.show);
 
-  const [name, setName]       = useState("");
-  const [phone, setPhone]     = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity]       = useState("");
-  const [errors, setErrors]   = useState({ name: false, phone: false, address: false });
+  const { control, handleSubmit, formState: { errors } } = useForm<CustomerValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: { name: "", phone: "", address: "", city: "" },
+  });
 
   const handleClose = useCallback(() => router.back(), []);
   const renderBackdrop = useCallback(
@@ -63,14 +75,15 @@ export default function AddCustomerSheet() {
     ), []
   );
 
-  const handleSave = () => {
-    const errs = { name: !name.trim(), phone: phone.trim().length < 10, address: !address.trim() };
-    setErrors(errs);
-    if (errs.name || errs.phone || errs.address) return;
-    addCustomer({ name: name.trim(), phone: phone.trim(), address: address.trim(), city: city.trim() || undefined });
-    showToast("Customer saved ✓", "success");
-    router.back();
-  };
+  const handleSave = handleSubmit((values) => {
+    addCustomer.mutate(
+      { name: values.name, phone: values.phone, address: values.address, city: values.city || undefined },
+      {
+        onSuccess: () => { showToast("Customer saved ✓", "success"); router.back(); },
+        onError: () => showToast("Failed to save customer", "error"),
+      }
+    );
+  });
 
   const sheetShadow = isDark
     ? { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 10 }
@@ -95,34 +108,42 @@ export default function AddCustomerSheet() {
           <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add New Customer</Text>
           <View style={styles.fields}>
             <View>
-              <SheetInput
-                label="Full name"
-                value={name}
-                onChange={(v) => { setName(v); setErrors((e) => ({ ...e, name: false })); }}
-                placeholder="e.g. Amara Obi"
+              <Controller
+                control={control}
+                name="name"
+                render={({ field: { value, onChange } }) => (
+                  <SheetInput label="Full name" value={value} onChange={onChange} placeholder="e.g. Amara Obi" />
+                )}
               />
-              {errors.name && <Text style={[styles.errMsg, { color: colors.error }]}>Name is required</Text>}
+              {errors.name && <Text style={[styles.errMsg, { color: colors.error }]}>{errors.name.message}</Text>}
             </View>
             <View>
-              <SheetInput
-                label="Phone number"
-                value={phone}
-                onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: false })); }}
-                placeholder="0800 000 0000"
-                keyboardType="phone-pad"
+              <Controller
+                control={control}
+                name="phone"
+                render={({ field: { value, onChange } }) => (
+                  <SheetInput label="Phone number" value={value} onChange={onChange} placeholder="0800 000 0000" keyboardType="phone-pad" />
+                )}
               />
-              {errors.phone && <Text style={[styles.errMsg, { color: colors.error }]}>Enter a valid phone number</Text>}
+              {errors.phone && <Text style={[styles.errMsg, { color: colors.error }]}>{errors.phone.message}</Text>}
             </View>
             <View>
-              <SheetInput
-                label="Delivery address"
-                value={address}
-                onChange={(v) => { setAddress(v); setErrors((e) => ({ ...e, address: false })); }}
-                placeholder="Street address"
+              <Controller
+                control={control}
+                name="address"
+                render={({ field: { value, onChange } }) => (
+                  <SheetInput label="Delivery address" value={value} onChange={onChange} placeholder="Street address" />
+                )}
               />
-              {errors.address && <Text style={[styles.errMsg, { color: colors.error }]}>Address is required</Text>}
+              {errors.address && <Text style={[styles.errMsg, { color: colors.error }]}>{errors.address.message}</Text>}
             </View>
-            <SheetInput label="City" value={city} onChange={setCity} placeholder="e.g. Lagos" optional />
+            <Controller
+              control={control}
+              name="city"
+              render={({ field: { value, onChange } }) => (
+                <SheetInput label="City" value={value ?? ""} onChange={onChange} placeholder="e.g. Lagos" optional />
+              )}
+            />
           </View>
           <View style={[styles.saveShadow, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
             <Pressable

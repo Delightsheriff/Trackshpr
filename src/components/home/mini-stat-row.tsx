@@ -2,9 +2,16 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useTheme } from "@/src/stores/themeStore";
 import { font, layout } from "@/src/constants/tokens";
-import { DUMMY_STATS } from "./home-types";
 
-export function MiniStatRow() {
+export function MiniStatRow({
+  delivered = 0,
+  inTransit = 0,
+  failed = 0,
+}: {
+  delivered?: number;
+  inTransit?: number;
+  failed?: number;
+}) {
   const { colors, isDark } = useTheme();
 
   const statCardShadow = isDark
@@ -36,7 +43,7 @@ export function MiniStatRow() {
           Done
         </Text>
         <Text style={[styles.statNum, { color: colors.success }]}>
-          {DUMMY_STATS.delivered}
+          {delivered}
         </Text>
       </View>
       <View
@@ -50,7 +57,7 @@ export function MiniStatRow() {
           Moving
         </Text>
         <Text style={[styles.statNum, { color: colors.warning }]}>
-          {DUMMY_STATS.inTransit}
+          {inTransit}
         </Text>
       </View>
       <View
@@ -64,7 +71,7 @@ export function MiniStatRow() {
           Failed
         </Text>
         <Text style={[styles.statNum, { color: colors.error }]}>
-          {DUMMY_STATS.failed}
+          {failed}
         </Text>
       </View>
     </View>

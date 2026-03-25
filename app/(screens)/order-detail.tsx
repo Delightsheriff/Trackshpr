@@ -2,7 +2,6 @@
  * Order Detail screen — shows order status hero, progress steps, map (in_transit),
  * action buttons, order details, magic links, photo strip, and delivery timeline.
  * DS §8.1, §8.4, §8.8 — Feather icons, DM Sans / DM Mono fonts.
- * TODO: replace DUMMY_ORDERS_DETAIL with real Supabase query by id.
  */
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Share } from "react-native";
@@ -16,23 +15,53 @@ import { layout, radius, font } from "@/src/constants/tokens";
 
 // Components
 import { StatusPill } from "@/src/components/home/status-pill";
-import { Order, DUMMY_ORDERS_DETAIL } from "@/src/components/orders/order-types";
+import { Order } from "@/src/components/orders/order-types";
 import { ProgressSteps, Step } from "@/src/components/orders/progress-steps";
 import { DetailRow } from "@/src/components/orders/detail-row";
 import { TimelineItem } from "@/src/components/orders/timeline-item";
 import { ActionBtn } from "@/src/components/orders/action-btn";
 import { MapSection } from "@/src/components/orders/map-section";
 import { MagicLinkCard } from "@/src/components/orders/magic-link-card";
+import { useOrder } from "@/src/hooks/useOrders";
 
-import { callPhone, copyLink, formatAmount } from "@/src/utils/helpers";
+import { callPhone, copyLink, formatAmount, formatRelativeTime, formatTime } from "@/src/utils/helpers";
 
 export default function OrderDetailScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const order: Order =
-    DUMMY_ORDERS_DETAIL.find((o) => o.id === id) ?? DUMMY_ORDERS_DETAIL[0];
+  const { data: dbOrder, isLoading } = useOrder(id ?? null);
 
+  // Map DB record → display shape
+  const order: Order | null = dbOrder
+    ? {
+        id: dbOrder.id,
+        orderId: `TRK-${dbOrder.id.substring(0, 6).toUpperCase()}`,
+        item: dbOrder.item,
+        customer: dbOrder.customer_name ?? "—",
+        customerPhone: dbOrder.customer_phone ?? "—",
+        address: dbOrder.delivery_address ?? "—",
+        rider: dbOrder.rider_name ?? (dbOrder.direct_phone ? "Direct rider" : "—"),
+        riderPhone: dbOrder.rider_phone ?? dbOrder.direct_phone ?? "—",
+        amount: dbOrder.delivery_fee ?? 0,
+        status: dbOrder.status,
+        riderToken: "",
+        customerToken: "",
+        createdAt: formatTime(dbOrder.created_at),
+        pickedUpAt: null,
+        deliveredAt: null,
+        failedAt: null,
+        failureReason: null,
+        pickedUpLocation: null,
+        elapsedLabel: formatRelativeTime(dbOrder.created_at),
+      }
+    : null;
+
+  if (isLoading || !order) {
+    return <View style={[styles.root, { backgroundColor: colors.surface }]} />;
+  }
+
+  const isPending = order.status === "pending";
   const isTransit = order.status === "in_transit";
   const isDelivered = order.status === "delivered";
   const isFailed = order.status === "failed";
@@ -53,13 +82,22 @@ export default function OrderDetailScreen() {
         elevation: 2,
       };
 
-  const heroBg = isTransit
-    ? colors.surfaceCard
-    : isDelivered
-      ? colors.successBg
-      : colors.errorBg;
+  const heroBg = isPending
+    ? colors.warningBg
+    : isTransit
+      ? colors.surfaceCard
+      : isDelivered
+        ? colors.successBg
+        : colors.errorBg;
 
-  const progressSteps: Step[] = isTransit
+  const progressSteps: Step[] = isPending
+    ? [
+        { label: "Confirmed", state: "active", icon: "1" },
+        { label: "Picked Up", state: "pending", icon: "2" },
+        { label: "Transit", state: "pending", icon: "3" },
+        { label: "Delivered", state: "pending", icon: "4" },
+      ]
+    : isTransit
     ? [
         { label: "Confirmed", state: "done", icon: "1" },
         { label: "Picked Up", state: "done", icon: "2" },
@@ -81,7 +119,7 @@ export default function OrderDetailScreen() {
         ];
 
   const progressLineColor = isDelivered ? colors.success : colors.primary;
-  const progressLineWidth = isTransit ? "66%" : isDelivered ? "100%" : "44%";
+  const progressLineWidth = isPending ? "0%" : isTransit ? "66%" : isDelivered ? "100%" : "44%";
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -126,6 +164,7 @@ export default function OrderDetailScreen() {
           style={[styles.heroCard, { backgroundColor: heroBg }, cardShadow]}
         >
           <View style={styles.heroStatusRow}>
+            {isPending && <StatusPill status="pending" />}
             {isTransit && <StatusPill status="in_transit" />}
             {isDelivered && <StatusPill status="delivered" />}
             {isFailed && <StatusPill status="failed" />}
@@ -321,6 +360,27 @@ export default function OrderDetailScreen() {
             cardShadow,
           ]}
         >
+          {isPending && (
+            <>
+              <DetailRow label="Item" value={order.item} separator />
+              <DetailRow label="Customer" value={order.customer} separator />
+              {order.customerPhone !== "—" && (
+                <DetailRow label="Phone" value={order.customerPhone} mono separator />
+              )}
+              {order.address !== "—" && (
+                <DetailRow label="Address" value={order.address} separator />
+              )}
+              <DetailRow label="Rider" value={order.rider} separator />
+              {order.amount > 0 && (
+                <DetailRow
+                  label="Amount to collect"
+                  value={formatAmount(order.amount)}
+                  mono
+                  valueStyle={{ color: colors.success, fontSize: 16, fontFamily: font.mono.medium }}
+                />
+              )}
+            </>
+          )}
           {isTransit && (
             <>
               <DetailRow label="Customer" value={order.customer} separator />
@@ -450,6 +510,14 @@ export default function OrderDetailScreen() {
           {isDelivered ? "Delivery timeline" : "Timeline"}
         </Text>
         <View style={styles.timeline}>
+          {isPending && (
+            <TimelineItem
+              state="active"
+              event="Order created"
+              meta={`Today · ${order.createdAt}`}
+              hasLine={false}
+            />
+          )}
           {isTransit && (
             <>
               <TimelineItem

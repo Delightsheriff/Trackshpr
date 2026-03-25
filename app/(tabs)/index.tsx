@@ -14,13 +14,14 @@ import { useTheme } from "@/src/stores/themeStore";
 import { layout, font } from "@/src/constants/tokens";
 
 // Extracted Components
-import { DUMMY_ORDERS } from "@/src/components/home/home-types";
 import { HomeHeader } from "@/src/components/home/home-header";
 import { HeroStatCard } from "@/src/components/home/hero-stat-card";
 import { MiniStatRow } from "@/src/components/home/mini-stat-row";
 import { QuickActionsRow } from "@/src/components/home/quick-actions-row";
 import { OrderCard } from "@/src/components/home/order-card";
 import { IncompleteProfileBanner } from "@/src/components/home/incomplete-profile-banner";
+import { useOrders } from "@/src/hooks/useOrders";
+import { formatRelativeTime } from "@/src/utils/helpers";
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
@@ -29,8 +30,17 @@ export default function HomeScreen() {
 
   const { userId } = useSession();
   const { data: profile } = useProfile(userId);
+  const { data: orders = [] } = useOrders(userId);
   const businessName = profile?.business_name ?? "";
   const initial = businessName.charAt(0).toUpperCase() || "?";
+
+  const today = new Date().toDateString();
+  const todayOrders = orders.filter((o) => new Date(o.created_at).toDateString() === today);
+  const statsTotal = todayOrders.length;
+  const statsDelivered = todayOrders.filter((o) => o.status === "delivered").length;
+  const statsInTransit = todayOrders.filter((o) => o.status === "in_transit").length;
+  const statsFailed = todayOrders.filter((o) => o.status === "failed").length;
+  const recentOrders = orders.slice(0, 3);
 
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const isFocused = useIsFocused();
@@ -80,10 +90,10 @@ export default function HomeScreen() {
         />
 
         {/* ── Hero stat card ────────────────────────────────────────────── */}
-        <HeroStatCard />
+        <HeroStatCard total={statsTotal} />
 
         {/* ── Mini stat row ─────────────────────────────────────────────── */}
-        <MiniStatRow />
+        <MiniStatRow delivered={statsDelivered} inTransit={statsInTransit} failed={statsFailed} />
 
         {/* ── Quick actions ─────────────────────────────────────────────── */}
         <QuickActionsRow />
@@ -98,8 +108,16 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {DUMMY_ORDERS.map((o) => (
-          <OrderCard key={o.id} {...o} />
+        {recentOrders.map((o) => (
+          <OrderCard
+            key={o.id}
+            id={o.id}
+            item={o.item}
+            customer={o.customer_name ?? "Unknown"}
+            area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
+            status={o.status}
+            time={formatRelativeTime(o.created_at)}
+          />
         ))}
 
         <View style={{ height: 16 }} />

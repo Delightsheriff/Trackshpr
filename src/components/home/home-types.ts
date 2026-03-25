@@ -40,41 +40,6 @@ export function greeting() {
   return "Good evening";
 }
 
-export const DUMMY_STATS = { total: 18, delivered: 11, inTransit: 5, failed: 2 };
-
-export const DUMMY_ORDERS: {
-  id: string;
-  item: string;
-  customer: string;
-  area: string;
-  status: OrderStatus;
-  time: string;
-}[] = [
-  {
-    id: "1",
-    item: "Adire Maxi Dress × 2",
-    customer: "Amara Obi",
-    area: "Lekki Phase 1",
-    status: "in_transit",
-    time: "12m ago",
-  },
-  {
-    id: "2",
-    item: "Ankara Tote Bag",
-    customer: "Tunde Bello",
-    area: "Yaba",
-    status: "pending",
-    time: "34m ago",
-  },
-  {
-    id: "3",
-    item: "Beaded Necklace Set",
-    customer: "Chisom Eze",
-    area: "Surulere",
-    status: "delivered",
-    time: "1h ago",
-  },
-];
 
 export const QUICK_ACTIONS: {
   icon: React.ComponentProps<typeof Feather>["name"];

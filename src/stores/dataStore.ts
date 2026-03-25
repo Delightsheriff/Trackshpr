@@ -17,44 +17,27 @@ export interface Rider {
 
 export interface Customer {
   id: string;
-  seller_id: string;
-  label: string | null;
-  customer_name: string;
-  customer_phone: string;
-  address: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
   city: string | null;
   created_at: string;
-}
-
-export type OrderStatus = "pending" | "picked_up" | "in_transit" | "delivered" | "failed";
-
-export interface Order {
-  id: string;
-  seller_id: string;
-  rider_id: string | null;
-  customer_name: string;
-  customer_phone: string;
-  delivery_address: string;
-  item_description: string;
-  status: OrderStatus;
-  created_at: string;
+  updated_at: string;
 }
 
 interface DataState {
   riders: Rider[];
   customers: Customer[];
-  orders: Order[];
   addRider: (data: Pick<Rider, "name" | "phone">) => void;
   deleteRider: (id: string) => void;
-  addCustomer: (data: Pick<Customer, "customer_name" | "customer_phone" | "address" | "city">) => void;
+  addCustomer: (data: Pick<Customer, "name" | "phone" | "address" | "city">) => void;
   deleteCustomer: (id: string) => void;
-  addOrder: (order: Omit<Order, "id" | "created_at">) => void;
 }
 
 export const useDataStore = create<DataState>((set) => ({
   riders: [],
   customers: [],
-  orders: [],
 
   addRider: (data) =>
     set((s) => ({
@@ -81,21 +64,13 @@ export const useDataStore = create<DataState>((set) => ({
         {
           ...data,
           id: crypto.randomUUID(),
-          seller_id: "",
-          label: null,
+          user_id: "",
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ],
     })),
 
   deleteCustomer: (id) =>
     set((s) => ({ customers: s.customers.filter((c) => c.id !== id) })),
-
-  addOrder: (order) =>
-    set((s) => ({
-      orders: [
-        { ...order, id: crypto.randomUUID(), created_at: new Date().toISOString() },
-        ...s.orders,
-      ],
-    })),
 }));

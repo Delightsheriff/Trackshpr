@@ -3,7 +3,8 @@
  * Sets selected customer in orderStore, then navigates back.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { useCustomers } from "@/src/hooks/useCustomers";
+import { useSession } from "@/src/hooks/useSession";
 import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
@@ -35,7 +36,8 @@ function initials(name: string) {
 export default function SelectCustomerScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const customers  = useDataStore((s) => s.customers);
+  const { userId }   = useSession();
+  const { data: customers = [] } = useCustomers(userId);
   const current    = useOrderStore((s) => s.draft.customer);
   const setCustomer= useOrderStore((s) => s.setCustomer);
 

@@ -1,19 +1,21 @@
 /**
  * Orders tab — searchable, filterable order list (DS §8.1, §8.4).
- * TODO: replace DUMMY_ORDERS_FULL with real Supabase query.
  */
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrders } from "@/src/hooks/useOrders";
+import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
 import { font, layout } from "@/src/constants/tokens";
+import { formatRelativeTime } from "@/src/utils/helpers";
 
 // Shared Components
 import { OrderCard } from "@/src/components/home/order-card";
 
 // Orders Features
-import { DUMMY_ORDERS_FULL, FilterKey } from "@/src/components/orders/order-types";
+import { FilterKey } from "@/src/components/orders/order-types";
 import { OrderSearchBar } from "@/src/components/orders/order-search-bar";
 import { OrderFilterTabs } from "@/src/components/orders/order-filter-tabs";
 import { OrderEmptyState } from "@/src/components/orders/order-empty-state";
@@ -22,17 +24,19 @@ import { OrderEmptyState } from "@/src/components/orders/order-empty-state";
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { userId } = useSession();
+  const { data: orders = [] } = useOrders(userId);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
 
-  const filtered = DUMMY_ORDERS_FULL.filter((o) => {
+  const filtered = orders.filter((o) => {
     const matchesFilter = filter === "all" || o.status === filter;
     const q = query.toLowerCase();
     const matchesQuery =
       !q ||
       o.item.toLowerCase().includes(q) ||
-      o.customer.toLowerCase().includes(q) ||
-      o.area.toLowerCase().includes(q);
+      (o.customer_name ?? "").toLowerCase().includes(q) ||
+      (o.city ?? "").toLowerCase().includes(q);
     return matchesFilter && matchesQuery;
   });
 
@@ -53,7 +57,7 @@ export default function OrdersScreen() {
             Orders
           </Text>
           <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
-            147 total · 18 today
+            {orders.length} total
           </Text>
         </View>
 
@@ -67,7 +71,17 @@ export default function OrdersScreen() {
         {filtered.length === 0 ? (
           <OrderEmptyState filter={filter} />
         ) : (
-          filtered.map((o) => <OrderCard key={o.id} {...o} />)
+          filtered.map((o) => (
+            <OrderCard
+              key={o.id}
+              id={o.id}
+              item={o.item}
+              customer={o.customer_name ?? "Unknown"}
+              area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
+              status={o.status}
+              time={formatRelativeTime(o.created_at)}
+            />
+          ))
         )}
 
         <View style={{ height: 16 }} />

@@ -57,6 +57,7 @@ export interface Customer {
 export interface Order {
   id: string;
   user_id: string;
+  order_number: number | null;
   item: string;
   delivery_fee: number | null;
   notes: string | null;

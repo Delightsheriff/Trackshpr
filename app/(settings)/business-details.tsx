@@ -256,7 +256,10 @@ export default function BusinessDetailsScreen() {
     // Upload new local image if picked
     if (logoUri && !logoUri.startsWith("https://")) {
       try {
-        const result = await uploadLogoMutation.mutateAsync({ userId, uri: logoUri });
+        const result = await uploadLogoMutation.mutateAsync({
+          userId,
+          uri: logoUri,
+        });
         if (result.error) {
           showToast(`Upload error: ${result.error}`, "error");
           finalLogoUrl = profile?.logo_url ?? null;
@@ -380,9 +383,10 @@ export default function BusinessDetailsScreen() {
               {logoUri ? (
                 <Image
                   source={{
-                    uri: logoUri.startsWith("https://") && profile?.updated_at
-                      ? `${logoUri}?v=${new Date(profile.updated_at).getTime()}`
-                      : logoUri,
+                    uri:
+                      logoUri.startsWith("https://") && profile?.updated_at
+                        ? `${logoUri}?v=${new Date(profile.updated_at).getTime()}`
+                        : logoUri,
                   }}
                   style={styles.logoImage}
                   contentFit="cover"

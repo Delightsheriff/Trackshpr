@@ -4,14 +4,20 @@
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useProfile, useSession } from "@/src/hooks";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { supabase } from "@/src/lib/supabase";
+import { useToastStore } from "@/src/stores/toastStore";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as Notifications from "expo-notifications";
+import * as Sharing from "expo-sharing";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -19,6 +25,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ── Toggle switch (DS §8.7) ───────────────────────────────────────────────────
 function Toggle({
@@ -157,9 +164,68 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { toggle } = useThemeStore();
-  const [notifs, setNotifs] = useState(true);
   const { userId } = useSession();
   const { data: profile } = useProfile(userId);
+  const showToast = useToastStore((s) => s.show);
+  const queryClient = useQueryClient();
+
+  const [notifEnabled, setNotifEnabled] = useState(!!profile?.push_token);
+
+  useEffect(() => {
+    setNotifEnabled(!!profile?.push_token);
+  }, [profile?.push_token]);
+
+  const exportCSV = async () => {
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("id, item_description, customer_name, status, created_at, delivery_address")
+      .eq("seller_id", userId!)
+      .order("created_at", { ascending: false });
+    if (error || !orders?.length) {
+      showToast("No orders to export", "info");
+      return;
+    }
+    const header = "ID,Item,Customer,Status,Address,Date\n";
+    const rows = orders
+      .map((o) =>
+        [
+          o.id,
+          (o.item_description ?? "").replace(/,/g, ";"),
+          (o.customer_name ?? "").replace(/,/g, ";"),
+          o.status ?? "",
+          (o.delivery_address ?? "").replace(/,/g, ";"),
+          o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
+        ].join(",")
+      )
+      .join("\n");
+    const path = (FileSystem.documentDirectory ?? "") + "trackshpr-orders.csv";
+    await FileSystem.writeAsStringAsync(path, header + rows);
+    await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Export Orders" });
+  };
+
+  const handleNotifToggle = async (value: boolean) => {
+    if (value) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === "granted") {
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const { error } = await supabase
+          .from("profiles")
+          .update({ push_token: tokenData.data })
+          .eq("id", userId!);
+        if (!error) {
+          setNotifEnabled(true);
+          queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId ?? "") });
+          showToast("Notifications enabled", "success");
+        }
+      } else {
+        showToast("Enable notifications in your device Settings", "error");
+      }
+    } else {
+      await supabase.from("profiles").update({ push_token: null }).eq("id", userId!);
+      setNotifEnabled(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId ?? "") });
+    }
+  };
 
   const profileSectionShadow = isDark
     ? {
@@ -341,7 +407,7 @@ export default function SettingsScreen() {
             iconBg={colors.successBg}
             label="Export history"
             sublabel="Download CSV"
-            onPress={() => {}}
+            onPress={exportCSV}
           />
         </SettingGroup>
 
@@ -366,7 +432,7 @@ export default function SettingsScreen() {
             iconColor={colors.primary}
             iconBg={colors.primarySoft}
             label="Push notifications"
-            right={<Toggle value={notifs} onChange={setNotifs} />}
+            right={<Toggle value={notifEnabled} onChange={handleNotifToggle} />}
           />
         </SettingGroup>
 
@@ -379,7 +445,7 @@ export default function SettingsScreen() {
             iconBg={colors.infoBg}
             label="Help & support"
             sublabel="Chat with us"
-            onPress={() => {}}
+            onPress={() => Linking.openURL("mailto:support@trackshpr.app")}
           />
           <View
             style={[

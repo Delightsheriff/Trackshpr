@@ -45,35 +45,33 @@ export interface Rider {
 
 export interface Customer {
   id: string;
-  user_id: string;
-  name: string;
-  phone: string | null;
-  address: string | null;
+  seller_id: string;
+  customer_name: string;
+  customer_phone: string;
+  address: string;
   city: string | null;
-  created_at: string;
-  updated_at: string;
+  label: string | null;
+  created_at: string | null;
 }
 
 export interface Order {
   id: string;
-  user_id: string;
-  order_number: number | null;
-  item: string;
-  delivery_fee: number | null;
+  seller_id: string;
+  item_description: string;
   notes: string | null;
-  photo_url: string | null;
-  status: OrderStatus;
-  customer_id: string | null;
-  customer_name: string | null;
-  customer_phone: string | null;
-  delivery_address: string | null;
-  city: string | null;
+  status: string | null;
+  customer_name: string;
+  customer_phone: string;
+  customer_token: string;
+  delivery_address: string;
   rider_id: string | null;
-  rider_name: string | null;
-  rider_phone: string | null;
-  direct_phone: string | null;
-  created_at: string;
-  updated_at: string;
+  rider_token: string;
+  seller_photo_url: string | null;
+  proof_photo_url: string | null;
+  delivered_at: string | null;
+  nudge_sent: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 // ── Profile ─────────────────────────────────────────────────────────────────
@@ -95,7 +93,7 @@ export async function fetchOrders(userId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
-    .eq("user_id", userId)
+    .eq("seller_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Failed to fetch orders");
@@ -103,20 +101,13 @@ export async function fetchOrders(userId: string): Promise<Order[]> {
 }
 
 export async function insertOrder(payload: {
-  user_id: string;
-  item: string;
-  delivery_fee?: number | null;
+  seller_id: string;
+  item_description: string;
   notes?: string | null;
-  photo_url?: string | null;
-  customer_id?: string | null;
-  customer_name?: string | null;
-  customer_phone?: string | null;
-  delivery_address?: string | null;
-  city?: string | null;
+  customer_name: string;
+  customer_phone: string;
+  delivery_address: string;
   rider_id?: string | null;
-  rider_name?: string | null;
-  rider_phone?: string | null;
-  direct_phone?: string | null;
 }): Promise<Order> {
   const { data, error } = await supabase
     .from("orders")
@@ -201,26 +192,26 @@ export async function deleteRider(riderId: string): Promise<void> {
 
 // ── Customers ─────────────────────────────────────────────────────────────────
 
-export async function fetchCustomers(userId: string): Promise<Customer[]> {
+export async function fetchCustomers(sellerId: string): Promise<Customer[]> {
   const { data, error } = await supabase
-    .from("customers")
+    .from("address_book")
     .select("*")
-    .eq("user_id", userId)
-    .order("name");
+    .eq("seller_id", sellerId)
+    .order("customer_name");
 
   if (error) throw new Error("Failed to fetch customers");
   return (data ?? []) as Customer[];
 }
 
 export async function insertCustomer(payload: {
-  user_id: string;
-  name: string;
-  phone?: string | null;
-  address?: string | null;
+  seller_id: string;
+  customer_name: string;
+  customer_phone: string;
+  address: string;
   city?: string | null;
 }): Promise<Customer> {
   const { data, error } = await supabase
-    .from("customers")
+    .from("address_book")
     .insert(payload)
     .select()
     .single();
@@ -261,7 +252,7 @@ export async function fetchAnalytics(
   const { data, error } = await supabase
     .from("orders")
     .select("status")
-    .eq("user_id", userId)
+    .eq("seller_id", userId)
     .gte("created_at", fromDate.toISOString());
 
   if (error) throw new Error("Failed to fetch analytics");

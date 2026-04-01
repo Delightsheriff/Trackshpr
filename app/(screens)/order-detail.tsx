@@ -4,7 +4,7 @@
  * DS §8.1, §8.4, §8.8 — Feather icons, DM Sans / DM Mono fonts.
  */
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Share } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,13 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/src/stores/themeStore";
 import { layout, radius, font } from "@/src/constants/tokens";
+import { supabase } from "@/src/lib/supabase";
+import { useToastStore } from "@/src/stores/toastStore";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 
 // Components
 import { StatusPill } from "@/src/components/home/status-pill";
@@ -22,31 +29,45 @@ import { TimelineItem } from "@/src/components/orders/timeline-item";
 import { ActionBtn } from "@/src/components/orders/action-btn";
 import { MapSection } from "@/src/components/orders/map-section";
 import { MagicLinkCard } from "@/src/components/orders/magic-link-card";
-import { useOrder } from "@/src/hooks/useOrders";
 
-import { callPhone, copyLink, formatAmount, formatRelativeTime, formatTime } from "@/src/utils/helpers";
+import { formatAmount, formatRelativeTime, formatTime } from "@/src/utils/helpers";
 
 export default function OrderDetailScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: dbOrder, isLoading } = useOrder(id ?? null);
+  const showToast = useToastStore((s) => s.show);
+  const queryClient = useQueryClient();
+
+  const { data: dbOrder, isLoading } = useQuery({
+    queryKey: queryKeys.order(id ?? ""),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*, riders(id, name, phone)")
+        .eq("id", id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
 
   // Map DB record → display shape
   const order: Order | null = dbOrder
     ? {
         id: dbOrder.id,
         orderId: `TRK-${dbOrder.id.substring(0, 6).toUpperCase()}`,
-        item: dbOrder.item,
+        item: dbOrder.item_description,
         customer: dbOrder.customer_name ?? "—",
         customerPhone: dbOrder.customer_phone ?? "—",
         address: dbOrder.delivery_address ?? "—",
-        rider: dbOrder.rider_name ?? (dbOrder.direct_phone ? "Direct rider" : "—"),
-        riderPhone: dbOrder.rider_phone ?? dbOrder.direct_phone ?? "—",
-        amount: dbOrder.delivery_fee ?? 0,
+        rider: (dbOrder.riders as any)?.name ?? "—",
+        riderPhone: (dbOrder.riders as any)?.phone ?? "—",
+        amount: 0,
         status: dbOrder.status,
-        riderToken: "",
-        customerToken: "",
+        riderToken: dbOrder.rider_token ?? "",
+        customerToken: dbOrder.customer_token ?? "",
         createdAt: formatTime(dbOrder.created_at),
         pickedUpAt: null,
         deliveredAt: null,
@@ -56,6 +77,75 @@ export default function OrderDetailScreen() {
         elapsedLabel: formatRelativeTime(dbOrder.created_at),
       }
     : null;
+
+  // Action handlers
+  const handleRetryDelivery = () => {
+    if (!order) return;
+    router.push({
+      pathname: "/(modals)/new-delivery",
+      params: {
+        prefillItem: order.item,
+        prefillCustomer: order.customer,
+        prefillPhone: order.customerPhone,
+        prefillAddress: order.address,
+      },
+    });
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!order) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+    const ext = uri.split(".").pop() ?? "jpg";
+    const fileName = `${order.id}-${Date.now()}.${ext}`;
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const { error: uploadError } = await supabase.storage
+      .from("order-photos")
+      .upload(fileName, blob, { contentType: `image/${ext}` });
+    if (uploadError) {
+      showToast("Photo upload failed.", "error");
+      return;
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("order-photos").getPublicUrl(fileName);
+    await supabase
+      .from("orders")
+      .update({ seller_photo_url: publicUrl })
+      .eq("id", order.id);
+    queryClient.invalidateQueries({ queryKey: queryKeys.order(order.id) });
+    showToast("Photo added", "success");
+  };
+
+  const handleCopyRiderLink = async () => {
+    if (!order) return;
+    await Clipboard.setStringAsync(
+      `https://trackshpr.app/rider/${order.riderToken}`
+    );
+    showToast("Rider link copied", "success");
+  };
+
+  const handleCopyTrackLink = async () => {
+    if (!order) return;
+    await Clipboard.setStringAsync(
+      `https://trackshpr.app/track/${order.customerToken}`
+    );
+    showToast("Tracking link copied", "success");
+  };
+
+  const handleShareTrackLink = async () => {
+    if (!order) return;
+    await Sharing.shareAsync(
+      `https://trackshpr.app/track/${order.customerToken}`,
+      { dialogTitle: "Share tracking link" }
+    );
+  };
 
   if (isLoading || !order) {
     return <View style={[styles.root, { backgroundColor: colors.surface }]} />;
@@ -230,6 +320,7 @@ export default function OrderDetailScreen() {
           >
             <Pressable
               style={styles.retryPressable}
+              onPress={handleRetryDelivery}
               android_ripple={{
                 color: "rgba(255,255,255,0.2)",
                 borderless: false,
@@ -260,20 +351,14 @@ export default function OrderDetailScreen() {
                 label="Rider link"
                 bg={colors.primarySoft}
                 fg={colors.primary}
-                onPress={() =>
-                  copyLink("https://trk.sh/rider/" + order.riderToken)
-                }
+                onPress={handleCopyRiderLink}
               />
               <ActionBtn
                 icon="send"
                 label="Share tracking"
                 bg={colors.infoBg}
                 fg={colors.info}
-                onPress={() =>
-                  Share.share({
-                    message: "https://trk.sh/track/" + order.customerToken,
-                  })
-                }
+                onPress={handleShareTrackLink}
               />
               {order.riderPhone !== "—" && (
                 <ActionBtn
@@ -281,7 +366,7 @@ export default function OrderDetailScreen() {
                   label="Call rider"
                   bg={colors.successBg}
                   fg={colors.success}
-                  onPress={() => callPhone(order.riderPhone)}
+                  onPress={() => Linking.openURL(`tel:${order.riderPhone}`)}
                 />
               )}
               {order.customerPhone !== "—" && (
@@ -290,7 +375,7 @@ export default function OrderDetailScreen() {
                   label="Call customer"
                   bg={colors.warningBg}
                   fg={colors.warning}
-                  onPress={() => callPhone(order.customerPhone)}
+                  onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
                 />
               )}
             </>
@@ -302,34 +387,28 @@ export default function OrderDetailScreen() {
                 label="Copy rider link"
                 bg={colors.primarySoft}
                 fg={colors.primary}
-                onPress={() =>
-                  copyLink("https://trk.sh/rider/" + order.riderToken)
-                }
+                onPress={handleCopyRiderLink}
               />
               <ActionBtn
                 icon="send"
                 label="Share tracking"
                 bg={colors.infoBg}
                 fg={colors.info}
-                onPress={() =>
-                  Share.share({
-                    message: "https://trk.sh/track/" + order.customerToken,
-                  })
-                }
+                onPress={handleShareTrackLink}
               />
               <ActionBtn
                 icon="phone"
                 label="Call rider"
                 bg={colors.successBg}
                 fg={colors.success}
-                onPress={() => callPhone(order.riderPhone)}
+                onPress={() => Linking.openURL(`tel:${order.riderPhone}`)}
               />
               <ActionBtn
                 icon="phone"
                 label="Call customer"
                 bg={colors.warningBg}
                 fg={colors.warning}
-                onPress={() => callPhone(order.customerPhone)}
+                onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
               />
             </>
           )}
@@ -341,7 +420,10 @@ export default function OrderDetailScreen() {
                 bg={colors.infoBg}
                 fg={colors.info}
                 onPress={() =>
-                  Share.share({ message: "https://trk.sh/receipt/" + order.id })
+                  Sharing.shareAsync(
+                    `https://trackshpr.app/receipt/${order.id}`,
+                    { dialogTitle: "Share receipt" }
+                  )
                 }
               />
               <ActionBtn
@@ -349,14 +431,14 @@ export default function OrderDetailScreen() {
                 label="Retry order"
                 bg={colors.primarySoft}
                 fg={colors.primary}
-                onPress={() => {}}
+                onPress={handleRetryDelivery}
               />
               <ActionBtn
                 icon="phone"
                 label="Call customer"
                 bg={colors.successBg}
                 fg={colors.success}
-                onPress={() => callPhone(order.customerPhone)}
+                onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
               />
             </>
           )}
@@ -367,23 +449,21 @@ export default function OrderDetailScreen() {
                 label="Call customer"
                 bg={colors.successBg}
                 fg={colors.success}
-                onPress={() => callPhone(order.customerPhone)}
+                onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
               />
               <ActionBtn
                 icon="phone"
                 label="Call rider"
                 bg={colors.successBg}
                 fg={colors.success}
-                onPress={() => callPhone(order.riderPhone)}
+                onPress={() => Linking.openURL(`tel:${order.riderPhone}`)}
               />
               <ActionBtn
                 icon="link"
                 label="Rider link"
                 bg={colors.primarySoft}
                 fg={colors.primary}
-                onPress={() =>
-                  copyLink("https://trk.sh/rider/" + order.riderToken)
-                }
+                onPress={handleCopyRiderLink}
               />
             </>
           )}
@@ -534,16 +614,17 @@ export default function OrderDetailScreen() {
                   color={colors.textMuted}
                 />
               </View>
-              <View
+              <Pressable
                 style={[
                   styles.photoThumbAdd,
                   { backgroundColor: colors.primarySoft },
                 ]}
+                onPress={handleUploadPhoto}
               >
                 <Text style={[styles.photoAdd, { color: colors.primary }]}>
                   +
                 </Text>
-              </View>
+              </Pressable>
             </ScrollView>
           </>
         )}

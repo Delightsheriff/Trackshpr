@@ -373,7 +373,7 @@ export default function BrandCustomizationScreen() {
     }
   }, [profile]);
 
-  const isPro = true; // plan gating to be added later
+  const isPro = false; // hardcoded until payments land
   const accent = ACCENT_COLORS[selectedIdx];
 
   const cardShadow = isDark
@@ -569,7 +569,7 @@ export default function BrandCustomizationScreen() {
             <View style={styles.proLock}>
               <PreviewCard
                 accentHex={colors.primary}
-                accentEnd="#6366F1"
+                accentEnd={ACCENT_COLORS[0].end}
                 isPro={false}
               />
               {/* Overlay */}

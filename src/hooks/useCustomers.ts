@@ -5,21 +5,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCustomers, insertCustomer } from "@/src/lib/supabaseQueries";
 import { queryKeys } from "@/src/lib/queryKeys";
 
-export function useCustomers(userId: string | null) {
+export function useCustomers(sellerId: string | null) {
   return useQuery({
-    queryKey: queryKeys.customers(userId ?? ""),
-    queryFn: () => fetchCustomers(userId!),
-    enabled: !!userId,
+    queryKey: queryKeys.customers(sellerId ?? ""),
+    queryFn: () => fetchCustomers(sellerId!),
+    enabled: !!sellerId,
   });
 }
 
-export function useAddCustomer(userId: string | null) {
+export function useAddCustomer(sellerId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; phone?: string; address?: string; city?: string }) =>
-      insertCustomer({ user_id: userId!, ...data }),
+    mutationFn: (data: { customer_name: string; customer_phone: string; address: string; city?: string }) =>
+      insertCustomer({ seller_id: sellerId!, ...data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.customers(userId ?? "") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(sellerId ?? "") });
     },
   });
 }

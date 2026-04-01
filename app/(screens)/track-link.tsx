@@ -10,12 +10,15 @@ import {
   layout,
   radius,
 } from "@/src/constants/tokens";
+import { supabase } from "@/src/lib/supabase";
 import { Feather } from "@expo/vector-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -48,31 +51,6 @@ interface OrderEvent {
   done: boolean;
   gps?: string;
 }
-
-// ── Dummy data — TODO: fetch from Supabase using token ───────────────────────
-const ORDER = {
-  id: "TRK-2847",
-  item: "Ankara Tote Bag × 2",
-  address: "14 Admiralty Way, Lekki",
-  amount: 35000,
-  status: "in_transit" as Status,
-  sellerName: "Zara's Closet",
-  sellerPhone: "08034567890",
-  pickedUpAt: "11:34 AM",
-  locationPings: [
-    { lat: 6.455, lng: 3.384, time: "11:52 AM" },
-  ] as LocationPing[],
-  events: [
-    { label: "Order confirmed", time: "10:58 AM", done: true },
-    {
-      label: "Rider picked up",
-      time: "11:34 AM",
-      done: true,
-      gps: "Yaba, Lagos",
-    },
-    { label: "In transit", time: "Now", done: false },
-  ] as OrderEvent[],
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatAmount(n: number): string {
@@ -118,6 +96,15 @@ function getStepState(
     return "done";
   }
   return "pending";
+}
+
+function mapEventLabel(status: string): string {
+  if (status === "created" || status === "pending") return "Order confirmed";
+  if (status === "picked_up") return "Rider picked up";
+  if (status === "in_transit") return "In transit";
+  if (status === "delivered") return "Delivered";
+  if (status === "failed") return "Failed";
+  return status;
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -385,23 +372,140 @@ function DetailRow({
 export default function TrackLinkScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ token?: string }>();
-  const order = ORDER;
+  const token = params.token;
+  const queryClient = useQueryClient();
 
-  // Auto-refresh counter — TODO: replace with Supabase Realtime subscription
-  const [refreshTick, setRefreshTick] = useState(0);
+  const { data: order, isLoading, error } = useQuery({
+    queryKey: ["track-order", token],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `*, order_status_events(id,status,note,created_at), location_pings(id,latitude,longitude,created_at)`,
+        )
+        .eq("customer_token", token)
+        .order("created_at", {
+          referencedTable: "order_status_events",
+          ascending: true,
+        })
+        .order("created_at", {
+          referencedTable: "location_pings",
+          ascending: false,
+        })
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!token,
+    retry: 1,
+  });
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRefreshTick((t) => t + 1);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!order?.id) return;
+    const channel = supabase
+      .channel(`track-${order.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "order_status_events",
+          filter: `order_id=eq.${order.id}`,
+        },
+        () => queryClient.invalidateQueries({ queryKey: ["track-order", token] }),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "location_pings",
+          filter: `order_id=eq.${order.id}`,
+        },
+        () => queryClient.invalidateQueries({ queryKey: ["track-order", token] }),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${order.id}`,
+        },
+        () => queryClient.invalidateQueries({ queryKey: ["track-order", token] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
 
-  const isDelivered = order.status === "delivered";
-  const showMap = order.status === "picked_up" || order.status === "in_transit";
-  const lastPing =
-    order.locationPings.length > 0
-      ? order.locationPings[order.locationPings.length - 1]
-      : null;
+  if (isLoading) {
+    return (
+      <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
+        <StatusBar style="dark" />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
+        <StatusBar style="dark" />
+        <View style={ss.invalidIconWrap}>
+          <Feather name="link-2" size={48} color={colors.textMuted} />
+        </View>
+        <Text style={ss.invalidTitle}>This link isn't valid</Text>
+        <Text style={ss.invalidSub}>
+          This tracking link may have expired. Contact the seller directly.
+        </Text>
+      </View>
+    );
+  }
+
+  // Map real data to UI
+  const orderId = `TRK-${order.id.substring(0, 6).toUpperCase()}`;
+  const orderItem = order.item_description;
+  const orderAddress = order.delivery_address;
+  const orderStatus = order.status as Status;
+  const sellerName = "Trackshpr";
+  const sellerPhone = "";
+
+  const pickedUpEvent = order.order_status_events?.find(
+    (e: { status: string }) => e.status === "picked_up",
+  );
+  const pickedUpAt = pickedUpEvent?.created_at
+    ? new Date(pickedUpEvent.created_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+
+  const events: OrderEvent[] = (order.order_status_events ?? []).map(
+    (ev: { status: string; created_at?: string }) => ({
+      label: mapEventLabel(ev.status),
+      time: new Date(ev.created_at ?? "").toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      done: ["picked_up", "delivered", "created"].includes(ev.status),
+    }),
+  );
+
+  const locationPings: LocationPing[] = (order.location_pings ?? []).map(
+    (p: { latitude: number; longitude: number; created_at?: string }) => ({
+      lat: p.latitude,
+      lng: p.longitude,
+      time: p.created_at ?? "",
+    }),
+  );
+
+  const lastPing = locationPings.length > 0 ? locationPings[0] : null;
+
+  const isDelivered = orderStatus === "delivered";
+  const showMap =
+    (orderStatus === "picked_up" || orderStatus === "in_transit") && !!lastPing;
 
   return (
     <View style={[ss.root, { paddingTop: insets.top }]}>
@@ -448,7 +552,7 @@ export default function TrackLinkScreen() {
             </View>
             <Text style={ss.celebrationTitle}>Order Delivered!</Text>
             <Text style={ss.celebrationSub}>
-              Your {order.item} was delivered successfully.
+              Your {orderItem} was delivered successfully.
             </Text>
             <View style={ss.celebrationBadge}>
               <Text style={ss.celebrationBadgeText}>
@@ -461,13 +565,13 @@ export default function TrackLinkScreen() {
           <View style={ss.heroCard}>
             {/* Top row: pill + order ID */}
             <View style={ss.heroTopRow}>
-              <StatusPill status={order.status} />
-              <Text style={ss.heroOrderId}>{order.id}</Text>
+              <StatusPill status={orderStatus} />
+              <Text style={ss.heroOrderId}>{orderId}</Text>
             </View>
 
             {/* Contextual headline */}
             <Text style={ss.heroHeadline}>
-              {getStatusHeadline(order.status)}
+              {getStatusHeadline(orderStatus)}
             </Text>
 
             {/* Delivering to address */}
@@ -479,13 +583,13 @@ export default function TrackLinkScreen() {
                 style={ss.pinIcon}
               />
               <Text style={ss.heroAddress} numberOfLines={2}>
-                Delivering to {order.address}
+                Delivering to {orderAddress}
               </Text>
             </View>
 
             {/* Progress steps */}
             <View style={{ marginTop: 18 }}>
-              <ProgressSteps status={order.status} />
+              <ProgressSteps status={orderStatus} />
             </View>
           </View>
         )}
@@ -523,24 +627,26 @@ export default function TrackLinkScreen() {
         <View style={ss.callBar}>
           <View style={{ flex: 1 }}>
             <Text style={ss.callBarMeta}>Questions? Call the seller</Text>
-            <Text style={ss.callBarName}>{order.sellerName}</Text>
+            <Text style={ss.callBarName}>{sellerName}</Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [ss.callBtn, pressed && { opacity: 0.75 }]}
-            onPress={() => Linking.openURL(`tel:${order.sellerPhone}`)}
-            accessibilityLabel={`Call ${order.sellerName}`}
-          >
-            <Feather name="phone" size={18} color={colors.success} />
-          </Pressable>
+          {sellerPhone ? (
+            <Pressable
+              style={({ pressed }) => [ss.callBtn, pressed && { opacity: 0.75 }]}
+              onPress={() => Linking.openURL(`tel:${sellerPhone}`)}
+              accessibilityLabel={`Call ${sellerName}`}
+            >
+              <Feather name="phone" size={18} color={colors.success} />
+            </Pressable>
+          ) : null}
         </View>
 
         {/* ── Detail Card ───────────────────────────────────────────────── */}
         <View style={ss.detailCard}>
-          <DetailRow label="Item" value={order.item} />
-          <DetailRow label="Picked up at" value={order.pickedUpAt} mono />
+          <DetailRow label="Item" value={orderItem} />
+          <DetailRow label="Picked up at" value={pickedUpAt} mono />
           <DetailRow
             label="Amount to pay"
-            value={formatAmount(order.amount)}
+            value={formatAmount(0)}
             mono
             valueFontSize={15}
             valueColor={colors.success}
@@ -552,13 +658,13 @@ export default function TrackLinkScreen() {
         {/* ── Timeline ──────────────────────────────────────────────────── */}
         <View style={ss.timelineSection}>
           <Text style={ss.timelineTitle}>Delivery timeline</Text>
-          {order.events.map((evt, i) => (
+          {events.map((evt, i) => (
             <EventRow
               key={`${evt.label}-${i}`}
               event={evt}
-              isLast={i === order.events.length - 1}
+              isLast={i === events.length - 1}
               index={i}
-              total={order.events.length}
+              total={events.length}
             />
           ))}
         </View>
@@ -586,6 +692,37 @@ const ss = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.surface,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: layout.screenPaddingH,
+  },
+
+  // Invalid link screen
+  invalidIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.infoBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  invalidTitle: {
+    fontSize: 18,
+    fontFamily: font.sans.bold,
+    color: colors.textPrimary,
+    letterSpacing: -0.36,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  invalidSub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
   },
 
   // Header

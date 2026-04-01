@@ -1,14 +1,11 @@
 /**
  * Home / Dashboard tab (DS §8.1, §8.4).
  */
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { View, ScrollView, StyleSheet, Text, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
-import { supabase } from "@/src/lib/supabase";
-import { fetchProfile } from "@/src/lib/supabaseQueries";
 import { useSession } from "@/src/hooks/useSession";
 import { useProfile } from "@/src/hooks/useProfile";
 import { useTheme } from "@/src/stores/themeStore";
@@ -109,31 +106,6 @@ export default function HomeScreen() {
   const statsFailed = todayOrders.filter((o) => o.status === "failed").length;
   const recentOrders = orders.slice(0, 3);
 
-  const [profileIncomplete, setProfileIncomplete] = useState(false);
-  const isFocused = useIsFocused();
-
-  useEffect(() => {
-    if (!isFocused) return;
-
-    async function checkProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setProfileIncomplete(false);
-        return;
-      }
-
-      try {
-        const profile = await fetchProfile(user.id);
-        setProfileIncomplete(!profile?.onboarding_complete);
-      } catch {
-        // Missing profile row should still prompt completion.
-        setProfileIncomplete(true);
-      }
-    }
-    checkProfile();
-  }, [isFocused]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -146,7 +118,9 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Profile incomplete banner ─────────────────────────────── */}
-        {profileIncomplete && <IncompleteProfileBanner />}
+        {profile && profile.onboarding_complete === false && (
+          <IncompleteProfileBanner onPress={() => router.push("/(auth)/profile-setup")} />
+        )}
 
         {/* ── Header ───────────────────────────────────────────────── */}
         <HomeHeader

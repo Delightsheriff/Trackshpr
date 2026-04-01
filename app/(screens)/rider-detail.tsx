@@ -4,11 +4,15 @@
  */
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useRider } from "@/src/hooks";
+import { supabase } from "@/src/lib/supabase";
+import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -72,6 +76,32 @@ export default function RiderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data: rider, isLoading, isError } = useRider(id);
+
+  const { userId } = useSession();
+
+  const { data: deliveries, isLoading: deliveriesLoading } = useQuery({
+    queryKey: ['rider-deliveries', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, item_description, status, created_at, customer_name')
+        .eq('rider_id', id)
+        .eq('seller_id', userId!)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!id && !!userId,
+  });
+
+  const stats = useMemo(() => {
+    const total     = deliveries?.length ?? 0
+    const delivered = deliveries?.filter(d => d.status === 'delivered').length ?? 0
+    const failed    = deliveries?.filter(d => d.status === 'failed').length ?? 0
+    const rate      = total > 0 ? Math.round((delivered / total) * 100) : 0
+    return { total, delivered, failed, rate }
+  }, [deliveries]);
 
   const AVATAR_COLORS = [
     { bg: colors.primarySoft, fg: colors.primary },
@@ -218,21 +248,21 @@ export default function RiderDetailScreen() {
         {/* ── Stats Grid ──────────────────────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard
-            value={String(rider.total_deliveries)}
+            value={String(stats.delivered)}
             label="DELIVERED"
             valueColor={colors.success}
             colors={colors}
             isDark={isDark}
           />
           <StatCard
-            value="—"
+            value={String(stats.failed)}
             label="FAILED"
-            valueColor={colors.textMuted}
+            valueColor={stats.failed > 0 ? colors.error : colors.textMuted}
             colors={colors}
             isDark={isDark}
           />
           <StatCard
-            value={rider.total_deliveries > 0 ? "100%" : "—"}
+            value={stats.total > 0 ? `${stats.rate}%` : "—"}
             label="SUCCESS"
             valueColor={colors.primary}
             colors={colors}
@@ -250,17 +280,91 @@ export default function RiderDetailScreen() {
           </View>
         )}
 
-        {/* ── Recent Deliveries — placeholder until orders are live ───── */}
+        {/* ── Recent Deliveries ────────────────────────────────────────── */}
         <View style={styles.deliveriesSection}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
             Recent Deliveries
           </Text>
-          <View style={[styles.emptyDeliveries, { backgroundColor: colors.surfaceCard }, cardShadow]}>
-            <Feather name="package" size={24} color={colors.textMuted} style={{ marginBottom: 8 }} />
-            <Text style={[styles.emptyDeliveriesText, { color: colors.textMuted }]}>
-              Delivery history coming soon
+
+          {deliveriesLoading && (
+            <View style={{ gap: layout.listGap }}>
+              {[0, 1, 2].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    backgroundColor: colors.surfaceContainer,
+                    borderRadius: radius.xl,
+                    height: 72,
+                  }}
+                />
+              ))}
+            </View>
+          )}
+
+          {!deliveriesLoading && (deliveries?.length ?? 0) === 0 && (
+            <Text
+              style={{
+                color: colors.textMuted,
+                textAlign: 'center',
+                fontFamily: font.sans.regular,
+                fontSize: 13,
+              }}
+            >
+              No deliveries yet for this rider
             </Text>
-          </View>
+          )}
+
+          {!deliveriesLoading && (deliveries?.length ?? 0) > 0 && (
+            <View style={{ gap: layout.listGap }}>
+              {deliveries!.map((delivery) => {
+                const statusDotColor =
+                  delivery.status === 'delivered'
+                    ? colors.success
+                    : delivery.status === 'failed'
+                    ? colors.error
+                    : delivery.status === 'in_transit' || delivery.status === 'picked_up'
+                    ? colors.info
+                    : colors.warning;
+
+                const formattedDate = new Date(delivery.created_at).toLocaleDateString(
+                  'en-NG',
+                  { day: 'numeric', month: 'short' },
+                );
+
+                return (
+                  <View
+                    key={delivery.id}
+                    style={[
+                      styles.deliveryCard,
+                      { backgroundColor: colors.surfaceCard },
+                      cardShadow,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.deliveryDot,
+                        { backgroundColor: statusDotColor },
+                      ]}
+                    />
+                    <View style={styles.deliveryMiddle}>
+                      <Text
+                        style={[styles.deliveryTitle, { color: colors.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {delivery.item_description}
+                      </Text>
+                      <Text style={[styles.deliveryCustomer, { color: colors.textMuted }]}>
+                        {delivery.customer_name ?? '—'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.deliveryDate, { color: colors.textMuted }]}>
+                      {formattedDate}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         <View style={{ height: 32 }} />
@@ -315,6 +419,23 @@ const styles = StyleSheet.create({
 
   deliveriesSection: { paddingHorizontal: layout.screenPaddingH, paddingTop: 14 },
   sectionLabel: { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.1, textTransform: "uppercase", marginBottom: 10 },
-  emptyDeliveries: { borderRadius: radius.xl, padding: 24, alignItems: "center", justifyContent: "center" },
-  emptyDeliveriesText: { fontSize: 13, fontFamily: font.sans.regular },
+
+  deliveryCard: {
+    borderRadius: radius.xl,
+    padding: layout.cardPadding,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  deliveryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  deliveryMiddle: { flex: 1, gap: 2 },
+  deliveryTitle: { fontSize: 13, fontFamily: font.sans.semiBold, fontWeight: "600", letterSpacing: -0.13 },
+  deliveryCustomer: { fontSize: 13, fontFamily: font.sans.regular },
+  deliveryDate: { fontSize: 11, fontFamily: font.mono.regular, flexShrink: 0 },
 });

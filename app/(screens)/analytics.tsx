@@ -1,120 +1,21 @@
 /**
  * Analytics screen — period-based delivery stats, bar chart, leaderboard (DS §8.1).
- * TODO: replace ANALYTICS and LEADERBOARD with real Supabase query.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
+import { useSession } from "@/src/hooks/useSession";
+import { supabase } from "@/src/lib/supabase";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// ── Dummy data — TODO: replace with real Supabase query ──────────────────────
-const ANALYTICS = {
-  "7": {
-    totalOrders: 42,
-    successRate: 88,
-    avgTime: "1h 28m",
-    failed: 5,
-    totalTrend: "+4 from last week",
-    rateTrend: "+2% improvement",
-    failTrend: "↓ 1 from last week",
-    chart: [
-      { total: 5, done: 4 },
-      { total: 8, done: 7 },
-      { total: 4, done: 3 },
-      { total: 7, done: 6 },
-      { total: 9, done: 8 },
-      { total: 6, done: 5 },
-      { total: 3, done: 3 },
-    ],
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-  },
-  "30": {
-    totalOrders: 147,
-    successRate: 91,
-    avgTime: "1h 42m",
-    failed: 13,
-    totalTrend: "+23 from last month",
-    rateTrend: "+3% improvement",
-    failTrend: "↓ 2 from last month",
-    chart: [
-      { total: 45, done: 38 },
-      { total: 52, done: 48 },
-      { total: 35, done: 30 },
-      { total: 60, done: 55 },
-      { total: 48, done: 42 },
-      { total: 70, done: 65 },
-      { total: 55, done: 50 },
-      { total: 40, done: 35 },
-      { total: 58, done: 54 },
-      { total: 62, done: 58 },
-      { total: 45, done: 40 },
-      { total: 72, done: 68 },
-      { total: 50, done: 44 },
-      { total: 68, done: 62 },
-    ],
-    labels: [
-      "1",
-      "3",
-      "5",
-      "7",
-      "9",
-      "11",
-      "13",
-      "15",
-      "17",
-      "19",
-      "21",
-      "23",
-      "25",
-      "27",
-    ],
-  },
-  "90": {
-    totalOrders: 398,
-    successRate: 89,
-    avgTime: "1h 55m",
-    failed: 42,
-    totalTrend: "+67 from last quarter",
-    rateTrend: "+1% improvement",
-    failTrend: "↓ 8 from last quarter",
-    chart: [
-      { total: 120, done: 105 },
-      { total: 95, done: 80 },
-      { total: 110, done: 100 },
-      { total: 130, done: 118 },
-      { total: 88, done: 75 },
-      { total: 145, done: 132 },
-      { total: 105, done: 95 },
-      { total: 115, done: 102 },
-      { total: 98, done: 88 },
-      { total: 140, done: 128 },
-      { total: 125, done: 112 },
-      { total: 108, done: 96 },
-      { total: 135, done: 122 },
-      { total: 118, done: 105 },
-    ],
-    labels: [
-      "W1",
-      "W2",
-      "W3",
-      "W4",
-      "W5",
-      "W6",
-      "W7",
-      "W8",
-      "W9",
-      "W10",
-      "W11",
-      "W12",
-      "W13",
-      "W14",
-    ],
-  },
-} as const;
 
 type Period = "7" | "30" | "90";
 
@@ -138,7 +39,9 @@ function rankBadgeColors(
 // ── Bar Chart ─────────────────────────────────────────────────────────────────
 const BAR_MAX_H = 72;
 
-function BarChart({ data }: { data: (typeof ANALYTICS)["7"] }) {
+type ChartEntry = { day: number; total: number; delivered: number };
+
+function BarChart({ data }: { data: ChartEntry[] }) {
   const { colors, isDark } = useTheme();
   const cardShadow = isDark
     ? {
@@ -155,7 +58,7 @@ function BarChart({ data }: { data: (typeof ANALYTICS)["7"] }) {
         shadowRadius: 8,
         elevation: 2,
       };
-  const maxVal = Math.max(...data.chart.map((d) => d.total));
+  const maxVal = Math.max(...data.map((d) => d.total), 1);
 
   return (
     <View
@@ -198,11 +101,13 @@ function BarChart({ data }: { data: (typeof ANALYTICS)["7"] }) {
 
       {/* Bars */}
       <View style={styles.chartArea}>
-        {data.chart.map((d, i) => {
+        {data.map((d, i) => {
           const totalH =
             maxVal > 0 ? Math.max(4, (d.total / maxVal) * BAR_MAX_H) : 4;
           const doneH =
-            maxVal > 0 ? Math.max(4, (d.done / maxVal) * BAR_MAX_H) : 4;
+            maxVal > 0
+              ? Math.max(4, (d.delivered / maxVal) * BAR_MAX_H)
+              : 4;
           return (
             <View key={i} style={styles.barGroup}>
               <View
@@ -228,12 +133,12 @@ function BarChart({ data }: { data: (typeof ANALYTICS)["7"] }) {
 
       {/* Labels */}
       <View style={styles.chartLabelsRow}>
-        {data.labels.map((lbl, i) => (
+        {data.map((d, i) => (
           <Text
             key={i}
             style={[styles.chartLabel, { color: colors.textMuted }]}
           >
-            {lbl}
+            {d.day}
           </Text>
         ))}
       </View>
@@ -266,7 +171,7 @@ function LeaderboardItem({
     "2": { bg: colors.successBg, fg: colors.success },
     "3": { bg: colors.warningBg, fg: colors.warning },
   };
-  const avatarCfg = AVATAR_COLORS[rider.id] ?? {
+  const avatarCfg = AVATAR_COLORS[String(rider.rank)] ?? {
     bg: colors.surfaceContainer,
     fg: colors.textMuted,
   };
@@ -322,8 +227,134 @@ export default function AnalyticsScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<Period>("7");
+  const { userId } = useSession();
+  const showToast = useToastStore((s) => s.show);
 
-  const data = ANALYTICS[period];
+  // ── Fetch orders ─────────────────────────────────────────────────────────
+  const { data: orders, isLoading } = useQuery({
+    queryKey: queryKeys.orders(userId ?? ""),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "id, item_description, status, created_at, rider_id, customer_name, delivery_address",
+        )
+        .eq("seller_id", userId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  // ── Fetch riders ─────────────────────────────────────────────────────────
+  const { data: riders } = useQuery({
+    queryKey: queryKeys.riders(userId ?? ""),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("riders")
+        .select("id, name")
+        .eq("seller_id", userId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  // ── Period-filtered orders ────────────────────────────────────────────────
+  const periodOrders = useMemo(() => {
+    if (!orders) return [];
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - Number(period));
+    return orders.filter((o) => new Date(o.created_at ?? "") >= cutoff);
+  }, [orders, period]);
+
+  const stats = useMemo(() => {
+    const total = periodOrders.length;
+    const delivered = periodOrders.filter(
+      (o) => o.status === "delivered",
+    ).length;
+    const failed = periodOrders.filter((o) => o.status === "failed").length;
+    const rate = total > 0 ? Math.round((delivered / total) * 100) : 0;
+    return { total, delivered, failed, rate };
+  }, [periodOrders]);
+
+  // ── Chart data (last 14 days) ─────────────────────────────────────────────
+  const chartData = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (13 - i));
+      const dayOrders = (orders ?? []).filter((o) => {
+        if (!o.created_at) return false;
+        return (
+          new Date(o.created_at).toDateString() === date.toDateString()
+        );
+      });
+      return {
+        day: date.getDate(),
+        total: dayOrders.length,
+        delivered: dayOrders.filter((o) => o.status === "delivered").length,
+      };
+    });
+  }, [orders]);
+
+  // ── Leaderboard ───────────────────────────────────────────────────────────
+  const leaderboard = useMemo<LeaderboardRider[]>(() => {
+    if (!riders || !orders) return [];
+    return riders
+      .map((r) => {
+        const riderOrders = orders.filter((o) => o.rider_id === r.id);
+        const delivered = riderOrders.filter(
+          (o) => o.status === "delivered",
+        ).length;
+        const total = riderOrders.length;
+        const rate =
+          total > 0 ? Math.round((delivered / total) * 100) : 0;
+        const nameParts = (r.name ?? "").trim().split(/\s+/);
+        const initials =
+          nameParts.length >= 2
+            ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+            : (r.name ?? "").slice(0, 2).toUpperCase();
+        return { id: r.id, name: r.name ?? "", initials, delivered, total, rate };
+      })
+      .sort((a, b) => b.delivered - a.delivered)
+      .slice(0, 5)
+      .map((r, i) => ({
+        id: r.id,
+        name: r.name,
+        initials: r.initials,
+        successRate: r.total > 0 ? `${r.rate}%` : "0%",
+        count: r.delivered,
+        rank: i + 1,
+      }));
+  }, [riders, orders]);
+
+  // ── CSV export ────────────────────────────────────────────────────────────
+  const exportCSV = async () => {
+    if (!orders?.length) {
+      showToast("No orders to export", "info");
+      return;
+    }
+    const header = "ID,Item,Customer,Status,Date\n";
+    const rows = orders
+      .map((o) =>
+        [
+          o.id,
+          (o.item_description ?? "").replace(/,/g, ";"),
+          (o.customer_name ?? "").replace(/,/g, ";"),
+          o.status ?? "",
+          o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
+        ].join(","),
+      )
+      .join("\n");
+    const path =
+      (FileSystem.documentDirectory ?? "") + "trackshpr-orders.csv";
+    await FileSystem.writeAsStringAsync(path, header + rows);
+    await Sharing.shareAsync(path, {
+      mimeType: "text/csv",
+      dialogTitle: "Export Orders",
+    });
+  };
 
   const cardShadow = isDark
     ? {
@@ -340,33 +371,6 @@ export default function AnalyticsScreen() {
         shadowRadius: 8,
         elevation: 2,
       };
-
-  const LEADERBOARD: LeaderboardRider[] = [
-    {
-      id: "1",
-      name: "Kunle Adeyemi",
-      initials: "KA",
-      successRate: "95%",
-      count: 42,
-      rank: 1,
-    },
-    {
-      id: "2",
-      name: "Emeka Musa",
-      initials: "EM",
-      successRate: "97%",
-      count: 28,
-      rank: 2,
-    },
-    {
-      id: "3",
-      name: "Taiwo James",
-      initials: "TJ",
-      successRate: "83%",
-      count: 15,
-      rank: 3,
-    },
-  ];
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -390,13 +394,13 @@ export default function AnalyticsScreen() {
           Analytics
         </Text>
 
-        {/* TODO: open share sheet */}
         <Pressable
           style={[
             styles.iconBtn,
             { backgroundColor: colors.surfaceCard },
             cardShadow,
           ]}
+          onPress={exportCSV}
           hitSlop={8}
         >
           <Feather name="download" size={16} color={colors.textPrimary} />
@@ -461,87 +465,102 @@ export default function AnalyticsScreen() {
           })}
         </View>
 
-        {/* ── 2×2 Stat cards ──────────────────────────────────────────────── */}
-        <View style={styles.statsGrid}>
-          {/* Total Orders */}
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-              TOTAL ORDERS
-            </Text>
-            <Text style={[styles.statValue, { color: colors.textPrimary }]}>
-              {data.totalOrders}
-            </Text>
-            <Text style={[styles.statTrend, { color: colors.success }]}>
-              ↑ {data.totalTrend}
-            </Text>
+        {/* ── 2x2 Stat cards (or skeletons) ───────────────────────────────── */}
+        {isLoading ? (
+          <View style={styles.statsGrid}>
+            {[0, 1, 2, 3].map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.statCard,
+                  styles.skeleton,
+                  { backgroundColor: colors.surfaceContainer },
+                ]}
+              />
+            ))}
           </View>
+        ) : (
+          <View style={styles.statsGrid}>
+            {/* Total Orders */}
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                TOTAL ORDERS
+              </Text>
+              <Text style={[styles.statValue, { color: colors.textPrimary }]}>
+                {stats.total}
+              </Text>
+              <Text style={[styles.statTrend, { color: colors.textMuted }]}>
+                Last {period} days
+              </Text>
+            </View>
 
-          {/* Success Rate */}
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-              SUCCESS RATE
-            </Text>
-            <Text style={[styles.statValue, { color: colors.success }]}>
-              {data.successRate}%
-            </Text>
-            <Text style={[styles.statTrend, { color: colors.success }]}>
-              ↑ {data.rateTrend}
-            </Text>
-          </View>
+            {/* Success Rate */}
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                SUCCESS RATE
+              </Text>
+              <Text style={[styles.statValue, { color: colors.success }]}>
+                {stats.rate}%
+              </Text>
+              <Text style={[styles.statTrend, { color: colors.success }]}>
+                Delivered
+              </Text>
+            </View>
 
-          {/* Avg Delivery Time */}
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-              AVG TIME
-            </Text>
-            <Text style={[styles.statValue, { color: colors.info }]}>
-              {data.avgTime}
-            </Text>
-            <Text style={[styles.statTrend, { color: colors.textMuted }]}>
-              Per order
-            </Text>
-          </View>
+            {/* Delivered */}
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                DELIVERED
+              </Text>
+              <Text style={[styles.statValue, { color: colors.info }]}>
+                {stats.delivered}
+              </Text>
+              <Text style={[styles.statTrend, { color: colors.textMuted }]}>
+                Completed
+              </Text>
+            </View>
 
-          {/* Failed Orders */}
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
-            ]}
-          >
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-              FAILED
-            </Text>
-            <Text style={[styles.statValue, { color: colors.error }]}>
-              {data.failed}
-            </Text>
-            <Text style={[styles.statTrend, { color: colors.error }]}>
-              {data.failTrend}
-            </Text>
+            {/* Failed Orders */}
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                FAILED
+              </Text>
+              <Text style={[styles.statValue, { color: colors.error }]}>
+                {stats.failed}
+              </Text>
+              <Text style={[styles.statTrend, { color: colors.error }]}>
+                Not delivered
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* ── Bar chart ────────────────────────────────────────────────────── */}
-        <BarChart data={data} />
+        <BarChart data={chartData} />
 
         {/* ── Leaderboard ──────────────────────────────────────────────────── */}
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -554,13 +573,24 @@ export default function AnalyticsScreen() {
             cardShadow,
           ]}
         >
-          {LEADERBOARD.map((rider, i) => (
-            <LeaderboardItem
-              key={rider.id}
-              rider={rider}
-              isLast={i === LEADERBOARD.length - 1}
-            />
-          ))}
+          {leaderboard.length === 0 ? (
+            <Text
+              style={[
+                styles.lbMeta,
+                { color: colors.textMuted, paddingVertical: 12 },
+              ]}
+            >
+              No rider data yet.
+            </Text>
+          ) : (
+            leaderboard.map((rider, i) => (
+              <LeaderboardItem
+                key={rider.id}
+                rider={rider}
+                isLast={i === leaderboard.length - 1}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
@@ -631,6 +661,10 @@ const styles = StyleSheet.create({
     width: "48%",
     borderRadius: radius.xl,
     padding: layout.cardPadding,
+  },
+  skeleton: {
+    height: 90,
+    borderRadius: radius.xl,
   },
   statLabel: {
     fontSize: 9,

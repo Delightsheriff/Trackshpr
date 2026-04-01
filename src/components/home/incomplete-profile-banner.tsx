@@ -5,11 +5,11 @@ import { router } from "expo-router";
 import { useTheme } from "@/src/stores/themeStore";
 import { radius, font, layout } from "@/src/constants/tokens";
 
-export function IncompleteProfileBanner() {
+export function IncompleteProfileBanner({ onPress }: { onPress?: () => void }) {
   const { colors } = useTheme();
   return (
     <Pressable
-      onPress={() => router.push("/(auth)/profile-setup")}
+      onPress={onPress ?? (() => router.push("/(auth)/profile-setup"))}
       style={[styles.profileBanner, { backgroundColor: colors.warningBg }]}
     >
       <View

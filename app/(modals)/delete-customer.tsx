@@ -4,7 +4,9 @@
  * TODO: replace deleteCustomer with Supabase delete.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { supabase } from "@/src/lib/supabase";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
@@ -14,16 +16,48 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function DeleteCustomerSheet() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
-  const sheetRef = useRef<BottomSheet>(null);
-  const deleteCustomer = useDataStore((s) => s.deleteCustomer);
-  const showToast = useToastStore((s) => s.show);
+  const sheetRef    = useRef<BottomSheet>(null);
+  const { userId }  = useSession();
+  const queryClient = useQueryClient();
+  const showToast   = useToastStore((s) => s.show);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('address_book')
+        .delete()
+        .eq('id', id)
+        .eq('seller_id', userId!);
+      if (error) throw error;
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.customers(userId ?? '') });
+      const prev = queryClient.getQueryData(queryKeys.customers(userId ?? ''));
+      queryClient.setQueryData(
+        queryKeys.customers(userId ?? ''),
+        (old: any[] | undefined) => (old ?? []).filter((c: any) => c.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_err: unknown, _vars: unknown, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(queryKeys.customers(userId ?? ''), ctx.prev);
+      showToast('Could not remove customer.', 'error');
+    },
+    onSuccess: () => {
+      showToast('Customer removed', 'success');
+      router.back();
+    },
+  });
+
+  const handleDelete = () => deleteMutation.mutate();
 
   const handleClose = useCallback(() => router.back(), []);
   const renderBackdrop = useCallback(
@@ -37,12 +71,6 @@ export default function DeleteCustomerSheet() {
     ),
     [],
   );
-
-  const handleDelete = () => {
-    deleteCustomer(id);
-    showToast(`${name} removed`, "error");
-    router.back();
-  };
 
   const sheetShadow = isDark
     ? {
@@ -92,13 +120,16 @@ export default function DeleteCustomerSheet() {
           <View style={styles.btnWrap}>
             <Pressable
               onPress={handleDelete}
+              disabled={deleteMutation.isPending}
               android_ripple={{
                 color: "rgba(255,255,255,0.2)",
                 borderless: false,
               }}
               style={[styles.dangerBtn, { backgroundColor: colors.error }]}
             >
-              <Text style={styles.dangerBtnText}>Yes, Remove Customer</Text>
+              {deleteMutation.isPending
+                ? <ActivityIndicator size="small" color="white" />
+                : <Text style={styles.dangerBtnText}>Yes, Remove Customer</Text>}
             </Pressable>
             <Pressable
               onPress={() => router.back()}

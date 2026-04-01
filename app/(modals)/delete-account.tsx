@@ -4,6 +4,7 @@
  */
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useDeleteAccount } from "@/src/hooks";
+import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
@@ -11,6 +12,7 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useRef } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
@@ -22,6 +24,8 @@ export default function DeleteAccountSheet() {
   const sheetRef = useRef<BottomSheet>(null);
   const showToast = useToastStore((s) => s.show);
   const deleteAccount = useDeleteAccount();
+  const queryClient = useQueryClient();
+  const resetDraft = useOrderStore((s) => s.reset);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -40,8 +44,8 @@ export default function DeleteAccountSheet() {
   const handleDelete = () => {
     deleteAccount.mutate(undefined, {
       onSuccess: () => {
-        router.dismissAll();
-        router.replace("/(auth)/sign-in");
+        queryClient.clear();
+        resetDraft();
       },
       onError: () => {
         showToast("Could not delete account. Please try again.", "error");

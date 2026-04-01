@@ -1,13 +1,15 @@
 /**
  * Fleet Map screen — full-screen live rider map with floating cards (DS §8.1).
- * TODO: replace FLEET_RIDERS with real Supabase real-time subscription.
  */
 import { font, radius } from "@/src/constants/tokens";
+import { useSession } from "@/src/hooks/useSession";
+import { supabase } from "@/src/lib/supabase";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import Animated, {
@@ -19,61 +21,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Dummy data — TODO: replace with real Supabase real-time query ─────────────
-// avatarBg/avatarFg intentionally left as static brand values; they are
-// overridden with live color tokens inside the component.
-const FLEET_RIDERS_RAW = [
-  {
-    id: "1",
-    name: "Kunle",
-    initials: "KA",
-    lat: 6.455,
-    lng: 3.3841,
-    status: "in_transit" as const,
-    item: "Adire Maxi Dress × 2",
-    dest: "Lekki Phase 1",
-    time: "12m ago",
-    stale: false,
-    avatarVariant: "primary" as const,
-  },
-  {
-    id: "2",
-    name: "Emeka",
-    initials: "EM",
-    lat: 6.4698,
-    lng: 3.358,
-    status: "delivered" as const,
-    item: "Beaded Necklace Set",
-    dest: "Surulere",
-    time: "1h ago",
-    stale: false,
-    avatarVariant: "success" as const,
-  },
-  {
-    id: "3",
-    name: "Taiwo",
-    initials: "TJ",
-    lat: 6.453,
-    lng: 3.395,
-    status: "in_transit" as const,
-    item: "Ankara Tote Bag",
-    dest: "Yaba",
-    time: "48m ago",
-    stale: true,
-    avatarVariant: "warning" as const,
-  },
-];
-
-type RiderRaw = (typeof FLEET_RIDERS_RAW)[0];
-
 // ── Status pill sub-component ─────────────────────────────────────────────────
 function Pill({ status }: { status: string }) {
   const { colors } = useTheme();
   const cfg =
     status === "in_transit"
       ? { bg: colors.infoBg, fg: colors.info, label: "Transit" }
-      : status === "delivered"
-        ? { bg: colors.successBg, fg: colors.success, label: "Delivered" }
+      : status === "picked_up"
+        ? { bg: colors.primarySoft, fg: colors.primary, label: "Picked Up" }
         : { bg: colors.warningBg, fg: colors.warning, label: "Pending" };
 
   return (
@@ -130,7 +85,95 @@ export default function FleetMapScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
-  const [selectedId, setSelectedId] = useState(FLEET_RIDERS_RAW[0].id);
+  const { userId } = useSession();
+  const queryClient = useQueryClient();
+
+  // ── Fetch active orders with GPS ──────────────────────────────────────────
+  const { data: activeOrders } = useQuery({
+    queryKey: ["fleet-orders", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `id, status, item_description, delivery_address, rider_id, riders(id,name,phone), location_pings(latitude,longitude,created_at)`,
+        )
+        .eq("seller_id", userId!)
+        .in("status", ["pending", "picked_up", "in_transit"])
+        .order("created_at", {
+          referencedTable: "location_pings",
+          ascending: false,
+        });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  // ── Realtime subscription ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel("fleet-pings")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "location_pings" },
+        () =>
+          queryClient.invalidateQueries({ queryKey: ["fleet-orders", userId] }),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `seller_id=eq.${userId}`,
+        },
+        () =>
+          queryClient.invalidateQueries({ queryKey: ["fleet-orders", userId] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  // ── Build fleet riders array from real data ───────────────────────────────
+  const fleetRiders = useMemo(() => {
+    if (!activeOrders) return [];
+    return activeOrders
+      .filter(
+        (o) => o.location_pings && (o.location_pings as any[]).length > 0,
+      )
+      .map((o) => {
+        const pings = o.location_pings as any[];
+        const lastPing = pings[0];
+        const stale =
+          Date.now() -
+            new Date(lastPing.created_at ?? "").getTime() >
+          30 * 60 * 1000;
+        const rider = o.riders as any;
+        const name = rider?.name ?? "Unknown";
+        return {
+          id: o.id,
+          name,
+          initials: name
+            .split(" ")
+            .map((w: string) => w[0] ?? "")
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+          lat: lastPing.latitude,
+          lng: lastPing.longitude,
+          status: o.status as "in_transit" | "picked_up" | "pending",
+          item: o.item_description,
+          dest: o.delivery_address,
+          stale,
+          avatarVariant: "primary" as const,
+        };
+      });
+  }, [activeOrders]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const overlayBg = isDark ? "rgba(15,14,26,0.95)" : "rgba(250,244,255,0.95)";
   const fadeBg = isDark ? "rgba(15,14,26,0.5)" : "rgba(250,244,255,0.5)";
@@ -168,27 +211,19 @@ export default function FleetMapScreen() {
       };
 
   // Resolve avatar colors from live tokens
-  const AVATAR_VARIANTS = {
-    primary: { bg: colors.primarySoft, fg: colors.primary },
-    success: { bg: colors.successBg, fg: colors.success },
-    warning: { bg: colors.warningBg, fg: colors.warning },
-  };
+  const avatarBg = colors.primarySoft;
+  const avatarFg = colors.primary;
 
-  const FLEET_RIDERS = FLEET_RIDERS_RAW.map((r) => ({
-    ...r,
-    avatarBg: AVATAR_VARIANTS[r.avatarVariant].bg,
-    avatarFg: AVATAR_VARIANTS[r.avatarVariant].fg,
-  }));
-
-  type Rider = (typeof FLEET_RIDERS)[0];
+  type Rider = (typeof fleetRiders)[0];
 
   function pinColor(r: Rider): string {
     if (r.stale) return colors.warning;
-    if (r.status === "delivered") return colors.success;
-    return colors.primary;
+    if (r.status === "in_transit") return colors.primary;
+    if (r.status === "picked_up") return colors.info;
+    return colors.warning;
   }
 
-  const activeCount = FLEET_RIDERS.filter(
+  const activeCount = fleetRiders.filter(
     (r) => r.status === "in_transit",
   ).length;
 
@@ -223,7 +258,7 @@ export default function FleetMapScreen() {
         showsUserLocation={false}
         showsCompass={false}
       >
-        {FLEET_RIDERS.map((r) => (
+        {fleetRiders.map((r) => (
           <Marker
             key={r.id}
             coordinate={{ latitude: r.lat, longitude: r.lng }}
@@ -279,101 +314,149 @@ export default function FleetMapScreen() {
         </View>
       </View>
 
-      {/* ── Bottom overlay ────────────────────────────────────────────────── */}
-      <View style={styles.bottomOverlay}>
-        {/* Soft fade strip above cards */}
-        <View style={[styles.fadeStrip, { backgroundColor: fadeBg }]} />
-
-        {/* Cards background */}
+      {/* ── Empty state overlay ───────────────────────────────────────────── */}
+      {fleetRiders.length === 0 && (
         <View
           style={[
-            styles.cardsBackground,
-            { paddingBottom: insets.bottom + 8, backgroundColor: overlayBg },
+            styles.emptyOverlay,
+            {
+              backgroundColor:
+                isDark
+                  ? `rgba(15,14,26,0.92)`
+                  : `rgba(250,244,255,0.92)`,
+            },
           ]}
         >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsScroll}
+          <View
+            style={[
+              styles.emptyIconContainer,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
           >
-            {FLEET_RIDERS.map((r) => {
-              const isSelected = selectedId === r.id;
-              return (
-                <Pressable
-                  key={r.id}
-                  style={[
-                    styles.fleetCard,
-                    { backgroundColor: colors.surfaceCard },
-                    cardShadow,
-                    isSelected && {
-                      borderWidth: 2,
-                      borderColor: colors.primary,
-                    },
-                  ]}
-                  onPress={() => selectRider(r)}
-                >
-                  {/* Top row */}
-                  <View style={styles.fleetCardTop}>
-                    <View style={styles.fleetCardLeft}>
-                      {/* Avatar */}
-                      <View
-                        style={[
-                          styles.cardAvatar,
-                          { backgroundColor: r.avatarBg },
-                        ]}
-                      >
-                        <Text
-                          style={[styles.cardAvatarText, { color: r.avatarFg }]}
+            <Feather name="map-pin" size={32} color={colors.textMuted} />
+          </View>
+          <Text
+            style={[
+              styles.emptyTitle,
+              { color: colors.textPrimary },
+            ]}
+          >
+            No active deliveries
+          </Text>
+          <Text
+            style={[
+              styles.emptySub,
+              { color: colors.textMuted },
+            ]}
+          >
+            Start a delivery to see riders on the map
+          </Text>
+          <Pressable
+            style={[styles.emptyCta, { backgroundColor: colors.primary }]}
+            onPress={() => router.push("/(modals)/new-delivery")}
+          >
+            <Text style={[styles.emptyCtaText, { color: colors.white }]}>
+              New Delivery
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Bottom overlay ────────────────────────────────────────────────── */}
+      {fleetRiders.length > 0 && (
+        <View style={styles.bottomOverlay}>
+          {/* Soft fade strip above cards */}
+          <View style={[styles.fadeStrip, { backgroundColor: fadeBg }]} />
+
+          {/* Cards background */}
+          <View
+            style={[
+              styles.cardsBackground,
+              { paddingBottom: insets.bottom + 8, backgroundColor: overlayBg },
+            ]}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {fleetRiders.map((r) => {
+                const isSelected = selectedId === r.id;
+                return (
+                  <Pressable
+                    key={r.id}
+                    style={[
+                      styles.fleetCard,
+                      { backgroundColor: colors.surfaceCard },
+                      cardShadow,
+                      isSelected && {
+                        borderWidth: 2,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => selectRider(r)}
+                  >
+                    {/* Top row */}
+                    <View style={styles.fleetCardTop}>
+                      <View style={styles.fleetCardLeft}>
+                        {/* Avatar */}
+                        <View
+                          style={[
+                            styles.cardAvatar,
+                            { backgroundColor: avatarBg },
+                          ]}
                         >
-                          {r.initials}
+                          <Text
+                            style={[styles.cardAvatarText, { color: avatarFg }]}
+                          >
+                            {r.initials}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.cardName,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {r.name}
                         </Text>
                       </View>
-                      <Text
-                        style={[styles.cardName, { color: colors.textPrimary }]}
-                      >
-                        {r.name}
-                      </Text>
+
+                      {/* Status or stale */}
+                      {r.stale ? <StaleBadge /> : <Pill status={r.status} />}
                     </View>
 
-                    {/* Status or stale */}
-                    {r.stale ? <StaleBadge /> : <Pill status={r.status} />}
-                  </View>
-
-                  {/* Item */}
-                  <Text
-                    style={[styles.cardItem, { color: colors.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {r.item}
-                  </Text>
-
-                  {/* Bottom row */}
-                  <View style={styles.fleetCardBottom}>
-                    <View style={styles.cardDestRow}>
-                      <Feather
-                        name="map-pin"
-                        size={11}
-                        color={colors.textMuted}
-                      />
-                      <Text
-                        style={[styles.cardDest, { color: colors.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {r.dest}
-                      </Text>
-                    </View>
+                    {/* Item */}
                     <Text
-                      style={[styles.cardTime, { color: colors.textMuted }]}
+                      style={[styles.cardItem, { color: colors.textMuted }]}
+                      numberOfLines={1}
                     >
-                      {r.time}
+                      {r.item}
                     </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+
+                    {/* Bottom row */}
+                    <View style={styles.fleetCardBottom}>
+                      <View style={styles.cardDestRow}>
+                        <Feather
+                          name="map-pin"
+                          size={11}
+                          color={colors.textMuted}
+                        />
+                        <Text
+                          style={[styles.cardDest, { color: colors.textMuted }]}
+                          numberOfLines={1}
+                        >
+                          {r.dest}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -429,6 +512,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+  },
+
+  // Empty state overlay
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  emptyIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+    textAlign: "center",
+  },
+  emptySub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  emptyCta: {
+    marginTop: 8,
+    borderRadius: radius.full,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+  },
+  emptyCtaText: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.14,
   },
 
   // Bottom overlay
@@ -507,11 +633,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.regular,
     flex: 1,
-  },
-  cardTime: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
-    flexShrink: 0,
   },
 
   // Status pill

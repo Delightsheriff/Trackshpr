@@ -2,13 +2,15 @@
  * Sign out confirmation bottom sheet.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
-import { supabase } from "@/src/lib/supabase";
+import { signOut } from "@/src/lib/auth";
+import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
@@ -19,6 +21,8 @@ export default function SignOutSheet() {
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet>(null);
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const resetDraft = useOrderStore((s) => s.reset);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -36,9 +40,9 @@ export default function SignOutSheet() {
 
   const handleSignOut = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
-    router.dismissAll();
-    router.replace("/(auth)/sign-in");
+    await signOut();
+    queryClient.clear();
+    resetDraft();
   };
 
   const sheetShadow = isDark
@@ -63,7 +67,7 @@ export default function SignOutSheet() {
           </View>
           <Text style={[styles.title, { color: colors.textPrimary }]}>Sign out?</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
-            You'll need to sign back in to access your{"\n"}Trackshpr account.
+            You&apos;ll need to sign back in to access your{"\n"}Trackshpr account.
           </Text>
           <View style={styles.btnWrap}>
             <Pressable

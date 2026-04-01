@@ -1,7 +1,6 @@
 /**
  * Rider Link screen — magic-link action page for riders.
  * Always light mode. DS tokens only — no theme store.
- * TODO: fetch from Supabase using token
  */
 import {
   colors,
@@ -10,13 +9,17 @@ import {
   layout,
   radius,
 } from "@/src/constants/tokens";
+import { supabase } from "@/src/lib/supabase";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -35,26 +38,13 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type Status = "pending" | "in_transit" | "delivered" | "failed";
+type Status = "pending" | "picked_up" | "in_transit" | "delivered" | "failed";
 
 interface TimelineEvent {
   label: string;
   time: string;
   type: string;
 }
-
-// ── Dummy data — TODO: fetch from Supabase using token ────────────────────────
-const ORDER = {
-  id: "TRK-2847",
-  item: "Ankara Tote Bag × 2",
-  customerName: "Amara Obi",
-  customerPhone: "0801 234 5678",
-  address: "14 Admiralty Way, Lekki Phase 1",
-  amount: 35000,
-  status: "pending" as Status,
-  sellerName: "Zara's Closet",
-  events: [{ label: "Order created", time: "10:58 AM", type: "created" }],
-};
 
 // ── Progress step config ───────────────────────────────────────────────────────
 const STEPS = ["Confirmed", "Picked Up", "Transit", "Delivered"];
@@ -101,7 +91,7 @@ function getStepState(
     if (stepIndex === 1) return "now";
     return "pending";
   }
-  if (status === "in_transit") {
+  if (status === "picked_up" || status === "in_transit") {
     if (stepIndex <= 1) return "done";
     if (stepIndex === 2) return "now";
     return "pending";
@@ -114,9 +104,32 @@ function getStepState(
 
 function getStatusLabel(status: Status): string {
   if (status === "pending") return "Pending";
+  if (status === "picked_up") return "Picked Up";
   if (status === "in_transit") return "In Transit";
   if (status === "delivered") return "Delivered";
   return "Failed";
+}
+
+function mapEventLabel(evStatus: string): string {
+  if (evStatus === "pending" || evStatus === "created") return "Order created";
+  if (evStatus === "picked_up") return "Item picked up";
+  if (evStatus === "in_transit") return "In transit";
+  if (evStatus === "delivered") return "Delivered";
+  if (evStatus === "failed") return "Delivery failed";
+  return evStatus;
+}
+
+function mapEventsToTimeline(
+  rawEvents: { id: string; status: string; note: string | null; created_at: string | null }[],
+): TimelineEvent[] {
+  return rawEvents.map((ev) => ({
+    label: mapEventLabel(ev.status),
+    time: new Date(ev.created_at ?? "").toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    type: ev.status,
+  }));
 }
 
 // ── Detail row ────────────────────────────────────────────────────────────────
@@ -148,25 +161,154 @@ function DetailRow({
 export default function RiderLinkScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useLocalSearchParams<{ token?: string }>();
+  const queryClient = useQueryClient();
+  const showToast = useToastStore((s) => s.show);
 
-  const [status, setStatus] = useState<Status>(ORDER.status);
-  const [events, setEvents] = useState<TimelineEvent[]>(ORDER.events);
-  const [ctaBusy, setCtaBusy] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
-  // GPS pings — no re-render needed
-  const locationPings = useRef<{ lat: number; lng: number; time: string }[]>(
-    [],
-  );
+  // ── Data query ───────────────────────────────────────────────────────────────
+  const { data: order, isLoading, error } = useQuery({
+    queryKey: ["rider-order", token],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `*, order_status_events(id,status,note,created_at), location_pings(id,latitude,longitude,created_at)`,
+        )
+        .eq("rider_token", token)
+        .order("created_at", {
+          referencedTable: "order_status_events",
+          ascending: true,
+        })
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!token,
+    retry: 1,
+  });
 
-  // Blinking dot for in_transit status pill
+  // ── Derived display values ───────────────────────────────────────────────────
+  const status: Status = order ? (order.status as Status) : "pending";
+  const events: TimelineEvent[] =
+    order?.order_status_events
+      ? mapEventsToTimeline(order.order_status_events)
+      : [];
+
+  // ── Pickup mutation ──────────────────────────────────────────────────────────
+  const pickupMutation = useMutation({
+    mutationFn: async () => {
+      let coords: { latitude: number; longitude: number } | null = null;
+      try {
+        const { status: locStatus } =
+          await Location.requestForegroundPermissionsAsync();
+        if (locStatus === "granted") {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          coords = loc.coords;
+        }
+      } catch {}
+      if (coords) {
+        await supabase.from("location_pings").insert({
+          order_id: order!.id,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+      }
+      await supabase.from("order_status_events").insert({
+        order_id: order!.id,
+        status: "picked_up",
+        note: coords
+          ? "Rider confirmed pickup"
+          : "Rider confirmed pickup (no GPS)",
+      });
+      await supabase
+        .from("orders")
+        .update({ status: "picked_up" })
+        .eq("id", order!.id);
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["rider-order", token] }),
+    onError: () => showToast("Could not update status. Try again.", "error"),
+  });
+
+  // ── Delivery mutation ────────────────────────────────────────────────────────
+  const deliveryMutation = useMutation({
+    mutationFn: async () => {
+      let coords: { latitude: number; longitude: number } | null = null;
+      try {
+        const { status: locStatus } =
+          await Location.requestForegroundPermissionsAsync();
+        if (locStatus === "granted") {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          coords = loc.coords;
+        }
+      } catch {}
+      if (coords) {
+        await supabase.from("location_pings").insert({
+          order_id: order!.id,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+      }
+      await supabase.from("order_status_events").insert({
+        order_id: order!.id,
+        status: "delivered",
+        note: "Rider confirmed delivery",
+      });
+      await supabase
+        .from("orders")
+        .update({ status: "delivered", delivered_at: new Date().toISOString() })
+        .eq("id", order!.id);
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["rider-order", token] }),
+    onError: () => showToast("Could not update status. Try again.", "error"),
+  });
+
+  // ── Report mutation ──────────────────────────────────────────────────────────
+  const reportMutation = useMutation({
+    mutationFn: async (problem: string) => {
+      await supabase.from("order_status_events").insert({
+        order_id: order!.id,
+        status: "failed",
+        note: problem,
+      });
+      await supabase
+        .from("orders")
+        .update({ status: "failed" })
+        .eq("id", order!.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rider-order", token] });
+      showToast("Problem reported", "success");
+      closeReport();
+    },
+    onError: () => showToast("Could not submit report.", "error"),
+  });
+
+  // ── CTA handler ──────────────────────────────────────────────────────────────
+  function handleCta() {
+    if (status === "pending" || status === "picked_up") {
+      pickupMutation.mutate();
+    } else if (status === "in_transit") {
+      deliveryMutation.mutate();
+    }
+  }
+
+  const ctaBusy = pickupMutation.isPending || deliveryMutation.isPending;
+
+  // Blinking dot for in_transit / picked_up status pill
   const blinkOpacity = useSharedValue(1);
   const blinkStyle = useAnimatedStyle(() => ({
     opacity: blinkOpacity.value,
   }));
 
   useEffect(() => {
-    if (status === "in_transit") {
+    if (status === "in_transit" || status === "picked_up") {
       blinkOpacity.value = withRepeat(
         withSequence(
           withTiming(0.3, { duration: 750 }),
@@ -196,53 +338,46 @@ export default function RiderLinkScreen() {
     setTimeout(() => setReportOpen(false), 320);
   }
 
-  async function handleCta() {
-    if (ctaBusy) return;
-    setCtaBusy(true);
-    try {
-      // GPS ping
-      const { status: locStatus } =
-        await Location.requestForegroundPermissionsAsync();
-      if (locStatus === "granted") {
-        const loc = await Location.getCurrentPositionAsync({});
-        locationPings.current.push({
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude,
-          time: new Date().toLocaleTimeString(),
-        });
-        // TODO: POST to Supabase
-      }
-
-      const now = new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      if (status === "pending") {
-        setStatus("in_transit");
-        setEvents((prev) => [
-          ...prev,
-          { label: "Item picked up", time: now, type: "picked_up" },
-        ]);
-      } else if (status === "in_transit") {
-        setStatus("delivered");
-        setEvents((prev) => [
-          ...prev,
-          { label: "Delivered successfully", time: now, type: "delivered" },
-        ]);
-      }
-    } finally {
-      setCtaBusy(false);
-    }
-  }
-
   // Progress line fill: fraction 0–1 of the inner track width
   function getLineFillRatio(): number {
-    if (status === "pending") return 1 / 3; // 1 step done
-    if (status === "in_transit") return 2 / 3; // 2 steps done
+    if (status === "pending") return 1 / 3;
+    if (status === "picked_up" || status === "in_transit") return 2 / 3;
     if (status === "delivered") return 1;
     return 0;
   }
+
+  // ── Loading state ─────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
+        <StatusBar style="dark" />
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  // ── Error / invalid link state ────────────────────────────────────────────────
+  if (error || !order) {
+    return (
+      <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
+        <StatusBar style="dark" />
+        <View style={ss.invalidIconContainer}>
+          <Feather name="link-2" size={48} color={colors.primary} />
+        </View>
+        <Text style={ss.invalidTitle}>This link isn't valid</Text>
+        <Text style={ss.invalidSub}>
+          This tracking link may have expired. Contact the seller directly.
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Derived display strings ───────────────────────────────────────────────────
+  const orderId = `TRK-${order.id.substring(0, 6).toUpperCase()}`;
+  const itemDescription = order.item_description ?? "";
+  const customerName = order.customer_name ?? "";
+  const customerPhone = order.customer_phone ?? "";
+  const deliveryAddress = order.delivery_address ?? "";
 
   return (
     <View style={[ss.root, { paddingTop: insets.top }]}>
@@ -293,7 +428,7 @@ export default function RiderLinkScreen() {
                 </Text>
               </View>
             )}
-            {status === "in_transit" && (
+            {(status === "picked_up" || status === "in_transit") && (
               <View
                 style={[
                   ss.pill,
@@ -343,11 +478,11 @@ export default function RiderLinkScreen() {
               </View>
             )}
 
-            <Text style={ss.orderId}>{ORDER.id}</Text>
+            <Text style={ss.orderId}>{orderId}</Text>
           </View>
 
           {/* Item name */}
-          <Text style={ss.itemName}>{ORDER.item}</Text>
+          <Text style={ss.itemName}>{itemDescription}</Text>
 
           {/* Address */}
           <View style={ss.addressRow}>
@@ -358,7 +493,7 @@ export default function RiderLinkScreen() {
               style={ss.pinIcon}
             />
             <Text style={ss.addressText} numberOfLines={2}>
-              {ORDER.address}
+              {deliveryAddress}
             </Text>
           </View>
 
@@ -434,12 +569,12 @@ export default function RiderLinkScreen() {
 
         {/* ── Detail Card ── */}
         <View style={ss.detailCard}>
-          <DetailRow label="Customer" value={ORDER.customerName} />
-          <DetailRow label="Phone" value={ORDER.customerPhone} />
-          <DetailRow label="Address" value={ORDER.address} />
+          <DetailRow label="Customer" value={customerName} />
+          <DetailRow label="Phone" value={customerPhone} />
+          <DetailRow label="Address" value={deliveryAddress} />
           <DetailRow
             label="Collect on delivery"
-            value={formatAmount(ORDER.amount)}
+            value={formatAmount(0)}
             isAmount
             isLast
           />
@@ -452,6 +587,7 @@ export default function RiderLinkScreen() {
             const isLast = i === events.length - 1;
             const isDone =
               ev.type === "created" ||
+              ev.type === "pending" ||
               ev.type === "picked_up" ||
               ev.type === "delivered";
             const isActive = isLast && !isDone;
@@ -504,7 +640,7 @@ export default function RiderLinkScreen() {
       </ScrollView>
 
       {/* ── CTA Section (floated above bottom) ── */}
-      {status !== "delivered" && (
+      {status !== "delivered" && status !== "failed" && (
         <View style={[ss.ctaSection, { paddingBottom: insets.bottom + 14 }]}>
           <Pressable
             onPress={handleCta}
@@ -515,7 +651,7 @@ export default function RiderLinkScreen() {
           >
             <LinearGradient
               colors={
-                status === "in_transit"
+                status === "in_transit" || status === "picked_up"
                   ? (gradients.success as [string, string])
                   : (gradients.primary as [string, string])
               }
@@ -523,11 +659,15 @@ export default function RiderLinkScreen() {
               end={{ x: 1, y: 0 }}
               style={ss.ctaButton}
             >
-              <Text style={ss.ctaText}>
-                {status === "pending"
-                  ? "I've Picked Up the Item"
-                  : "Delivery Complete"}
-              </Text>
+              {ctaBusy ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <Text style={ss.ctaText}>
+                  {status === "pending"
+                    ? "I've Picked Up the Item"
+                    : "Delivery Complete"}
+                </Text>
+              )}
             </LinearGradient>
           </Pressable>
 
@@ -571,10 +711,7 @@ export default function RiderLinkScreen() {
                     ss.reportOption,
                     { opacity: pressed ? 0.7 : 1 },
                   ]}
-                  onPress={() => {
-                    // TODO: submit report to Supabase
-                    closeReport();
-                  }}
+                  onPress={() => reportMutation.mutate(opt.title)}
                 >
                   <View
                     style={[
@@ -618,6 +755,37 @@ const ss = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.surface,
+  },
+  centered: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: layout.screenPaddingH,
+  },
+
+  // Invalid link state
+  invalidIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: colors.infoBg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  invalidTitle: {
+    fontSize: 18,
+    fontFamily: font.sans.bold,
+    color: colors.textPrimary,
+    letterSpacing: -0.36,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  invalidSub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 19,
   },
 
   // Header

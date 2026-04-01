@@ -24,8 +24,8 @@ export function useOrder(orderId: string | null) {
 export function useCreateOrder(userId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Omit<Parameters<typeof insertOrder>[0], "user_id">): Promise<Order> =>
-      insertOrder({ user_id: userId!, ...payload }),
+    mutationFn: (payload: Omit<Parameters<typeof insertOrder>[0], "seller_id">): Promise<Order> =>
+      insertOrder({ seller_id: userId!, ...payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders(userId ?? "") });
     },

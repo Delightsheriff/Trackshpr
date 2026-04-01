@@ -4,7 +4,8 @@
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useAddCustomer } from "@/src/hooks/useCustomers";
+import { supabase } from "@/src/lib/supabase";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useSession } from "@/src/hooks/useSession";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
@@ -12,8 +13,9 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
-import { useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function SheetInput({ label, value, onChange, placeholder, keyboardType, optional }: {
@@ -60,8 +62,29 @@ export default function AddCustomerSheet() {
   const insets      = useSafeAreaInsets();
   const sheetRef    = useRef<BottomSheet>(null);
   const { userId }  = useSession();
-  const addCustomer = useAddCustomer(userId);
+  const queryClient = useQueryClient();
   const showToast   = useToastStore((s) => s.show);
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { name: string; phone: string; address: string; city?: string }) => {
+      const { error } = await supabase
+        .from('address_book')
+        .insert({
+          seller_id: userId!,
+          customer_name: data.name,
+          customer_phone: data.phone,
+          address: data.address,
+          city: data.city ?? null,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(userId ?? '') });
+      showToast('Customer saved', 'success');
+      router.back();
+    },
+    onError: () => showToast('Could not save customer. Try again.', 'error'),
+  });
 
   const { control, handleSubmit, formState: { errors } } = useForm<CustomerValues>({
     resolver: zodResolver(customerSchema),
@@ -76,13 +99,7 @@ export default function AddCustomerSheet() {
   );
 
   const handleSave = handleSubmit((values) => {
-    addCustomer.mutate(
-      { name: values.name, phone: values.phone, address: values.address, city: values.city || undefined },
-      {
-        onSuccess: () => { showToast("Customer saved ✓", "success"); router.back(); },
-        onError: () => showToast("Failed to save customer", "error"),
-      }
-    );
+    addMutation.mutate({ name: values.name, phone: values.phone, address: values.address, city: values.city || undefined });
   });
 
   const sheetShadow = isDark
@@ -148,11 +165,14 @@ export default function AddCustomerSheet() {
           <View style={[styles.saveShadow, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
             <Pressable
               onPress={handleSave}
+              disabled={addMutation.isPending}
               android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
               style={styles.savePressable}
             >
               <View style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
-                <Text style={styles.saveBtnText}>Save Customer</Text>
+                {addMutation.isPending
+                  ? <ActivityIndicator size="small" color="white" />
+                  : <Text style={styles.saveBtnText}>Save Customer</Text>}
               </View>
             </Pressable>
           </View>

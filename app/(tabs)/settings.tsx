@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as FileSystem from "expo-file-system";
-import * as Notifications from "expo-notifications";
+// import * as Notifications from "expo-notifications"; // Disabled until ready
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -203,28 +203,9 @@ export default function SettingsScreen() {
     await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Export Orders" });
   };
 
-  const handleNotifToggle = async (value: boolean) => {
-    if (value) {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === "granted") {
-        const tokenData = await Notifications.getExpoPushTokenAsync();
-        const { error } = await supabase
-          .from("profiles")
-          .update({ push_token: tokenData.data })
-          .eq("id", userId!);
-        if (!error) {
-          setNotifEnabled(true);
-          queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId ?? "") });
-          showToast("Notifications enabled", "success");
-        }
-      } else {
-        showToast("Enable notifications in your device Settings", "error");
-      }
-    } else {
-      await supabase.from("profiles").update({ push_token: null }).eq("id", userId!);
-      setNotifEnabled(false);
-      queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId ?? "") });
-    }
+  const handleNotifToggle = async (_value: boolean) => {
+    // TODO: Re-enable when expo-notifications is configured
+    showToast("Notifications not yet available", "info");
   };
 
   const profileSectionShadow = isDark

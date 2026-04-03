@@ -8,6 +8,7 @@ import {
   SlideTwo,
 } from "@/src/components/onboarding";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_SEEN_KEY } from "@/src/lib/storageKeys";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
@@ -23,7 +24,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SPRING = { damping: 28, stiffness: 280, mass: 0.85 };
 const SLIDE_COUNT = 3;
-const ONBOARDING_SEEN_KEY = "onboarding_seen";
 
 export default function OnboardingScreen() {
   const { width } = useWindowDimensions();

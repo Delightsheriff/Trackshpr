@@ -5,6 +5,7 @@ import { font, layout, radius } from "@/src/constants/tokens";
 import { signOut } from "@/src/lib/auth";
 import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import BottomSheet, {
   BottomSheetBackdrop,
@@ -23,6 +24,7 @@ export default function SignOutSheet() {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const resetDraft = useOrderStore((s) => s.reset);
+  const showToast = useToastStore((s) => s.show);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -40,9 +42,15 @@ export default function SignOutSheet() {
 
   const handleSignOut = async () => {
     setLoading(true);
-    await signOut();
-    queryClient.clear();
-    resetDraft();
+    try {
+      await signOut();
+      queryClient.clear();
+      resetDraft();
+      // navigation is handled by onAuthStateChange in useAuthState
+    } catch {
+      setLoading(false);
+      showToast("Sign out failed. Please try again.", "error");
+    }
   };
 
   const sheetShadow = isDark

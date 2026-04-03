@@ -9,6 +9,7 @@ import { colors, font, gradients } from "@/src/constants/tokens";
 
 import { ProfileSetupFormData, profileSetupSchema } from "./profile-setup-schema";
 import { SectionLabel, FieldGroup, FieldRow, TextField, RowDivider } from "./profile-setup-fields";
+import ContactNumbersSection from "./contact-numbers-section";
 
 interface ProfileSetupFormProps {
   initialValues: ProfileSetupFormData;
@@ -39,26 +40,19 @@ export function ProfileSetupForm({
   });
 
   const [uploading, setUploading] = useState(false);
-  const [requiredFocused, setRequiredFocused] = useState<{ businessName: boolean; phone: boolean }>({
-    businessName: false,
-    phone: false,
-  });
 
   const businessName = watch("businessName");
   const logoLocalUri = watch("logoLocalUri");
   const isFilled = (businessName?.trim().length || 0) > 0;
   const firstName = businessName?.trim().split(" ")[0];
 
-  const hasBusinessNameError = !!errors.businessName;
-  const hasPhoneError = !!errors.phone;
-
   const handleLogoUpload = async () => {
     const uri = await onPickLogo();
     if (!uri) return;
-    
+
     setValue("logoLocalUri", uri);
     setValue("logoPublicUrl", null);
-    
+
     setUploading(true);
     const result = await onUploadLogo(uri);
     if (!result.error && result.publicUrl) {
@@ -67,11 +61,13 @@ export function ProfileSetupForm({
     setUploading(false);
   };
 
-  const requiredBorder = hasBusinessNameError || hasPhoneError
-    ? { borderWidth: 2, borderColor: colors.error }
-    : requiredFocused.businessName || requiredFocused.phone
-      ? { borderWidth: 2, borderColor: colors.primary }
-      : { borderWidth: 0 };
+  // Contact numbers errors: errors.contactNumbers can be an array (per-entry)
+  // or a root-level error (the .refine for exactly-one-primary)
+  const contactNumbersRootError = (errors.contactNumbers as any)?.root?.message
+    ?? (errors.contactNumbers as any)?.message;
+  const contactNumbersEntryErrors = Array.isArray(errors.contactNumbers)
+    ? (errors.contactNumbers as any[])
+    : [];
 
   return (
     <View style={styles.formBody}>
@@ -98,100 +94,52 @@ export function ProfileSetupForm({
         </View>
       )}
 
-      {/* ── Required: Business info ────────────────────────────── */}
+      {/* ── Required: Business name ───────────────────────────── */}
       <SectionLabel label="Business info" />
-      <FieldGroup>
-        <View style={[styles.requiredGroup, requiredBorder]}>
-          <Controller
-            control={control}
-            name="businessName"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <FieldRow
-                icon="briefcase"
-                iconBg={hasBusinessNameError ? colors.errorBg : colors.primarySoft}
-                label="Business name"
-                required
-                hasError={hasBusinessNameError}
-              >
-                <TextField
-                  value={value}
-                  onChange={onChange}
-                  onFocus={() => setRequiredFocused((prev) => ({ ...prev, businessName: true }))}
-                  onBlur={() => {
-                    setRequiredFocused((prev) => ({ ...prev, businessName: false }));
-                    onBlur();
-                  }}
-                  placeholder="e.g. Zara's Closet"
-                />
-              </FieldRow>
-            )}
-          />
-          <RowDivider />
-          <Controller
-            control={control}
-            name="phone"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <FieldRow
-                icon="phone"
-                iconBg={hasPhoneError ? colors.errorBg : colors.warningBg}
-                label="WhatsApp number"
-                required
-                hasError={hasPhoneError}
-              >
-                <TextField
-                  value={value}
-                  onChange={onChange}
-                  onFocus={() => setRequiredFocused((prev) => ({ ...prev, phone: true }))}
-                  onBlur={() => {
-                    setRequiredFocused((prev) => ({ ...prev, phone: false }));
-                    onBlur();
-                  }}
-                  placeholder="0800 000 0000"
-                  keyboardType="phone-pad"
-                />
-              </FieldRow>
-            )}
-          />
-        </View>
-      </FieldGroup>
-
-      {(hasBusinessNameError || hasPhoneError) && (
-        <View style={styles.errorRow}>
-          <Feather
-            name="alert-triangle"
-            size={12}
-            color={colors.error}
-            style={styles.errorIcon}
-          />
-          <Text style={styles.errorText}>
-            Business name and WhatsApp number are required
-          </Text>
-        </View>
-      )}
-
-      {/* ── Optional: Contact & Location ─────────────────────────── */}
-      <SectionLabel label="Contact & Location" />
       <FieldGroup>
         <Controller
           control={control}
-          name="secondaryPhone"
+          name="businessName"
           render={({ field: { onChange, onBlur, value } }) => (
             <FieldRow
-              icon="phone-call"
-              iconBg={colors.surfaceContainer}
-              label="Secondary phone"
+              icon="briefcase"
+              iconBg={errors.businessName ? colors.errorBg : colors.primarySoft}
+              label="Business name"
+              required
+              hasError={!!errors.businessName}
             >
               <TextField
-                value={value ?? ""}
+                value={value}
                 onChange={onChange}
                 onBlur={onBlur}
-                placeholder="Optional — second line"
-                keyboardType="phone-pad"
+                placeholder="e.g. Zara's Closet"
               />
             </FieldRow>
           )}
         />
-        <RowDivider />
+      </FieldGroup>
+      {!!errors.businessName && (
+        <Text style={styles.fieldError}>{errors.businessName.message}</Text>
+      )}
+
+      {/* ── Contact numbers ───────────────────────────────────── */}
+      <SectionLabel label="Contact numbers" />
+      <Controller
+        control={control}
+        name="contactNumbers"
+        render={({ field: { onChange, value } }) => (
+          <ContactNumbersSection
+            values={value}
+            onChange={onChange}
+            errors={contactNumbersEntryErrors}
+            globalError={contactNumbersRootError}
+          />
+        )}
+      />
+
+      {/* ── Location ─────────────────────────────────────────── */}
+      <SectionLabel label="Location" />
+      <FieldGroup>
         <Controller
           control={control}
           name="city"
@@ -228,7 +176,7 @@ export function ProfileSetupForm({
         />
       </FieldGroup>
 
-      {/* ── Optional: About ─────────────────────────────────────── */}
+      {/* ── About ────────────────────────────────────────────── */}
       <SectionLabel label="About" />
       <FieldGroup>
         <Controller
@@ -252,7 +200,7 @@ export function ProfileSetupForm({
         />
       </FieldGroup>
 
-      {/* ── Optional: Social ────────────────────────────────────── */}
+      {/* ── Social ───────────────────────────────────────────── */}
       <SectionLabel label="Social handles" />
       <FieldGroup>
         <Controller
@@ -314,15 +262,12 @@ export function ProfileSetupForm({
         </View>
       )}
 
-      {/* ── CTA ──────────────────────────────────────────────────── */}
+      {/* ── CTA ─────────────────────────────────────────────── */}
       <View style={styles.saveBtnShadow}>
         <Pressable
           onPress={handleSubmit(onSave)}
           disabled={isSaving}
-          android_ripple={{
-            color: "rgba(255,255,255,0.20)",
-            borderless: false,
-          }}
+          android_ripple={{ color: "rgba(255,255,255,0.20)", borderless: false }}
           style={styles.saveBtnPressable}
         >
           <LinearGradient
@@ -341,7 +286,6 @@ export function ProfileSetupForm({
           </LinearGradient>
         </Pressable>
       </View>
-
     </View>
   );
 }
@@ -375,23 +319,13 @@ const styles = StyleSheet.create({
     color: colors.success,
     flex: 1,
   },
-  requiredGroup: {
-    overflow: "hidden",
-    borderRadius: 16,
-  },
-  errorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 4,
-    marginTop: 2,
-  },
-  errorIcon: { flexShrink: 0 },
-  errorText: {
+  fieldError: {
     fontSize: 11,
     fontFamily: font.sans.semiBold,
-    fontWeight: "500",
+    fontWeight: "600",
     color: colors.error,
+    paddingHorizontal: 4,
+    marginTop: 2,
   },
   infoNote: {
     flexDirection: "row",

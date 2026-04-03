@@ -13,6 +13,7 @@ import { colors, font, radius, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_SEEN_KEY } from "@/src/lib/storageKeys";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useMutation } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,8 +38,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const ONBOARDING_SEEN_KEY = "onboarding_seen";
 
 // ── Gradient headline text ─────────────────────────────────────────────────────
 

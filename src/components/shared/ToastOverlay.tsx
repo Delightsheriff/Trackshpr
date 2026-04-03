@@ -1,12 +1,13 @@
 /**
- * Global toast overlay — rendered in the tabs layout above all content.
+ * Global toast overlay — rendered in root layout above all content.
  * Reads from useToastStore. DS §11.3.
  */
 import { font, radius } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
+import { Feather } from "@expo/vector-icons";
 import { useEffect } from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -14,6 +15,26 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type IconName = React.ComponentProps<typeof Feather>["name"];
+
+const TYPE_CONFIG: Record<
+  "success" | "error" | "info",
+  { icon: IconName; getColors: (c: ReturnType<typeof useTheme>["colors"]) => { bg: string; fg: string } }
+> = {
+  success: {
+    icon: "check-circle",
+    getColors: (c) => ({ bg: c.successBg, fg: c.success }),
+  },
+  error: {
+    icon: "x-circle",
+    getColors: (c) => ({ bg: c.errorBg, fg: c.error }),
+  },
+  info: {
+    icon: "info",
+    getColors: (c) => ({ bg: c.infoBg, fg: c.info }),
+  },
+};
 
 export default function ToastOverlay() {
   const { toast, hide } = useToastStore();
@@ -43,28 +64,20 @@ export default function ToastOverlay() {
 
   if (!toast) return null;
 
-  const TYPE_CONFIG = {
-    success: { bg: colors.successBg, color: colors.success, prefix: "✅" },
-    error:   { bg: colors.errorBg,   color: colors.error,   prefix: "❌" },
-    info:    { bg: colors.infoBg,    color: colors.info,    prefix: "📦" },
-  };
-
   const cfg = TYPE_CONFIG[toast.type];
+  const { bg, fg } = cfg.getColors(colors);
 
   return (
     <Animated.View
-      style={[
-        styles.toast,
-        { top: insets.top + 16, backgroundColor: cfg.bg },
-        animStyle,
-      ]}
+      style={[styles.toast, { top: insets.top + 16, backgroundColor: bg }, animStyle]}
       pointerEvents="none"
     >
-      <Text style={[styles.text, { color: cfg.color }]}>
-        {cfg.prefix}
-        {"  "}
-        {toast.message}
-      </Text>
+      <View style={styles.row}>
+        <Feather name={cfg.icon} size={15} color={fg} style={styles.icon} />
+        <Text style={[styles.message, { color: fg }]} numberOfLines={2}>
+          {toast.message}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
@@ -79,9 +92,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     zIndex: 999,
   },
-  text: {
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  icon: {
+    flexShrink: 0,
+  },
+  message: {
     fontSize: 13,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
+    flex: 1,
+    lineHeight: 18,
   },
 });

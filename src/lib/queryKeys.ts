@@ -13,5 +13,7 @@ export const queryKeys = {
   riders:     (sellerId: string)       => ["riders", sellerId] as const,
   rider:      (riderId: string)        => ["rider", riderId] as const,
   customers:  (sellerId: string)       => ["customers", sellerId] as const,
-  analytics:  (sellerId: string, period: string) => ["analytics", sellerId, period] as const,
+  analytics:    (sellerId: string, period: string) => ["analytics", sellerId, period] as const,
+  activeOrders: (sellerId: string) => ["activeOrders", sellerId] as const,
+  todayStats:   (sellerId: string) => ["todayStats", sellerId] as const,
 } as const;

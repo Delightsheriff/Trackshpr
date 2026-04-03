@@ -4,7 +4,7 @@
 import { saveProfile, uploadLogo } from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
 import { queryKeys } from "@/src/lib/queryKeys";
-import { fetchProfile, type Profile } from "@/src/lib/supabaseQueries";
+import { fetchProfile, type ContactNumber, type Profile } from "@/src/lib/supabaseQueries";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -34,14 +34,15 @@ interface SaveProfilePayload {
   pickup_address?: string | null;
   instagram_handle?: string | null;
   tiktok_handle?: string | null;
+  contact_numbers?: ContactNumber[] | null;
   onboarding_complete?: boolean;
 }
 
 export function useSaveProfile() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (payload: SaveProfilePayload) => saveProfile(payload),
+  return useMutation<void, Error, SaveProfilePayload>({
+    mutationFn: (payload) => saveProfile(payload),
 
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({

@@ -14,6 +14,18 @@ import {
 
 export type OrderStatus = "pending" | "in_transit" | "delivered" | "failed";
 
+/**
+ * A single seller contact number stored in profiles.contact_numbers (jsonb).
+ * `number` is always E.164 (e.g. "+2348012345678").
+ * Exactly one entry must have is_primary: true — enforced by DB check constraint.
+ */
+export interface ContactNumber {
+  number: string;
+  label: string;
+  is_whatsapp: boolean;
+  is_primary: boolean;
+}
+
 export interface Profile {
   id: string;
   business_name: string | null;
@@ -28,6 +40,9 @@ export interface Profile {
   pickup_address: string | null;
   instagram_handle: string | null;
   tiktok_handle: string | null;
+  contact_numbers: ContactNumber[] | null;
+  order_count: number;
+  push_token: string | null;
   onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
@@ -116,7 +131,51 @@ export async function insertOrder(payload: {
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Failed to create order");
+
+  // TODO(Termii): send delivery notification to seller's primary contact number.
+  // When wiring this up, fetch the seller's profile and read:
+  //   profile.contact_numbers.find(n => n.is_primary)?.number
+  // Use that E.164 number as the Termii recipient. Do not hardcode phone from
+  // the order — the seller may have changed their primary number since the order
+  // was created. Only use is_primary: true from profiles.contact_numbers.
+
   return data as Order;
+}
+
+export async function fetchActiveOrders(userId: string): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("seller_id", userId)
+    .in("status", ["pending", "in_transit"])
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Failed to fetch active orders");
+  return (data ?? []) as Order[];
+}
+
+export interface TodayStats {
+  total: number;
+  delivered: number;
+  inTransit: number;
+  failed: number;
+}
+
+export async function fetchTodayStats(userId: string): Promise<TodayStats> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("status")
+    .eq("seller_id", userId)
+    .gte("created_at", startOfDay(new Date()).toISOString());
+
+  if (error) throw new Error("Failed to fetch today's stats");
+  const rows = data ?? [];
+  return {
+    total: rows.length,
+    delivered: rows.filter((o) => o.status === "delivered").length,
+    inTransit: rows.filter((o) => o.status === "in_transit").length,
+    failed: rows.filter((o) => o.status === "failed").length,
+  };
 }
 
 export async function fetchOrder(orderId: string): Promise<Order> {

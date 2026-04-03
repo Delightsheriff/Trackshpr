@@ -2,14 +2,22 @@
  * Home / Dashboard tab (DS §8.1, §8.4).
  */
 import React from "react";
-import { View, ScrollView, StyleSheet, Text, Pressable } from "react-native";
+import { View, StyleSheet, Text, Pressable } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSession } from "@/src/hooks/useSession";
 import { useProfile } from "@/src/hooks/useProfile";
+import {
+  useActiveOrders,
+  useTodayStats,
+  useOrdersRealtime,
+} from "@/src/hooks/useOrders";
 import { useTheme } from "@/src/stores/themeStore";
 import { layout, font, radius } from "@/src/constants/tokens";
+import type { Order } from "@/src/lib/supabaseQueries";
 
 // Extracted Components
 import { HomeHeader } from "@/src/components/home/home-header";
@@ -18,8 +26,8 @@ import { MiniStatRow } from "@/src/components/home/mini-stat-row";
 import { QuickActionsRow } from "@/src/components/home/quick-actions-row";
 import { OrderCard } from "@/src/components/home/order-card";
 import { IncompleteProfileBanner } from "@/src/components/home/incomplete-profile-banner";
-import { useOrders } from "@/src/hooks/useOrders";
 import { formatRelativeTime } from "@/src/utils/helpers";
+import type { OrderStatus } from "@/src/components/home/home-types";
 
 // ── Skeletons ──────────────────────────────────────────────────────────────────
 function HeroSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
@@ -94,93 +102,135 @@ export default function HomeScreen() {
 
   const { userId } = useSession();
   const { data: profile } = useProfile(userId);
-  const { data: orders = [], isLoading: ordersLoading } = useOrders(userId);
+  const {
+    data: activeOrders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+  } = useActiveOrders(userId);
+  const { data: stats, isLoading: statsLoading } = useTodayStats(userId);
+
+  // Subscribe to live order changes
+  useOrdersRealtime(userId);
+
   const businessName = profile?.business_name ?? "";
   const initial = businessName.charAt(0).toUpperCase() || "?";
 
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter((o) => new Date(o.created_at).toDateString() === today);
-  const statsTotal = todayOrders.length;
-  const statsDelivered = todayOrders.filter((o) => o.status === "delivered").length;
-  const statsInTransit = todayOrders.filter((o) => o.status === "in_transit").length;
-  const statsFailed = todayOrders.filter((o) => o.status === "failed").length;
-  const recentOrders = orders.slice(0, 3);
+  // Show at most 3 active orders on the dashboard
+  const dashboardOrders = activeOrders.slice(0, 3);
 
+  // ── List header ────────────────────────────────────────────────────────────
+  const ListHeader = (
+    <View>
+      {/* Profile incomplete banner */}
+      {profile && profile.onboarding_complete === false && (
+        <IncompleteProfileBanner onPress={() => router.push("/(auth)/profile-setup")} />
+      )}
+
+      {/* Header */}
+      <HomeHeader
+        businessName={businessName}
+        initial={initial}
+        logoUrl={profile?.logo_url}
+        updatedAt={profile?.updated_at}
+      />
+
+      {/* Hero stat card */}
+      {statsLoading ? (
+        <HeroSkeleton colors={colors} />
+      ) : (
+        <HeroStatCard total={stats?.total ?? 0} />
+      )}
+
+      {/* Mini stat row */}
+      {statsLoading ? (
+        <MiniStatSkeleton colors={colors} />
+      ) : (
+        <MiniStatRow
+          delivered={stats?.delivered ?? 0}
+          inTransit={stats?.inTransit ?? 0}
+          failed={stats?.failed ?? 0}
+        />
+      )}
+
+      {/* Quick actions */}
+      <QuickActionsRow />
+
+      {/* Active orders section header */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+          Active Orders
+        </Text>
+        <Pressable onPress={() => router.navigate("/(tabs)/orders")} hitSlop={8}>
+          <Text style={[styles.sectionLink, { color: colors.primary }]}>
+            See all
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Loading skeletons */}
+      {ordersLoading && (
+        <>
+          <OrderCardSkeleton colors={colors} />
+          <OrderCardSkeleton colors={colors} />
+          <OrderCardSkeleton colors={colors} />
+        </>
+      )}
+
+      {/* Error state */}
+      {ordersError && !ordersLoading && (
+        <View style={styles.emptyWrap}>
+          <Feather name="alert-circle" size={28} color={colors.error} />
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+            Could not load orders
+          </Text>
+          <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
+            Check your connection and pull down to refresh.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  // ── Empty state (no active orders, not loading, no error) ──────────────────
+  const EmptyComponent = !ordersLoading && !ordersError ? (
+    <View style={styles.emptyWrap}>
+      <Feather name="package" size={28} color={colors.textMuted} />
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+        No active orders
+      </Text>
+      <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
+        Tap "New Delivery" to create your first order.
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + layout.screenPaddingTop },
-        ]}
+      <FlashList
+        data={ordersLoading || ordersError ? [] : dashboardOrders}
+        keyExtractor={(item: Order) => item.id}
+        estimatedItemSize={70}
+        renderItem={({ item: o }: { item: Order }) => (
+          <OrderCard
+            key={o.id}
+            id={o.id}
+            item={o.item_description}
+            customer={o.customer_name ?? "Unknown"}
+            area={o.delivery_address?.split(",").pop()?.trim() ?? "—"}
+            status={(o.status ?? "pending") as OrderStatus}
+            time={formatRelativeTime(o.created_at ?? "")}
+          />
+        )}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={EmptyComponent}
+        ListFooterComponent={<View style={{ height: 16 }} />}
+        contentContainerStyle={{
+          paddingHorizontal: layout.screenPaddingH,
+          paddingTop: insets.top + layout.screenPaddingTop,
+        }}
         showsVerticalScrollIndicator={false}
-      >
-        {/* ── Profile incomplete banner ─────────────────────────────── */}
-        {profile && profile.onboarding_complete === false && (
-          <IncompleteProfileBanner onPress={() => router.push("/(auth)/profile-setup")} />
-        )}
-
-        {/* ── Header ───────────────────────────────────────────────── */}
-        <HomeHeader
-          businessName={businessName}
-          initial={initial}
-          logoUrl={profile?.logo_url}
-          updatedAt={profile?.updated_at}
-        />
-
-        {/* ── Hero stat card ────────────────────────────────────────────── */}
-        {ordersLoading ? (
-          <HeroSkeleton colors={colors} />
-        ) : (
-          <HeroStatCard total={statsTotal} />
-        )}
-
-        {/* ── Mini stat row ─────────────────────────────────────────────── */}
-        {ordersLoading ? (
-          <MiniStatSkeleton colors={colors} />
-        ) : (
-          <MiniStatRow delivered={statsDelivered} inTransit={statsInTransit} failed={statsFailed} />
-        )}
-
-        {/* ── Quick actions ─────────────────────────────────────────────── */}
-        <QuickActionsRow />
-
-        {/* ── Active orders ─────────────────────────────────────────────── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Active Orders
-          </Text>
-          <Pressable onPress={() => router.navigate("/(tabs)/orders")} hitSlop={8}>
-            <Text style={[styles.sectionLink, { color: colors.primary }]}>
-              See all
-            </Text>
-          </Pressable>
-        </View>
-
-        {ordersLoading ? (
-          <>
-            <OrderCardSkeleton colors={colors} />
-            <OrderCardSkeleton colors={colors} />
-            <OrderCardSkeleton colors={colors} />
-          </>
-        ) : (
-          recentOrders.map((o) => (
-            <OrderCard
-              key={o.id}
-              id={o.id}
-              item={o.item}
-              customer={o.customer_name ?? "Unknown"}
-              area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
-              status={o.status}
-              time={formatRelativeTime(o.created_at)}
-            />
-          ))
-        )}
-
-        <View style={{ height: 16 }} />
-      </ScrollView>
+      />
     </View>
   );
 }
@@ -188,7 +238,6 @@ export default function HomeScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingHorizontal: layout.screenPaddingH },
 
   // Section header
   sectionHeader: {
@@ -207,5 +256,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
+  },
+
+  // Empty / error state
+  emptyWrap: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    letterSpacing: -0.14,
+  },
+  emptyBody: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    textAlign: "center",
+    maxWidth: 240,
   },
 });

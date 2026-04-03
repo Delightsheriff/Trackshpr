@@ -6,6 +6,7 @@ import { useRiders, useSession } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -19,6 +20,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SwipeableRiderCard } from "@/src/components/riders/swipeable-rider-card";
+import type { Rider } from "@/src/lib/supabaseQueries";
 
 // ── Skeleton card ──────────────────────────────────────────────────────────────
 function RiderSkeleton({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
@@ -50,7 +52,7 @@ export default function RidersScreen() {
   const [query, setQuery] = useState("");
 
   const { userId } = useSession();
-  const { data: riders = [], isLoading, isError } = useRiders(userId);
+  const { data: riders = [], isLoading, isError, refetch } = useRiders(userId);
 
   useEffect(() => {
     if (isError) showToast("Could not load riders. Pull to refresh.", "error");
@@ -64,17 +66,15 @@ export default function RidersScreen() {
     (r) => !query || r.name.toLowerCase().includes(query.toLowerCase()),
   );
 
+  const renderRider = ({ item, index }: { item: Rider; index: number }) => (
+    <SwipeableRiderCard rider={item} colorIdx={index} />
+  );
+
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + layout.screenPaddingTop, paddingBottom: 96 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Title ─────────────────────────────────────────────────────── */}
+      {/* ── Fixed header ───────────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: insets.top + layout.screenPaddingTop }]}>
+        {/* ── Title ─────────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
           <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>
             Riders
@@ -84,7 +84,7 @@ export default function RidersScreen() {
           </Text>
         </View>
 
-        {/* ── Search ────────────────────────────────────────────────────── */}
+        {/* ── Search ────────────────────────────────────────────────── */}
         <View
           style={[
             styles.searchBar,
@@ -107,38 +107,73 @@ export default function RidersScreen() {
             </Pressable>
           )}
         </View>
+      </View>
 
-        {/* ── Content ───────────────────────────────────────────────────── */}
-        {isLoading ? (
-          <>
-            <RiderSkeleton colors={colors} />
-            <RiderSkeleton colors={colors} />
-            <RiderSkeleton colors={colors} />
-          </>
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather
-              name="user"
-              size={36}
-              color={colors.primary}
-              style={styles.emptyIcon}
-            />
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              {query ? "No riders found" : "No riders yet"}
-            </Text>
-            <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              {query
-                ? "Try a different name."
-                : "Add your first rider to start assigning deliveries."}
-            </Text>
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      {isLoading ? (
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <RiderSkeleton colors={colors} />
+          <RiderSkeleton colors={colors} />
+          <RiderSkeleton colors={colors} />
+        </ScrollView>
+      ) : isError ? (
+        <View style={styles.errorState}>
+          <View style={[styles.errorIconWrap, { backgroundColor: colors.errorBg }]}>
+            <Feather name="wifi-off" size={28} color={colors.error} />
           </View>
-        ) : (
-          filtered.map((rider, i) => (
-            <SwipeableRiderCard key={rider.id} rider={rider} colorIdx={i} />
-          ))
-        )}
-
-      </ScrollView>
+          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>
+            Couldn't load riders
+          </Text>
+          <Text style={[styles.errorSub, { color: colors.textMuted }]}>
+            Check your connection and try again.
+          </Text>
+          <Pressable
+            onPress={() => refetch()}
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.retryBtnText}>Try Again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlashList
+          data={filtered}
+          keyExtractor={(r) => r.id}
+          renderItem={renderRider}
+          estimatedItemSize={80}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyIconWrap, { backgroundColor: colors.primarySoft }]}>
+                <Feather name="users" size={32} color={colors.primary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+                {query ? "No riders found" : "No riders saved"}
+              </Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                {query
+                  ? "Try a different name."
+                  : "Save your frequent riders to assign them faster."}
+              </Text>
+              {!query && (
+                <Pressable
+                  onPress={() => router.push("/(modals)/add-rider")}
+                  style={[styles.emptyCtaBtn, { backgroundColor: colors.primarySoft }]}
+                >
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[styles.emptyCtaText, { color: colors.primary }]}>
+                    Add Rider
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          }
+        />
+      )}
 
       {/* ── FAB — always visible above the tab bar ────────────────────── */}
       <View style={[styles.fab, { shadowColor: colors.primary }]}>
@@ -165,7 +200,14 @@ export default function RidersScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingHorizontal: layout.screenPaddingH },
+
+  header: { paddingHorizontal: layout.screenPaddingH },
+
+  listContent: {
+    paddingHorizontal: layout.screenPaddingH,
+    paddingBottom: 96,
+    paddingTop: 4,
+  },
 
   titleBlock: { paddingTop: 8, marginBottom: 14 },
   pageTitle: {
@@ -197,6 +239,89 @@ const styles = StyleSheet.create({
     margin: 0,
   },
 
+  // Error state
+  errorState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: layout.screenPaddingH,
+    paddingBottom: 64,
+  },
+  errorIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  errorTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+  },
+  errorSub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  retryBtn: {
+    borderRadius: radius.full,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  // Empty state
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+  },
+  emptySub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    textAlign: "center",
+    maxWidth: 240,
+  },
+  emptyCtaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.full,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 4,
+  },
+  emptyCtaText: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
+
   fab: {
     position: "absolute",
     bottom: 16,
@@ -225,23 +350,5 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     color: "#fff",
-  },
-
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 48,
-    gap: 8,
-  },
-  emptyIcon: { marginBottom: 4 },
-  emptyTitle: {
-    fontSize: 17,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: -0.34,
-  },
-  emptySub: {
-    fontSize: 13,
-    fontFamily: font.sans.regular,
-    textAlign: "center",
   },
 });

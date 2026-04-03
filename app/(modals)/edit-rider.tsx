@@ -1,12 +1,15 @@
 /**
  * Edit Rider bottom sheet — pre-filled with current rider data.
+ * Phone validated to E.164 via libphonenumber-js; uses PhoneNumberInput.
  * Receives riderId as a search param; fetches the rider then renders a form.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useRider, useSession, useUpdateRider } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
+import PhoneNumberInput from "@/src/components/profile-setup/phone-number-input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { isValidPhoneNumber } from "libphonenumber-js";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
@@ -28,19 +31,26 @@ import { z } from "zod";
 // ── Schema ────────────────────────────────────────────────────────────────────
 const riderSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
-  phone: z.string().trim().min(10, "Enter a valid phone number"),
+  phone: z
+    .string()
+    .min(1, "Phone number is required")
+    .refine(
+      (val) => {
+        try { return isValidPhoneNumber(val); } catch { return false; }
+      },
+      "Enter a valid phone number",
+    ),
   notes: z.string().trim().optional(),
 });
 type RiderFormData = z.infer<typeof riderSchema>;
 
-// ── Input component ───────────────────────────────────────────────────────────
+// ── Text input component (name / notes) ──────────────────────────────────────
 function SheetInput({
   label,
   value,
   onChange,
   onBlur,
   placeholder,
-  keyboardType,
   optional,
   hasError,
   errorMsg,
@@ -50,7 +60,6 @@ function SheetInput({
   onChange: (v: string) => void;
   onBlur: () => void;
   placeholder?: string;
-  keyboardType?: "default" | "phone-pad";
   optional?: boolean;
   hasError?: boolean;
   errorMsg?: string;
@@ -86,9 +95,51 @@ function SheetInput({
           }}
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
-          keyboardType={keyboardType}
           style={[si.input, { color: colors.textPrimary } as any]}
           returnKeyType="next"
+        />
+      </View>
+      {hasError && errorMsg && (
+        <Text style={[si.errMsg, { color: colors.error }]}>{errorMsg}</Text>
+      )}
+    </View>
+  );
+}
+
+// ── Phone field wrapper (label + PhoneNumberInput + error) ───────────────────
+function SheetPhoneField({
+  value,
+  onChange,
+  onBlur,
+  hasError,
+  errorMsg,
+}: {
+  value: string;
+  onChange: (e164: string) => void;
+  onBlur: () => void;
+  hasError?: boolean;
+  errorMsg?: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View>
+      <View
+        style={[
+          si.wrap,
+          {
+            backgroundColor: colors.surface,
+            borderColor: hasError ? colors.error : "transparent",
+          },
+        ]}
+      >
+        <Text style={[si.label, { color: hasError ? colors.error : colors.textMuted }]}>
+          WhatsApp number
+        </Text>
+        <PhoneNumberInput
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          hasError={hasError}
         />
       </View>
       {hasError && errorMsg && (
@@ -183,7 +234,7 @@ export default function EditRiderSheet() {
       <BottomSheet
         ref={sheetRef}
         index={0}
-        snapPoints={[460 + insets.bottom]}
+        snapPoints={[480 + insets.bottom]}
         enablePanDownToClose
         onClose={handleClose}
         backdropComponent={renderBackdrop}
@@ -226,13 +277,10 @@ export default function EditRiderSheet() {
                   control={control}
                   name="phone"
                   render={({ field: { onChange, onBlur, value } }) => (
-                    <SheetInput
-                      label="WhatsApp number"
+                    <SheetPhoneField
                       value={value}
                       onChange={onChange}
                       onBlur={onBlur}
-                      placeholder="0800 000 0000"
-                      keyboardType="phone-pad"
                       hasError={!!errors.phone}
                       errorMsg={errors.phone?.message}
                     />

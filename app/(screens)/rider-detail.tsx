@@ -248,6 +248,13 @@ export default function RiderDetailScreen() {
         {/* ── Stats Grid ──────────────────────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard
+            value={String(rider.total_deliveries)}
+            label="TOTAL"
+            valueColor={colors.primary}
+            colors={colors}
+            isDark={isDark}
+          />
+          <StatCard
             value={String(stats.delivered)}
             label="DELIVERED"
             valueColor={colors.success}
@@ -258,13 +265,6 @@ export default function RiderDetailScreen() {
             value={String(stats.failed)}
             label="FAILED"
             valueColor={stats.failed > 0 ? colors.error : colors.textMuted}
-            colors={colors}
-            isDark={isDark}
-          />
-          <StatCard
-            value={stats.total > 0 ? `${stats.rate}%` : "—"}
-            label="SUCCESS"
-            valueColor={colors.primary}
             colors={colors}
             isDark={isDark}
           />

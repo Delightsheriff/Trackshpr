@@ -17,10 +17,13 @@ export interface Rider {
 
 export interface Customer {
   id: string;
-  user_id: string;
+  seller_id: string;
   name: string;
-  phone: string | null;
-  address: string | null;
+  phone: string;
+  notes: string | null;
+  order_count: number;
+  failed_count: number;
+  address: string | null; // denormalized default address from customer_addresses
   city: string | null;
   created_at: string;
   updated_at: string;
@@ -31,7 +34,7 @@ interface DataState {
   customers: Customer[];
   addRider: (data: Pick<Rider, "name" | "phone">) => void;
   deleteRider: (id: string) => void;
-  addCustomer: (data: Pick<Customer, "name" | "phone" | "address" | "city">) => void;
+  addCustomer: (data: Pick<Customer, "name" | "phone">) => void;
   deleteCustomer: (id: string) => void;
 }
 
@@ -64,7 +67,12 @@ export const useDataStore = create<DataState>((set) => ({
         {
           ...data,
           id: crypto.randomUUID(),
-          user_id: "",
+          seller_id: "",
+          notes: null,
+          order_count: 0,
+          failed_count: 0,
+          address: null,
+          city: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

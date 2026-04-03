@@ -32,7 +32,7 @@ export default function DeleteCustomerSheet() {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
-        .from('address_book')
+        .from('customers')
         .delete()
         .eq('id', id)
         .eq('seller_id', userId!);

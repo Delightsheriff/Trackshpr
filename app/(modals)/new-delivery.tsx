@@ -388,10 +388,11 @@ export default function NewDeliveryScreen() {
         item: step1Values.item,
         delivery_fee: step1Values.deliveryFee ? parseFloat(step1Values.deliveryFee) : null,
         notes: step1Values.notes || null,
+        // customer_id references customers.id (customers table, post-migration from address_book)
         customer_id: draft.customer?.id ?? null,
         customer_name: draft.customer?.name ?? null,
         customer_phone: draft.customer?.phone ?? null,
-        delivery_address: draft.customer?.address ?? null,
+        delivery_address: draft.customer?.address ?? null, // denormalized default address
         city: draft.customer?.city ?? null,
         rider_id: draft.rider?.id ?? null,
         rider_name: draft.rider?.name ?? null,

@@ -61,11 +61,27 @@ export interface Rider {
 export interface Customer {
   id: string;
   seller_id: string;
-  customer_name: string;
-  customer_phone: string;
+  name: string;
+  phone: string;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  // Denormalised default address (from customers_with_stats view)
+  address: string | null;
+  city: string | null;
+  // Server-side aggregated counts (from customers_with_stats view)
+  order_count: number;
+  failed_count: number;
+}
+
+export interface CustomerAddress {
+  id: string;
+  customer_id: string;
+  seller_id: string;
   address: string;
   city: string | null;
   label: string | null;
+  is_default: boolean;
   created_at: string | null;
 }
 
@@ -251,32 +267,156 @@ export async function deleteRider(riderId: string): Promise<void> {
 
 // ── Customers ─────────────────────────────────────────────────────────────────
 
+/** List all customers with server-side order_count / failed_count via the
+ *  customers_with_stats view (security_invoker = true → RLS applies). */
 export async function fetchCustomers(sellerId: string): Promise<Customer[]> {
   const { data, error } = await supabase
-    .from("address_book")
+    .from("customers_with_stats")
     .select("*")
     .eq("seller_id", sellerId)
-    .order("customer_name");
+    .order("name");
 
   if (error) throw new Error("Failed to fetch customers");
   return (data ?? []) as Customer[];
 }
 
+export async function fetchCustomer(customerId: string): Promise<Customer> {
+  const { data, error } = await supabase
+    .from("customers_with_stats")
+    .select("*")
+    .eq("id", customerId)
+    .single();
+
+  if (error || !data) throw new Error("Customer not found");
+  return data as Customer;
+}
+
+/** Insert customer + first address in a single logical operation. */
 export async function insertCustomer(payload: {
   seller_id: string;
-  customer_name: string;
-  customer_phone: string;
+  name: string;
+  phone: string;
+  notes?: string | null;
   address: string;
   city?: string | null;
+  address_label?: string | null;
 }): Promise<Customer> {
+  const { seller_id, name, phone, notes, address, city, address_label } = payload;
+
+  // 1. Insert the customer record
+  const { data: customer, error: cErr } = await supabase
+    .from("customers")
+    .insert({ seller_id, name, phone, notes: notes ?? null })
+    .select()
+    .single();
+
+  if (cErr || !customer) throw new Error(cErr?.message ?? "Failed to save customer");
+
+  // 2. Insert the first (default) address
+  const { error: aErr } = await supabase
+    .from("customer_addresses")
+    .insert({
+      customer_id: customer.id,
+      seller_id,
+      address,
+      city: city ?? null,
+      label: address_label ?? null,
+      is_default: true,
+    });
+
+  if (aErr) throw new Error(aErr.message ?? "Failed to save customer address");
+
+  // 3. Return full record with stats via view
+  return fetchCustomer(customer.id);
+}
+
+export async function updateCustomer(
+  customerId: string,
+  payload: { name: string; phone: string; notes?: string | null },
+): Promise<Customer> {
+  const { error } = await supabase
+    .from("customers")
+    .update(payload)
+    .eq("id", customerId);
+
+  if (error) throw new Error("Failed to update customer");
+  return fetchCustomer(customerId);
+}
+
+export async function deleteCustomer(customerId: string): Promise<void> {
+  const { error } = await supabase
+    .from("customers")
+    .delete()
+    .eq("id", customerId);
+
+  if (error) throw new Error("Failed to delete customer");
+}
+
+// ── Customer addresses ────────────────────────────────────────────────────────
+
+export async function fetchCustomerAddresses(
+  customerId: string,
+): Promise<CustomerAddress[]> {
   const { data, error } = await supabase
-    .from("address_book")
+    .from("customer_addresses")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("is_default", { ascending: false });
+
+  if (error) throw new Error("Failed to fetch addresses");
+  return (data ?? []) as CustomerAddress[];
+}
+
+export async function insertCustomerAddress(payload: {
+  customer_id: string;
+  seller_id: string;
+  address: string;
+  city?: string | null;
+  label?: string | null;
+  is_default: boolean;
+}): Promise<CustomerAddress> {
+  const { data, error } = await supabase
+    .from("customer_addresses")
     .insert(payload)
     .select()
     .single();
 
-  if (error || !data) throw new Error(error?.message ?? "Failed to save customer");
-  return data as Customer;
+  if (error || !data) throw new Error(error?.message ?? "Failed to save address");
+  return data as CustomerAddress;
+}
+
+export async function updateCustomerAddress(
+  addressId: string,
+  payload: { address?: string; city?: string | null; label?: string | null; is_default?: boolean },
+): Promise<CustomerAddress> {
+  const { data, error } = await supabase
+    .from("customer_addresses")
+    .update(payload)
+    .eq("id", addressId)
+    .select()
+    .single();
+
+  if (error || !data) throw new Error("Failed to update address");
+  return data as CustomerAddress;
+}
+
+export async function deleteCustomerAddress(addressId: string): Promise<void> {
+  const { error } = await supabase
+    .from("customer_addresses")
+    .delete()
+    .eq("id", addressId);
+
+  if (error) throw new Error("Failed to delete address");
+}
+
+/** Promote a different address to default before deleting the current default. */
+export async function setDefaultAddress(addressId: string): Promise<void> {
+  const { error } = await supabase
+    .from("customer_addresses")
+    .update({ is_default: true })
+    .eq("id", addressId);
+
+  if (error) throw new Error("Failed to set default address");
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────────

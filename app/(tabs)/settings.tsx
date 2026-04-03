@@ -382,6 +382,26 @@ export default function SettingsScreen() {
               { backgroundColor: colors.surfaceContainer },
             ]}
           />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
+          <SettingRow
+            icon="book"
+            iconColor={colors.info}
+            iconBg={colors.infoBg}
+            label="Address Book"
+            sublabel="Customers & delivery contacts"
+            onPress={() => router.push("/(screens)/customers")}
+          />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.surfaceContainer },
+            ]}
+          />
           <SettingRow
             icon="download"
             iconColor={colors.success}

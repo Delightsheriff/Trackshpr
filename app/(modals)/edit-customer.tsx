@@ -1,11 +1,11 @@
 /**
- * Add Customer bottom sheet.
- * Inserts into customers then customer_addresses in one logical operation.
+ * Edit Customer bottom sheet.
+ * Pre-populates from useCustomer(id) and submits via useUpdateCustomer.
  * Phone validated to E.164 via libphonenumber-js + PhoneNumberInput.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useAddCustomer, useSession } from "@/src/hooks";
+import { useCustomer, useUpdateCustomer, useSession } from "@/src/hooks";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import PhoneNumberInput from "@/src/components/profile-setup/phone-number-input";
@@ -17,13 +17,13 @@ import BottomSheet, {
   BottomSheetScrollView,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
-import { router } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
-const customerSchema = z.object({
+const editSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   phone: z
     .string()
@@ -33,10 +33,8 @@ const customerSchema = z.object({
       "Enter a valid phone number",
     ),
   notes: z.string().trim().optional(),
-  address: z.string().trim().min(1, "At least one delivery address is required"),
-  city: z.string().trim().optional(),
 });
-type CustomerValues = z.infer<typeof customerSchema>;
+type EditValues = z.infer<typeof editSchema>;
 
 // ── Text field ────────────────────────────────────────────────────────────────
 function SheetInput({
@@ -106,41 +104,57 @@ const si = StyleSheet.create({
 });
 
 // ── Sheet ─────────────────────────────────────────────────────────────────────
-export default function AddCustomerSheet() {
+export default function EditCustomerSheet() {
   const { colors, isDark } = useTheme();
-  const insets     = useSafeAreaInsets();
-  const sheetRef   = useRef<BottomSheet>(null);
+  const insets = useSafeAreaInsets();
+  const sheetRef = useRef<BottomSheet>(null);
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { userId } = useSession();
-  const showToast  = useToastStore((s) => s.show);
-  const addCustomer = useAddCustomer(userId);
+  const showToast = useToastStore((s) => s.show);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<CustomerValues>({
-    resolver: zodResolver(customerSchema),
-    defaultValues: { name: "", phone: "", notes: "", address: "", city: "" },
+  const { data: customer } = useCustomer(id ?? null);
+  const updateCustomer = useUpdateCustomer(userId);
+
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<EditValues>({
+    resolver: zodResolver(editSchema),
+    defaultValues: { name: "", phone: "", notes: "" },
   });
 
-  const handleClose   = useCallback(() => router.back(), []);
+  // Pre-populate when customer data loads
+  useEffect(() => {
+    if (customer) {
+      reset({
+        name: customer.name,
+        phone: customer.phone,
+        notes: customer.notes ?? "",
+      });
+    }
+  }, [customer, reset]);
+
+  const handleClose = useCallback(() => router.back(), []);
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} pressBehavior="close" />
     ), [],
   );
 
-  const onSubmit = (values: CustomerValues) => {
-    addCustomer.mutate(
+  const onSubmit = (values: EditValues) => {
+    if (!id) return;
+    updateCustomer.mutate(
       {
-        name: values.name,
-        phone: values.phone,
-        notes: values.notes || null,
-        address: values.address,
-        city: values.city || null,
+        customerId: id,
+        data: {
+          name: values.name,
+          phone: values.phone,
+          notes: values.notes || null,
+        },
       },
       {
         onSuccess: () => {
-          showToast(`${values.name} saved`, "success");
+          showToast("Customer updated", "success");
           router.back();
         },
-        onError: () => showToast("Could not save customer. Try again.", "error"),
+        onError: () => showToast("Could not update customer. Try again.", "error"),
       },
     );
   };
@@ -154,7 +168,7 @@ export default function AddCustomerSheet() {
       <BottomSheet
         ref={sheetRef}
         index={0}
-        snapPoints={[600 + insets.bottom]}
+        snapPoints={[460 + insets.bottom]}
         enablePanDownToClose
         onClose={handleClose}
         backdropComponent={renderBackdrop}
@@ -167,56 +181,46 @@ export default function AddCustomerSheet() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 16 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add New Customer</Text>
+          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Edit Customer</Text>
 
           <View style={styles.fields}>
             <Controller control={control} name="name"
               render={({ field: { value, onChange, onBlur } }) => (
-                <SheetInput label="Full name" value={value} onChange={onChange} onBlur={onBlur}
-                  placeholder="e.g. Amara Obi" hasError={!!errors.name} errorMsg={errors.name?.message} />
+                <SheetInput
+                  label="Full name" value={value} onChange={onChange} onBlur={onBlur}
+                  placeholder="e.g. Amara Obi"
+                  hasError={!!errors.name} errorMsg={errors.name?.message}
+                />
               )} />
 
             <Controller control={control} name="phone"
               render={({ field: { value, onChange, onBlur } }) => (
-                <SheetPhoneField value={value} onChange={onChange} onBlur={onBlur}
-                  hasError={!!errors.phone} errorMsg={errors.phone?.message} />
+                <SheetPhoneField
+                  value={value} onChange={onChange} onBlur={onBlur}
+                  hasError={!!errors.phone} errorMsg={errors.phone?.message}
+                />
               )} />
 
             <Controller control={control} name="notes"
               render={({ field: { value, onChange, onBlur } }) => (
-                <SheetInput label="Notes" value={value ?? ""} onChange={onChange} onBlur={onBlur}
-                  placeholder="e.g. Business customer" optional />
+                <SheetInput
+                  label="Notes" value={value ?? ""} onChange={onChange} onBlur={onBlur}
+                  placeholder="e.g. Business customer" optional
+                />
               )} />
-
-            {/* ── Address section ─────────────────────────── */}
-            <View style={[styles.addressSection, { borderColor: errors.address ? colors.error : colors.surfaceContainer }]}>
-              <Text style={[styles.addressSectionLabel, { color: errors.address ? colors.error : colors.textMuted }]}>
-                Default Delivery Address
-              </Text>
-              <Controller control={control} name="address"
-                render={({ field: { value, onChange, onBlur } }) => (
-                  <SheetInput label="Street address" value={value} onChange={onChange} onBlur={onBlur}
-                    placeholder="Street address" hasError={!!errors.address} errorMsg={errors.address?.message} />
-                )} />
-              <Controller control={control} name="city"
-                render={({ field: { value, onChange, onBlur } }) => (
-                  <SheetInput label="City" value={value ?? ""} onChange={onChange} onBlur={onBlur}
-                    placeholder="e.g. Lagos" optional />
-                )} />
-            </View>
           </View>
 
           <View style={[styles.saveShadow, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
             <Pressable
               onPress={handleSubmit(onSubmit)}
-              disabled={addCustomer.isPending}
+              disabled={updateCustomer.isPending}
               android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
               style={styles.savePressable}
             >
               <View style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
-                {addCustomer.isPending
+                {updateCustomer.isPending
                   ? <ActivityIndicator size="small" color="white" />
-                  : <Text style={styles.saveBtnText}>Save Customer</Text>}
+                  : <Text style={styles.saveBtnText}>Save Changes</Text>}
               </View>
             </Pressable>
           </View>
@@ -232,8 +236,6 @@ const styles = StyleSheet.create({
   content:      { paddingHorizontal: layout.screenPaddingH },
   sheetTitle:   { fontSize: 17, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: -0.34, marginBottom: 16 },
   fields:       { gap: 10, marginBottom: 16 },
-  addressSection: { borderWidth: 1, borderRadius: radius.lg, padding: 10, gap: 8 },
-  addressSectionLabel: { fontSize: 10, fontFamily: font.sans.bold, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 2 },
   saveShadow:   { borderRadius: radius.full, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 8 },
   savePressable:{ borderRadius: radius.full, overflow: "hidden" },
   saveBtn:      { borderRadius: radius.full, paddingVertical: 15, alignItems: "center", justifyContent: "center", minHeight: 50 },

@@ -48,6 +48,7 @@ export default function RootLayout() {
               <Stack.Screen name="(screens)/order-detail" />
               <Stack.Screen name="(screens)/rider-detail" />
               <Stack.Screen name="(screens)/customers" />
+              <Stack.Screen name="(screens)/customer-detail" />
               <Stack.Screen name="(screens)/inventory" />
               <Stack.Screen name="(screens)/product-detail" />
               <Stack.Screen name="(screens)/analytics" />
@@ -58,6 +59,7 @@ export default function RootLayout() {
               <Stack.Screen name="(modals)/edit-rider" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/delete-rider" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/add-customer" options={{ presentation: "transparentModal" }} />
+              <Stack.Screen name="(modals)/edit-customer" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/delete-customer" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/sign-out" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/delete-account" options={{ presentation: "transparentModal" }} />

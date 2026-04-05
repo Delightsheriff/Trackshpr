@@ -3,7 +3,7 @@
  * Custom tab bar: frosted glass 68px, raised gradient FAB center (52×52 r18),
  * active dot below label, Feather icons. DS §8.5.
  */
-import { font, gradients, radius } from "@/src/constants/tokens";
+import { font, gradients, radius, shadowsLight, shadowsDark } from "@/src/constants/tokens";
 import { useTheme } from "@/src/stores/themeStore";
 import Feather from "@expo/vector-icons/Feather";
 import { LinearGradient } from "expo-linear-gradient";
@@ -35,11 +35,19 @@ function CustomTabBar({
   navigation: { navigate: (name: string) => void };
 }) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   // Height = 68px visible nav area + device safe area below home indicator
   const barHeight = 68 + insets.bottom;
   const paddingBottom = insets.bottom + 6;
+
+  // 94% opacity per DS §8.5 — surface at 0.94 alpha
+  const bgColor = isDark
+    ? "rgba(15, 14, 26, 0.94)"
+    : "rgba(250, 244, 255, 0.94)";
+
+  // FAB shadow adapts to dark mode (DS §6)
+  const fabShadowTokens = isDark ? shadowsDark.fab : shadowsLight.fab;
 
   return (
     <View
@@ -48,7 +56,7 @@ function CustomTabBar({
         {
           height: barHeight,
           paddingBottom,
-          backgroundColor: colors.surface,
+          backgroundColor: bgColor,
           borderTopColor: colors.border,
         },
       ]}
@@ -63,7 +71,11 @@ function CustomTabBar({
                   styles.fabShadow,
                   {
                     backgroundColor: colors.primary,
-                    shadowColor: colors.primary,
+                    shadowColor: fabShadowTokens.shadowColor,
+                    shadowOffset: fabShadowTokens.shadowOffset,
+                    shadowOpacity: fabShadowTokens.shadowOpacity,
+                    shadowRadius: fabShadowTokens.shadowRadius,
+                    elevation: fabShadowTokens.elevation,
                   },
                 ]}
               >
@@ -111,7 +123,11 @@ function CustomTabBar({
             <Text
               style={[
                 styles.tabLabel,
-                { color: isActive ? colors.primary : colors.textMuted },
+                {
+                  color: isActive ? colors.primary : colors.textMuted,
+                  fontFamily: isActive ? font.sans.bold : font.sans.regular,
+                  fontWeight: isActive ? "700" : "400",
+                },
               ]}
             >
               {tab.label}
@@ -146,8 +162,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 9,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "500",
+    // fontFamily and fontWeight applied inline (active = bold, inactive = regular)
     letterSpacing: 0.03 * 9,
   },
   activeDot: {
@@ -166,14 +181,7 @@ const styles = StyleSheet.create({
   },
   fabShadow: {
     borderRadius: 18,
-    backgroundColor: "#4647D3",
-    // iOS
-    shadowColor: "#4647D3",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    // Android
-    elevation: 12,
+    // backgroundColor, shadow* and elevation applied inline (theme-aware)
   },
   fabPressable: {
     borderRadius: 18,

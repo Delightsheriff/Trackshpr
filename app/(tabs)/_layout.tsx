@@ -19,9 +19,9 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BAR_HEIGHT = 68; // visible zone (px), excluding safe area
+const BAR_HEIGHT = 68; // visible icon zone (px), NOT including safe area
 const FAB_SIZE = 52;
-const FAB_FLOAT = 18; // how far FAB rises above the bar's top border (px)
+const FAB_FLOAT = 14; // px the FAB rises above the bar's top border
 
 type TabRoute = "index" | "orders" | "riders" | "settings";
 type TabIcon = "home" | "package" | "user" | "settings" | "plus";
@@ -75,23 +75,15 @@ function CustomTabBar({
       {/* Background: liquid glass on iOS, opaque on Android */}
       {Platform.OS === "ios" ? (
         <>
-          <BlurView
-            intensity={72}
-            tint={blurTint}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            style={[StyleSheet.absoluteFill, { backgroundColor: overlayColor }]}
-          />
+          <BlurView intensity={72} tint={blurTint} style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: overlayColor }]} />
         </>
       ) : (
-        <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: androidBg }]}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: androidBg }]} />
       )}
 
-      {/* Content: 68px visual zone */}
-      <View style={[styles.row, { paddingBottom: insets.bottom }]}>
+      {/* Icon zone — exactly BAR_HEIGHT tall, items vertically centered */}
+      <View style={styles.row}>
         {VISUAL_TABS.map((tab) => {
           if (tab.isFab) {
             return (
@@ -174,6 +166,9 @@ function CustomTabBar({
           );
         })}
       </View>
+
+      {/* Safe area spacer — fills the home indicator zone below the icon row */}
+      {insets.bottom > 0 && <View style={{ height: insets.bottom }} />}
     </View>
   );
 }
@@ -187,7 +182,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    height: BAR_HEIGHT,
+    height: BAR_HEIGHT, // fixed 68px — never affected by safe area
     alignItems: "center",
     paddingHorizontal: 8,
   },

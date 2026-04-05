@@ -2,14 +2,22 @@
  * useOrders — TanStack Query hooks for orders (fetch, fetch one, create).
  */
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  fetchFleetMapOrders,
   fetchOrders,
   fetchOrder,
+  fetchOrderItems,
+  fetchOrdersPage,
+  fetchOrderTimeline,
   insertOrder,
   fetchActiveOrders,
   fetchTodayStats,
+  ORDER_PAGE_SIZE,
   type Order,
+  type OrderEvent,
+  type OrderItem,
+  type FleetMapOrder,
   type TodayStats,
 } from "@/src/lib/supabaseQueries";
 import { queryKeys } from "@/src/lib/queryKeys";
@@ -23,10 +31,57 @@ export function useOrders(userId: string | null) {
   });
 }
 
+export function useFleetMapOrders(userId: string | null) {
+  return useQuery<FleetMapOrder[]>({
+    queryKey: queryKeys.fleetOrders(userId ?? ""),
+    queryFn: () => fetchFleetMapOrders(userId!),
+    enabled: !!userId,
+  });
+}
+
+export function useInfiniteOrders(
+  userId: string | null,
+  status: string | null,
+  search: string,
+) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.ordersInfinite(userId ?? "", status ?? "all", search),
+    queryFn: ({ pageParam }) =>
+      fetchOrdersPage({
+        sellerId: userId!,
+        status,
+        search,
+        cursor: pageParam,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      if (lastPage.length < ORDER_PAGE_SIZE) return undefined;
+      return lastPageParam + ORDER_PAGE_SIZE;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useOrderTimeline(orderId: string | null) {
+  return useQuery<OrderEvent[]>({
+    queryKey: queryKeys.orderTimeline(orderId ?? ""),
+    queryFn: () => fetchOrderTimeline(orderId!),
+    enabled: !!orderId,
+  });
+}
+
 export function useOrder(orderId: string | null) {
   return useQuery({
     queryKey: queryKeys.order(orderId ?? ""),
     queryFn: () => fetchOrder(orderId!),
+    enabled: !!orderId,
+  });
+}
+
+export function useOrderItems(orderId: string | null) {
+  return useQuery<OrderItem[]>({
+    queryKey: queryKeys.orderItems(orderId ?? ""),
+    queryFn: () => fetchOrderItems(orderId!),
     enabled: !!orderId,
   });
 }
@@ -69,6 +124,7 @@ export function useOrdersRealtime(userId: string | null) {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.orders(userId) });
+          queryClient.invalidateQueries({ queryKey: ["ordersInfinite", userId] });
           queryClient.invalidateQueries({ queryKey: queryKeys.activeOrders(userId) });
           queryClient.invalidateQueries({ queryKey: queryKeys.todayStats(userId) });
         },
@@ -86,10 +142,17 @@ export function useCreateOrder(userId: string | null) {
   return useMutation({
     mutationFn: (payload: Omit<Parameters<typeof insertOrder>[0], "seller_id">): Promise<Order> =>
       insertOrder({ seller_id: userId!, ...payload }),
-    onSuccess: () => {
+    onSuccess: (_order, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders(userId ?? "") });
+      queryClient.invalidateQueries({ queryKey: ["ordersInfinite", userId ?? ""] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activeOrders(userId ?? "") });
       queryClient.invalidateQueries({ queryKey: queryKeys.todayStats(userId ?? "") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers(userId ?? "") });
+
+      if (variables.order_items?.length) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.products(userId ?? "") });
+        queryClient.invalidateQueries({ queryKey: queryKeys.lowStockProducts(userId ?? "") });
+      }
     },
   });
 }

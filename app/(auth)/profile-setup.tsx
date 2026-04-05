@@ -5,7 +5,11 @@
 import { colors, font } from "@/src/constants/tokens";
 import { useProfile, useSaveProfile, useUploadLogo } from "@/src/hooks";
 import { triggerAuthRecheck } from "@/src/lib/authRecheck";
-import { pickLogoUri } from "@/src/lib/profiles";
+import {
+  getLegacyPhoneFields,
+  getProfileContactNumbers,
+  pickLogoUri,
+} from "@/src/lib/profiles";
 import { supabase } from "@/src/lib/supabase";
 import type { ContactNumber } from "@/src/lib/supabaseQueries";
 import { useToastStore } from "@/src/stores/toastStore";
@@ -25,7 +29,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   ProfileSetupFormData,
-  defaultContactNumber,
   defaultProfileSetupValues,
 } from "@/src/components/profile-setup/profile-setup-schema";
 import { ProfileSetupForm } from "@/src/components/profile-setup/profile-setup-form";
@@ -58,20 +61,18 @@ export default function ProfileSetupScreen() {
         return;
       }
 
-      const primaryContact = data.contactNumbers.find((n) => n.is_primary);
-      const secondContact = data.contactNumbers.find(
-        (n) => !n.is_primary && n.number,
+      const { phone, secondary_phone } = getLegacyPhoneFields(
+        data.contactNumbers as ContactNumber[],
       );
 
       saveMutation.mutate(
         {
           id: userId,
           business_name: data.businessName.trim(),
-          // Derive phone/secondary_phone from contact_numbers for backward compat
-          phone: primaryContact?.number ?? "",
-          secondary_phone: secondContact?.number ?? null,
+          phone,
+          secondary_phone,
           city: data.city?.trim() || null,
-          brand_name: data.description?.trim() || null,
+          description: data.description?.trim() || null,
           logo_url: data.logoPublicUrl ?? null,
           pickup_address: data.pickupAddress?.trim() || null,
           instagram_handle: data.instagramHandle?.trim() || null,
@@ -148,12 +149,9 @@ export default function ProfileSetupScreen() {
   const initialValues: ProfileSetupFormData = profileData
     ? {
         businessName: profileData.business_name ?? "",
-        contactNumbers:
-          profileData.contact_numbers && profileData.contact_numbers.length > 0
-            ? profileData.contact_numbers
-            : [defaultContactNumber],
+        contactNumbers: getProfileContactNumbers(profileData),
         city: profileData.city ?? "",
-        description: profileData.brand_name ?? "",
+        description: profileData.description ?? "",
         pickupAddress: profileData.pickup_address ?? "",
         instagramHandle: profileData.instagram_handle ?? "",
         tiktokHandle: profileData.tiktok_handle ?? "",

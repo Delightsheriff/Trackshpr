@@ -22,8 +22,8 @@ export function useProfile(userId: string | null) {
 
 interface SaveProfilePayload {
   id: string;
-  business_name: string;
-  phone: string;
+  business_name?: string | null;
+  phone?: string | null;
   secondary_phone?: string | null;
   city?: string | null;
   description?: string | null;
@@ -36,6 +36,7 @@ interface SaveProfilePayload {
   tiktok_handle?: string | null;
   contact_numbers?: ContactNumber[] | null;
   onboarding_complete?: boolean;
+  is_pro?: boolean;
 }
 
 export function useSaveProfile() {
@@ -68,7 +69,6 @@ export function useDeleteAccount() {
     mutationFn: async () => {
       const { error } = await supabase.rpc("delete_user");
       if (error) throw new Error(error.message);
-      await supabase.auth.signOut();
     },
   });
 }

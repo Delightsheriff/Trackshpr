@@ -36,6 +36,7 @@ interface DataState {
   deleteRider: (id: string) => void;
   addCustomer: (data: Pick<Customer, "name" | "phone">) => void;
   deleteCustomer: (id: string) => void;
+  reset: () => void;
 }
 
 export const useDataStore = create<DataState>((set) => ({
@@ -81,4 +82,6 @@ export const useDataStore = create<DataState>((set) => ({
 
   deleteCustomer: (id) =>
     set((s) => ({ customers: s.customers.filter((c) => c.id !== id) })),
+
+  reset: () => set({ riders: [], customers: [] }),
 }));

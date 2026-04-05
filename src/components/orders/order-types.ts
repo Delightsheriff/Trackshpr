@@ -5,6 +5,7 @@ export type FilterKey = "all" | OrderStatus;
 export const FILTER_TABS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
+  { key: "picked_up", label: "Picked Up" },
   { key: "in_transit", label: "In Transit" },
   { key: "delivered", label: "Delivered" },
   { key: "failed", label: "Failed" },

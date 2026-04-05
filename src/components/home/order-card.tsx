@@ -9,15 +9,19 @@ import { StatusPill } from "./status-pill";
 
 export function OrderCard({
   id,
+  orderId,
   item,
   customer,
+  rider,
   area,
   status,
   time,
 }: {
   id: string;
+  orderId?: string;
   item: string;
   customer: string;
+  rider?: string | null;
   area: string;
   status: OrderStatus;
   time: string;
@@ -56,14 +60,21 @@ export function OrderCard({
         <Feather name={cfg.icon} size={16} color={cfg.fg} />
       </View>
       <View style={styles.orderInfo}>
-        <Text
-          style={[styles.orderName, { color: colors.textPrimary }]}
-          numberOfLines={1}
-        >
-          {item}
-        </Text>
-        <Text style={[styles.orderMeta, { color: colors.textMuted }]}>
-          {customer} · {area}
+        <View style={styles.orderNameRow}>
+          {!!orderId && (
+            <Text style={[styles.orderNumber, { color: colors.textMuted }]}>
+              {orderId}
+            </Text>
+          )}
+          <Text
+            style={[styles.orderName, { color: colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {item}
+          </Text>
+        </View>
+        <Text style={[styles.orderMeta, { color: colors.textMuted }]} numberOfLines={1}>
+          {customer}{rider ? ` · ${rider}` : ""}
         </Text>
       </View>
       <View style={styles.orderRight}>
@@ -94,12 +105,18 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   orderInfo: { flex: 1, minWidth: 0 },
+  orderNameRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginBottom: 2 },
+  orderNumber: {
+    fontSize: 10,
+    fontFamily: font.mono.regular,
+    flexShrink: 0,
+  },
   orderName: {
     fontSize: 13,
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.13,
-    marginBottom: 2,
+    flexShrink: 1,
   },
   orderMeta: {
     fontSize: 11,

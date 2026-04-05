@@ -20,8 +20,9 @@ export default function RootLayout() {
 
   const colors = useThemeStore((s) => s.colors);
   const isDark = useThemeStore((s) => s.isDark);
+  const hasHydrated = useThemeStore((s) => s.hasHydrated);
 
-  if (status === "loading") {
+  if (status === "loading" || !hasHydrated) {
     return <SplashScreen />;
   }
 
@@ -43,8 +44,12 @@ export default function RootLayout() {
               <Stack.Screen name="(settings)/business-details" />
               <Stack.Screen name="(settings)/brand-customization" />
               <Stack.Screen name="(settings)/account" />
+              <Stack.Screen name="pro-upgrade" />
               <Stack.Screen name="(screens)/order-detail" />
               <Stack.Screen name="(screens)/rider-detail" />
+              <Stack.Screen name="(screens)/customers" />
+              <Stack.Screen name="(screens)/inventory" />
+              <Stack.Screen name="(screens)/product-detail" />
               <Stack.Screen name="(screens)/analytics" />
               <Stack.Screen name="(screens)/fleet-map" />
               <Stack.Screen name="(screens)/rider-link" />

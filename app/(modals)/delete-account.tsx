@@ -4,7 +4,8 @@
  */
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useDeleteAccount } from "@/src/hooks";
-import { useOrderStore } from "@/src/stores/orderStore";
+import { resetLocalSessionState } from "@/src/lib/sessionReset";
+import { supabase } from "@/src/lib/supabase";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
@@ -14,8 +15,8 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useCallback, useRef } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function DeleteAccountSheet() {
@@ -25,7 +26,7 @@ export default function DeleteAccountSheet() {
   const showToast = useToastStore((s) => s.show);
   const deleteAccount = useDeleteAccount();
   const queryClient = useQueryClient();
-  const resetDraft = useOrderStore((s) => s.reset);
+  const [confirmationText, setConfirmationText] = useState("");
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -41,16 +42,15 @@ export default function DeleteAccountSheet() {
     [],
   );
 
-  const handleDelete = () => {
-    deleteAccount.mutate(undefined, {
-      onSuccess: () => {
-        queryClient.clear();
-        resetDraft();
-      },
-      onError: () => {
-        showToast("Could not delete account. Please try again.", "error");
-      },
-    });
+  const handleDelete = async () => {
+    try {
+      await deleteAccount.mutateAsync();
+      await supabase.auth.signOut().catch(() => undefined);
+      await resetLocalSessionState(queryClient);
+      router.replace("/(auth)/sign-in");
+    } catch {
+      showToast("Could not delete your account. Please try again.", "error");
+    }
   };
 
   const sheetShadow = isDark
@@ -81,12 +81,36 @@ export default function DeleteAccountSheet() {
               This cannot be undone.
             </Text>
           </Text>
+          <View
+            style={[
+              styles.confirmWrap,
+              { backgroundColor: colors.surfaceCard, borderColor: colors.surfaceContainer },
+            ]}
+          >
+            <Text style={[styles.confirmLabel, { color: colors.textMuted }]}>
+              Type DELETE to confirm
+            </Text>
+            <TextInput
+              value={confirmationText}
+              onChangeText={setConfirmationText}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!deleteAccount.isPending}
+              placeholder="DELETE"
+              placeholderTextColor={colors.textMuted}
+              style={[styles.confirmInput, { color: colors.textPrimary }]}
+            />
+          </View>
           <View style={styles.btnWrap}>
             <Pressable
               onPress={handleDelete}
-              disabled={deleteAccount.isPending}
+              disabled={deleteAccount.isPending || confirmationText !== "DELETE"}
               android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
-              style={[styles.dangerBtn, { backgroundColor: colors.error }]}
+              style={[
+                styles.dangerBtn,
+                { backgroundColor: colors.error },
+                confirmationText !== "DELETE" && styles.dangerBtnDisabled,
+              ]}
             >
               {deleteAccount.isPending ? (
                 <ActivityIndicator color="#fff" size="small" />
@@ -116,8 +140,32 @@ const styles = StyleSheet.create({
   iconWrap: { width: 56, height: 56, borderRadius: 18, alignItems: "center", justifyContent: "center", marginBottom: 12 },
   title: { fontSize: 17, fontFamily: font.sans.bold, fontWeight: "700", textAlign: "center", letterSpacing: -0.34, marginBottom: 6 },
   sub: { fontSize: 13, fontFamily: font.sans.regular, textAlign: "center", lineHeight: 19.5, marginBottom: 20 },
+  confirmWrap: {
+    width: "100%",
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  confirmLabel: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  confirmInput: {
+    fontSize: 14,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    padding: 0,
+    margin: 0,
+  },
   btnWrap: { width: "100%", gap: 8 },
   dangerBtn: { borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden", minHeight: 50, justifyContent: "center" },
+  dangerBtnDisabled: { opacity: 0.45 },
   dangerBtnText: { fontSize: 14, fontFamily: font.sans.bold, fontWeight: "700", color: "white" },
   cancelBtn: { borderRadius: radius.full, paddingVertical: 14, alignItems: "center", overflow: "hidden" },
   cancelBtnText: { fontSize: 14, fontFamily: font.sans.semiBold, fontWeight: "600" },

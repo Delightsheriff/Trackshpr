@@ -3,7 +3,7 @@
  * action buttons, order details, magic links, photo strip, and delivery timeline.
  * DS §8.1, §8.4, §8.8 — Feather icons, DM Sans / DM Mono fonts.
  */
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,6 +19,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
+import { useOrderTimeline } from "@/src/hooks/useOrders";
+import type { OrderEvent } from "@/src/lib/supabaseQueries";
+import type { TLState } from "@/src/components/orders/timeline-item";
 
 // Components
 import { StatusPill } from "@/src/components/home/status-pill";
@@ -31,6 +34,17 @@ import { MapSection } from "@/src/components/orders/map-section";
 import { MagicLinkCard } from "@/src/components/orders/magic-link-card";
 
 import { formatAmount, formatRelativeTime, formatTime } from "@/src/utils/helpers";
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "pending": return "Order confirmed";
+    case "picked_up": return "Rider picked up";
+    case "in_transit": return "In transit";
+    case "delivered": return "Delivered";
+    case "failed": return "Delivery failed";
+    default: return status;
+  }
+}
 
 export default function OrderDetailScreen() {
   const { colors, isDark } = useTheme();
@@ -57,20 +71,22 @@ export default function OrderDetailScreen() {
   const order: Order | null = dbOrder
     ? {
         id: dbOrder.id,
-        orderId: `TRK-${dbOrder.id.substring(0, 6).toUpperCase()}`,
-        item: dbOrder.item_description,
+        orderId: (dbOrder as any).order_number
+          ? `#${(dbOrder as any).order_number}`
+          : `TRK-${dbOrder.id.substring(0, 6).toUpperCase()}`,
+        item: dbOrder.item,
         customer: dbOrder.customer_name ?? "—",
         customerPhone: dbOrder.customer_phone ?? "—",
         address: dbOrder.delivery_address ?? "—",
-        rider: (dbOrder.riders as any)?.name ?? "—",
-        riderPhone: (dbOrder.riders as any)?.phone ?? "—",
-        amount: 0,
+        rider: (dbOrder.riders as any)?.name ?? dbOrder.rider_name ?? "—",
+        riderPhone: (dbOrder.riders as any)?.phone ?? dbOrder.rider_phone ?? "—",
+        amount: (dbOrder as any).delivery_fee ?? 0,
         status: dbOrder.status,
         riderToken: dbOrder.rider_token ?? "",
         customerToken: dbOrder.customer_token ?? "",
         createdAt: formatTime(dbOrder.created_at),
         pickedUpAt: null,
-        deliveredAt: null,
+        deliveredAt: dbOrder.delivered_at ? formatTime(dbOrder.delivered_at) : null,
         failedAt: null,
         failureReason: null,
         pickedUpLocation: null,
@@ -78,16 +94,42 @@ export default function OrderDetailScreen() {
       }
     : null;
 
+  // ── Order timeline (order_status_events) ──────────────────────────────────
+  const { data: timelineEvents = [] } = useOrderTimeline(id ?? null);
+
+  // ── Realtime — append new status events without manual refresh ────────────
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`order_events_${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "order_status_events",
+          filter: `order_id=eq.${id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.orderTimeline(id) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [id, queryClient]);
+
   // Action handlers
   const handleRetryDelivery = () => {
-    if (!order) return;
+    if (!order || !dbOrder) return;
     router.push({
       pathname: "/(modals)/new-delivery",
       params: {
         prefillItem: order.item,
-        prefillCustomer: order.customer,
-        prefillPhone: order.customerPhone,
+        prefillCustomerName: order.customer,
+        prefillCustomerPhone: order.customerPhone,
         prefillAddress: order.address,
+        prefillCustomerId: (dbOrder as any).customer_id ?? "",
       },
     });
   };
@@ -633,100 +675,34 @@ export default function OrderDetailScreen() {
           {isDelivered ? "Delivery timeline" : "Timeline"}
         </Text>
         <View style={styles.timeline}>
-          {isPending && (
+          {timelineEvents.length === 0 ? (
             <TimelineItem
               state="active"
-              event="Order created"
-              meta={`Today · ${order.createdAt}`}
+              event="Order confirmed"
+              meta={order.createdAt}
               hasLine={false}
             />
-          )}
-          {isTransit && (
-            <>
-              <TimelineItem
-                state="done"
-                event="Order created"
-                meta="Today · 10:58 AM"
-                tagType="photo"
-                tagLabel="Item photo saved"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="done"
-                event="Rider picked up"
-                meta="Today · 11:34 AM"
-                tagType="gps"
-                tagLabel="GPS: Yaba, Lagos"
-                hasLine
-                lineColor={colors.surfaceContainer}
-              />
-              <TimelineItem
-                state="active"
-                event="In transit"
-                meta="Now · En route to Lekki"
-                hasLine={false}
-              />
-            </>
-          )}
-          {isDelivered && (
-            <>
-              <TimelineItem
-                state="done"
-                event="Order created"
-                meta="Today · 10:48 AM"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="done"
-                event="Rider picked up"
-                meta="Today · 11:02 AM"
-                tagType="gps"
-                tagLabel="GPS: Yaba, Lagos"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="done"
-                event="In transit"
-                meta="11:02 AM → 12:26 PM"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="done"
-                event="Delivered"
-                meta="Today · 12:26 PM"
-                tagType="gps"
-                tagLabel="GPS: Surulere"
-                hasLine={false}
-              />
-            </>
-          )}
-          {isFailed && (
-            <>
-              <TimelineItem
-                state="done"
-                event="Order created"
-                meta="Today · 9:14 AM"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="done"
-                event="Rider picked up"
-                meta="Today · 9:48 AM"
-                hasLine
-                lineColor={colors.successBg}
-              />
-              <TimelineItem
-                state="error"
-                event="Delivery failed"
-                meta={`Today · 10:55 AM · ${order.failureReason ?? "Unknown reason"}`}
-                hasLine={false}
-              />
-            </>
+          ) : (
+            timelineEvents.map((ev, i) => {
+              const isLast = i === timelineEvents.length - 1;
+              const state: TLState = !isLast
+                ? "done"
+                : isFailed
+                  ? "error"
+                  : isDelivered
+                    ? "done"
+                    : "active";
+              return (
+                <TimelineItem
+                  key={ev.id}
+                  state={state}
+                  event={statusLabel(ev.status)}
+                  meta={formatTime(ev.created_at)}
+                  hasLine={!isLast}
+                  lineColor={state === "done" ? colors.successBg : colors.surfaceContainer}
+                />
+              );
+            })
           )}
         </View>
       </ScrollView>

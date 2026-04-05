@@ -1,16 +1,17 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Share } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { useTheme } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { layout, radius, font } from "@/src/constants/tokens";
 import { Order } from "./order-types";
 
-function copyLink(url: string) {
-  Share.share({ message: url });
-}
+const APP_URL = "https://trackshpr.app";
 
 export function MagicLinkCard({ order }: { order: Order }) {
   const { colors, isDark } = useTheme();
+  const showToast = useToastStore((s) => s.show);
 
   const cardShadow = isDark
     ? {
@@ -28,6 +29,16 @@ export function MagicLinkCard({ order }: { order: Order }) {
         elevation: 2,
       };
 
+  const handleCopyRider = async () => {
+    await Clipboard.setStringAsync(`${APP_URL}/rider/${order.riderToken}`);
+    showToast("Rider link copied", "success");
+  };
+
+  const handleCopyTracking = async () => {
+    await Clipboard.setStringAsync(`${APP_URL}/track/${order.customerToken}`);
+    showToast("Tracking link copied", "success");
+  };
+
   return (
     <>
       <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -41,89 +52,44 @@ export function MagicLinkCard({ order }: { order: Order }) {
         ]}
       >
         <View style={styles.magicRow}>
-          <View
-            style={[
-              styles.magicIcon,
-              { backgroundColor: colors.primarySoft },
-            ]}
-          >
+          <View style={[styles.magicIcon, { backgroundColor: colors.primarySoft }]}>
             <Feather name="truck" size={14} color={colors.primary} />
           </View>
           <View style={styles.magicBody}>
-            <Text
-              style={[
-                styles.magicRowLabel,
-                { color: colors.textPrimary },
-              ]}
-            >
+            <Text style={[styles.magicRowLabel, { color: colors.textPrimary }]}>
               Rider link
             </Text>
-            <Text
-              style={[styles.magicUrl, { color: colors.textMuted }]}
-              numberOfLines={1}
-            >
-              trk.sh/rider/{order.riderToken}
+            <Text style={[styles.magicUrl, { color: colors.textMuted }]} numberOfLines={1}>
+              trackshpr.app/rider/{order.riderToken}
             </Text>
           </View>
           <Pressable
-            style={[
-              styles.copyBtn,
-              { backgroundColor: colors.primarySoft },
-            ]}
-            onPress={() =>
-              copyLink("https://trk.sh/rider/" + order.riderToken)
-            }
+            style={[styles.copyBtn, { backgroundColor: colors.primarySoft }]}
+            onPress={handleCopyRider}
           >
-            <Text style={[styles.copyBtnText, { color: colors.primary }]}>
-              Copy
-            </Text>
+            <Text style={[styles.copyBtnText, { color: colors.primary }]}>Copy</Text>
           </Pressable>
         </View>
 
-        <View
-          style={[
-            styles.detailSep,
-            { backgroundColor: colors.surfaceContainer },
-          ]}
-        />
+        <View style={[styles.gap, { backgroundColor: colors.surfaceContainer }]} />
 
         <View style={styles.magicRow}>
-          <View
-            style={[
-              styles.magicIcon,
-              { backgroundColor: colors.successBg },
-            ]}
-          >
+          <View style={[styles.magicIcon, { backgroundColor: colors.successBg }]}>
             <Feather name="navigation" size={14} color={colors.success} />
           </View>
           <View style={styles.magicBody}>
-            <Text
-              style={[
-                styles.magicRowLabel,
-                { color: colors.textPrimary },
-              ]}
-            >
+            <Text style={[styles.magicRowLabel, { color: colors.textPrimary }]}>
               Customer tracking link
             </Text>
-            <Text
-              style={[styles.magicUrl, { color: colors.textMuted }]}
-              numberOfLines={1}
-            >
-              trk.sh/track/{order.customerToken}
+            <Text style={[styles.magicUrl, { color: colors.textMuted }]} numberOfLines={1}>
+              trackshpr.app/track/{order.customerToken}
             </Text>
           </View>
           <Pressable
-            style={[
-              styles.copyBtn,
-              { backgroundColor: colors.primarySoft },
-            ]}
-            onPress={() =>
-              copyLink("https://trk.sh/track/" + order.customerToken)
-            }
+            style={[styles.copyBtn, { backgroundColor: colors.primarySoft }]}
+            onPress={handleCopyTracking}
           >
-            <Text style={[styles.copyBtnText, { color: colors.primary }]}>
-              Copy
-            </Text>
+            <Text style={[styles.copyBtnText, { color: colors.primary }]}>Copy</Text>
           </Pressable>
         </View>
       </View>
@@ -147,6 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     paddingHorizontal: 14,
+    gap: 4,
   },
   magicRow: {
     flexDirection: "row",
@@ -185,7 +152,9 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
   },
-  detailSep: {
-    height: 1,
+  // Background-shift row separator — replaces 1px border (DS §1)
+  gap: {
+    height: 8,
+    marginHorizontal: -14,
   },
 });

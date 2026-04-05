@@ -1,14 +1,16 @@
 /**
  * Business Details settings screen.
- * Back + Save header, logo upload, required/optional fields, validation.
+ * Saves name, city, logo, description, and seller contact numbers.
  */
+import ContactNumbersSection from "@/src/components/profile-setup/contact-numbers-section";
+import type { ContactNumberData } from "@/src/components/profile-setup/profile-setup-schema";
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
+import { useProfile, useSaveProfile, useSession, useUploadLogo } from "@/src/hooks";
 import {
-  useProfile,
-  useSaveProfile,
-  useSession,
-  useUploadLogo,
-} from "@/src/hooks";
+  getLegacyPhoneFields,
+  getProfileContactNumbers,
+} from "@/src/lib/profiles";
+import type { ContactNumber } from "@/src/lib/supabaseQueries";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
@@ -17,7 +19,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -37,17 +39,16 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Section label ─────────────────────────────────────────────────────────────
+const E164_REGEX = /^\+[1-9]\d{6,14}$/;
+
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
+
   return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-      {label}
-    </Text>
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
   );
 }
 
-// ── Form input ────────────────────────────────────────────────────────────────
 function FormInput({
   label,
   value,
@@ -61,7 +62,7 @@ function FormInput({
 }: {
   label: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   placeholder?: string;
   keyboardType?: "default" | "phone-pad";
   multiline?: boolean;
@@ -89,19 +90,19 @@ function FormInput({
         elevation: 1,
       };
 
-  const fieldBg = focused ? colors.surfaceCard : colors.surfaceContainer;
-  const borderColor = showError
-    ? colors.error
-    : focused
-      ? colors.primary
-      : "transparent";
-
   return (
     <View>
       <View
         style={[
           styles.inputField,
-          { backgroundColor: fieldBg, borderColor },
+          {
+            backgroundColor: focused ? colors.surfaceCard : colors.surfaceContainer,
+            borderColor: showError
+              ? colors.error
+              : focused
+                ? colors.primary
+                : "transparent",
+          },
           !focused && !showError && fieldShadow,
         ]}
       >
@@ -112,7 +113,6 @@ function FormInput({
           ]}
         >
           {label}
-          {showError ? " — required" : ""}
         </Text>
         <TextInput
           value={value}
@@ -129,57 +129,144 @@ function FormInput({
             { color: colors.textPrimary },
             multiline && { minHeight: 56, textAlignVertical: "top" },
           ]}
-          returnKeyType={multiline ? "default" : "next"}
         />
-        {maxLength !== undefined && (
+        {maxLength !== undefined ? (
           <Text style={[styles.charCount, { color: colors.textMuted }]}>
             {value.length} / {maxLength}
           </Text>
-        )}
+        ) : null}
       </View>
       {showError && errorMsg ? (
-        <Text style={[styles.errorMsg, { color: colors.error }]}>
-          {errorMsg}
-        </Text>
+        <Text style={[styles.errorMsg, { color: colors.error }]}>{errorMsg}</Text>
       ) : null}
     </View>
   );
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+function StateCard({
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  sub,
+  cta,
+  ctaLabel,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  sub: string;
+  cta?: () => void;
+  ctaLabel?: string;
+}) {
+  const { colors, isDark } = useTheme();
+  const cardShadow = isDark
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
+
+  return (
+    <View style={[styles.stateCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+      <View style={[styles.stateIcon, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={22} color={iconColor} />
+      </View>
+      <Text style={[styles.stateTitle, { color: colors.textPrimary }]}>{title}</Text>
+      <Text style={[styles.stateSub, { color: colors.textMuted }]}>{sub}</Text>
+      {cta && ctaLabel ? (
+        <Pressable onPress={cta} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
+          <Text style={styles.retryBtnText}>{ctaLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function validateContactNumbers(values: ContactNumberData[]) {
+  const entryErrors = values.map((entry) => {
+    const next: { number?: string; label?: string } = {};
+
+    if (!entry.number.trim() || !E164_REGEX.test(entry.number.trim())) {
+      next.number = "Enter a valid phone number with country code";
+    }
+
+    if (!entry.label.trim()) {
+      next.label = "Add a label";
+    }
+
+    return Object.keys(next).length > 0 ? next : undefined;
+  });
+
+  let globalError: string | undefined;
+
+  if (!values.length) {
+    globalError = "Add at least one contact number";
+  } else if (values.filter((entry) => entry.is_primary).length !== 1) {
+    globalError = "One number must be set as primary";
+  }
+
+  return {
+    entryErrors,
+    globalError,
+    isValid:
+      !globalError && entryErrors.every((entry) => entry == null),
+  };
+}
+
 export default function BusinessDetailsScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const showToast = useToastStore((s) => s.show);
+  const showToast = useToastStore((state) => state.show);
   const { userId } = useSession();
-
-  const { data: profile, isLoading: profileLoading } = useProfile(userId);
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isError,
+    refetch,
+  } = useProfile(userId);
   const saveProfileMutation = useSaveProfile();
   const uploadLogoMutation = useUploadLogo();
 
   const [businessName, setBusinessName] = useState("");
-  const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [description, setDescription] = useState("");
   const [logoUri, setLogoUri] = useState<string | null>(null);
+  const [contactNumbers, setContactNumbers] = useState<ContactNumberData[]>([
+    {
+      number: "",
+      label: "WhatsApp",
+      is_whatsapp: true,
+      is_primary: true,
+    },
+  ]);
+  const [contactErrors, setContactErrors] = useState<
+    ({ number?: string; label?: string } | undefined)[]
+  >([]);
+  const [contactGlobalError, setContactGlobalError] = useState<string>();
   const [nameErr, setNameErr] = useState(false);
-  const [phoneErr, setPhoneErr] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const bannerY = useSharedValue(-40);
   const bannerOp = useSharedValue(0);
 
-  const hasErrors = nameErr || phoneErr;
-
-  // Pre-fill from profile once loaded
   useEffect(() => {
-    if (profile) {
-      setBusinessName(profile.business_name ?? "");
-      setPhone(profile.phone ?? "");
-      setCity(profile.city ?? "");
-      setDescription(profile.description ?? "");
-      setLogoUri(profile.logo_url ?? null);
-    }
+    if (!profile) return;
+
+    setBusinessName(profile.business_name ?? "");
+    setCity(profile.city ?? "");
+    setDescription(profile.description ?? "");
+    setLogoUri(profile.logo_url ?? null);
+    setContactNumbers(getProfileContactNumbers(profile) as ContactNumberData[]);
   }, [profile]);
 
   const cardShadow = isDark
@@ -216,13 +303,18 @@ export default function BusinessDetailsScreen() {
 
   const handlePickLogo = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") return;
+    if (status !== "granted") {
+      showToast("Please allow photo access to upload your logo.", "info");
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 1,
     });
+
     if (!result.canceled && result.assets[0]) {
       setLogoUri(result.assets[0].uri);
     }
@@ -243,64 +335,77 @@ export default function BusinessDetailsScreen() {
 
   const handleSave = async () => {
     if (!userId || isPending) return;
-    const nameOk = businessName.trim().length > 0;
-    const phoneOk = phone.trim().length > 0;
-    setNameErr(!nameOk);
-    setPhoneErr(!phoneOk);
-    if (!nameOk || !phoneOk) return;
+
+    const trimmedName = businessName.trim();
+    setNameErr(!trimmedName);
+
+    const validation = validateContactNumbers(contactNumbers);
+    setContactErrors(validation.entryErrors);
+    setContactGlobalError(validation.globalError);
+
+    if (!trimmedName || !validation.isValid) {
+      return;
+    }
 
     let finalLogoUrl: string | null = logoUri?.startsWith("https://")
       ? logoUri
       : (profile?.logo_url ?? null);
 
-    // Upload new local image if picked
     if (logoUri && !logoUri.startsWith("https://")) {
       try {
         const result = await uploadLogoMutation.mutateAsync({
           userId,
           uri: logoUri,
         });
+
         if (result.error) {
-          showToast(`Upload error: ${result.error}`, "error");
-          finalLogoUrl = profile?.logo_url ?? null;
+          showToast("Couldn't upload your logo. Please try again.", "error");
         } else {
           finalLogoUrl = result.publicUrl;
         }
-      } catch (e) {
-        showToast("Logo upload failed. Please try again.", "error");
-        finalLogoUrl = profile?.logo_url ?? null;
+      } catch {
+        showToast("Couldn't upload your logo. Please try again.", "error");
       }
     } else if (!logoUri) {
       finalLogoUrl = null;
     }
 
-    saveProfileMutation.mutate(
-      {
+    const { phone, secondary_phone } = getLegacyPhoneFields(
+      contactNumbers as ContactNumber[],
+    );
+
+    try {
+      await saveProfileMutation.mutateAsync({
         id: userId,
-        business_name: businessName.trim(),
-        phone: phone.trim(),
+        business_name: trimmedName,
+        phone,
+        secondary_phone,
         city: city.trim() || null,
         description: description.trim() || null,
         logo_url: finalLogoUrl,
+        contact_numbers: contactNumbers as ContactNumber[],
         onboarding_complete: true,
-      },
-      {
-        onSuccess: () => {
-          setSaved(true);
-          showBanner();
-          setTimeout(() => setSaved(false), 3000);
-        },
-        onError: () => {
-          showToast("Could not save details. Please try again.", "error");
-        },
-      },
-    );
+      });
+
+      await refetch();
+      showBanner();
+    } catch {
+      showToast("Couldn't save your business details. Please try again.", "error");
+    }
   };
 
   const bannerStyle = useAnimatedStyle(() => ({
     opacity: bannerOp.value,
     transform: [{ translateY: bannerY.value }],
   }));
+
+  const logoPreviewUri = useMemo(() => {
+    if (!logoUri) return null;
+    if (logoUri.startsWith("https://") && profile?.updated_at) {
+      return `${logoUri}?v=${new Date(profile.updated_at).getTime()}`;
+    }
+    return logoUri;
+  }, [logoUri, profile?.updated_at]);
 
   return (
     <View
@@ -311,7 +416,6 @@ export default function BusinessDetailsScreen() {
     >
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: colors.surfaceCard }]}>
         <Pressable
           onPress={() => router.back()}
@@ -330,7 +434,6 @@ export default function BusinessDetailsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* ── Saved banner ── */}
       <Animated.View
         style={[
           styles.savedBanner,
@@ -345,239 +448,223 @@ export default function BusinessDetailsScreen() {
         </Text>
       </Animated.View>
 
-      {/* ── Form ── */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingBottom: insets.bottom + 40 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+      {profileLoading ? (
+        <View style={styles.centeredState}>
+          <StateCard
+            icon="loader"
+            iconBg={colors.primarySoft}
+            iconColor={colors.primary}
+            title="Loading business details"
+            sub="We&apos;re fetching your current profile."
+          />
+        </View>
+      ) : isError ? (
+        <View style={styles.centeredState}>
+          <StateCard
+            icon="wifi-off"
+            iconBg={colors.errorBg}
+            iconColor={colors.error}
+            title="Couldn't load your profile"
+            sub="Check your connection and try again."
+            cta={() => refetch()}
+            ctaLabel="Try Again"
+          />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {/* Logo upload card */}
-          <View
-            style={[
-              styles.logoCard,
-              { backgroundColor: colors.surfaceCard },
-              cardShadow,
+          <ScrollView
+            contentContainerStyle={[
+              styles.scroll,
+              { paddingBottom: insets.bottom + 40 },
             ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View
               style={[
-                styles.logoPreview,
-                logoUri
-                  ? styles.logoPreviewFilled
-                  : [
-                      styles.logoPreviewEmpty,
-                      {
-                        backgroundColor: colors.surfaceContainer,
-                        borderColor: colors.surfaceContainer,
-                      },
-                    ],
+                styles.logoCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
               ]}
             >
-              {logoUri ? (
-                <Image
-                  source={{
-                    uri:
-                      logoUri.startsWith("https://") && profile?.updated_at
-                        ? `${logoUri}?v=${new Date(profile.updated_at).getTime()}`
-                        : logoUri,
-                  }}
-                  style={styles.logoImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <Feather name="briefcase" size={24} color={colors.textMuted} />
-              )}
               <View
                 style={[
-                  styles.logoBadge,
-                  { borderColor: colors.surfaceCard },
-                  logoUri
-                    ? { backgroundColor: colors.success }
-                    : { backgroundColor: colors.primary },
+                  styles.logoPreview,
+                  logoPreviewUri
+                    ? styles.logoPreviewFilled
+                    : [
+                        styles.logoPreviewEmpty,
+                        {
+                          backgroundColor: colors.surfaceContainer,
+                          borderColor: colors.surfaceContainer,
+                        },
+                      ],
                 ]}
               >
-                <Feather
-                  name={logoUri ? "check" : "plus"}
-                  size={11}
-                  color="#fff"
-                />
-              </View>
-            </View>
-
-            <View style={styles.logoInfo}>
-              <Text style={[styles.logoTitle, { color: colors.textPrimary }]}>
-                Business logo
-              </Text>
-              <Text style={[styles.logoSub, { color: colors.textMuted }]}>
-                {logoUri
-                  ? "Looking great. This shows on all tracking pages."
-                  : "Shows on customer tracking pages. Square image, min 200×200px."}
-              </Text>
-              <View style={styles.logoActions}>
-                <Pressable
-                  onPress={handlePickLogo}
+                {logoPreviewUri ? (
+                  <Image
+                    source={{ uri: logoPreviewUri }}
+                    style={styles.logoImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Feather name="briefcase" size={24} color={colors.textMuted} />
+                )}
+                <View
                   style={[
-                    styles.logoBtnPrimary,
-                    { backgroundColor: colors.primarySoft },
+                    styles.logoBadge,
+                    { borderColor: colors.surfaceCard },
+                    logoPreviewUri
+                      ? { backgroundColor: colors.success }
+                      : { backgroundColor: colors.primary },
                   ]}
-                  android_ripple={{
-                    color: colors.primarySoft,
-                    borderless: false,
-                  }}
                 >
-                  <Text
-                    style={[
-                      styles.logoBtnPrimaryText,
-                      { color: colors.primary },
-                    ]}
-                  >
-                    {logoUri ? "Change photo" : "Upload photo"}
-                  </Text>
-                </Pressable>
-                {logoUri ? (
+                  <Feather
+                    name={logoPreviewUri ? "check" : "plus"}
+                    size={11}
+                    color="#FFFFFF"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.logoInfo}>
+                <Text style={[styles.logoTitle, { color: colors.textPrimary }]}>
+                  Business logo
+                </Text>
+                <Text style={[styles.logoSub, { color: colors.textMuted }]}>
+                  {logoPreviewUri
+                    ? "Looking good. This shows on all tracking pages."
+                    : "Shows on customer tracking pages. Square image, min 200x200px."}
+                </Text>
+                <View style={styles.logoActions}>
                   <Pressable
-                    onPress={() => setLogoUri(null)}
+                    onPress={handlePickLogo}
                     style={[
-                      styles.logoBtnDanger,
-                      { backgroundColor: colors.errorBg },
+                      styles.logoBtnPrimary,
+                      { backgroundColor: colors.primarySoft },
                     ]}
-                    android_ripple={{
-                      color: colors.errorBg,
-                      borderless: false,
-                    }}
                   >
                     <Text
                       style={[
-                        styles.logoBtnDangerText,
-                        { color: colors.error },
+                        styles.logoBtnPrimaryText,
+                        { color: colors.primary },
                       ]}
                     >
-                      Remove
+                      {logoPreviewUri ? "Change photo" : "Upload photo"}
                     </Text>
                   </Pressable>
-                ) : null}
+                  {logoPreviewUri ? (
+                    <Pressable
+                      onPress={() => setLogoUri(null)}
+                      style={[
+                        styles.logoBtnDanger,
+                        { backgroundColor: colors.errorBg },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.logoBtnDangerText,
+                          { color: colors.error },
+                        ]}
+                      >
+                        Remove
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Required */}
-          <SectionLabel label="Required" />
-
-          <FormInput
-            label="Business name"
-            value={businessName}
-            onChange={(v) => {
-              setBusinessName(v);
-              if (v.trim()) setNameErr(false);
-            }}
-            placeholder="e.g. Zara's Closet"
-            hasError={nameErr}
-            errorMsg="Business name cannot be empty"
-          />
-
-          <FormInput
-            label="WhatsApp number"
-            value={phone}
-            onChange={(v) => {
-              setPhone(v);
-              if (v.trim()) setPhoneErr(false);
-            }}
-            placeholder="0800 000 0000"
-            keyboardType="phone-pad"
-            hasError={phoneErr}
-            errorMsg="WhatsApp number cannot be empty"
-          />
-
-          {/* Optional */}
-          <SectionLabel label="Optional" />
-
-          <FormInput
-            label="City"
-            value={city}
-            onChange={setCity}
-            placeholder="e.g. Lagos"
-          />
-
-          <FormInput
-            label="Short description"
-            value={description}
-            onChange={setDescription}
-            placeholder="What do you sell? Shown on tracking pages."
-            multiline
-            maxLength={80}
-          />
-
-          {/* Info card */}
-          <View
-            style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}
-          >
-            <Feather
-              name="eye"
-              size={16}
-              color={colors.primary}
-              style={styles.infoCardIcon}
-            />
-            <Text
-              style={[styles.infoCardText, { color: colors.textSecondary }]}
-            >
-              Your <Text style={styles.bold}>business name</Text>,{" "}
-              <Text style={styles.bold}>logo</Text> and{" "}
-              <Text style={styles.bold}>description</Text> appear on every
-              customer tracking page you share.
-            </Text>
-          </View>
-
-          {/* Save button */}
-          <View
-            style={[
-              styles.saveShadow,
-              { backgroundColor: colors.primary },
-              (hasErrors || isPending) && styles.saveShadowDim,
-            ]}
-          >
-            <Pressable
-              onPress={handleSave}
-              disabled={isPending}
-              style={styles.savePressable}
-              android_ripple={{
-                color: "rgba(255,255,255,0.2)",
-                borderless: false,
+            <SectionLabel label="Required" />
+            <FormInput
+              label="Business name"
+              value={businessName}
+              onChange={(value) => {
+                setBusinessName(value);
+                if (value.trim()) setNameErr(false);
               }}
+              placeholder="e.g. Zara's Closet"
+              hasError={nameErr}
+              errorMsg="Business name cannot be empty"
+            />
+
+            <ContactNumbersSection
+              values={contactNumbers}
+              onChange={(updated) => {
+                setContactNumbers(updated);
+                setContactErrors([]);
+                setContactGlobalError(undefined);
+              }}
+              errors={contactErrors}
+              globalError={contactGlobalError}
+            />
+
+            <SectionLabel label="Optional" />
+            <FormInput
+              label="City"
+              value={city}
+              onChange={setCity}
+              placeholder="e.g. Lagos"
+            />
+            <FormInput
+              label="Short description"
+              value={description}
+              onChange={setDescription}
+              placeholder="What do you sell? Shown on tracking pages."
+              multiline
+              maxLength={80}
+            />
+
+            <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
+              <Feather
+                name="eye"
+                size={16}
+                color={colors.primary}
+                style={styles.infoCardIcon}
+              />
+              <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
+                Your <Text style={styles.bold}>business name</Text>,{" "}
+                <Text style={styles.bold}>logo</Text>,{" "}
+                <Text style={styles.bold}>contact numbers</Text>, and{" "}
+                <Text style={styles.bold}>description</Text> appear on the pages
+                your customers see.
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.saveShadow,
+                { backgroundColor: colors.primary },
+                isPending && styles.saveShadowDim,
+              ]}
             >
-              <LinearGradient
-                colors={gradients.primary}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.saveBtn}
-              >
-                {isPending ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={[styles.saveBtnText, { color: "#fff" }]}>
-                    Save Changes
-                  </Text>
-                )}
-              </LinearGradient>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              <Pressable onPress={handleSave} disabled={isPending} style={styles.savePressable}>
+                <LinearGradient
+                  colors={gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.saveBtn}
+                >
+                  {isPending ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.saveBtnText}>Save Changes</Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -602,8 +689,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.34,
   },
   headerSpacer: { width: 34 },
-
-  // Saved banner
   savedBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -619,27 +704,63 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
   },
-
-  // Scroll
   scroll: {
     paddingHorizontal: layout.screenPaddingH,
     paddingTop: 12,
     gap: 12,
-    flexDirection: "column",
   },
-
-  // Section label
+  centeredState: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  stateCard: {
+    marginHorizontal: layout.screenPaddingH,
+    padding: 18,
+    borderRadius: radius.xl,
+    alignItems: "center",
+    gap: 8,
+  },
+  stateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stateTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+    textAlign: "center",
+  },
+  stateSub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  retryBtn: {
+    borderRadius: radius.full,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   sectionLabel: {
     fontSize: 10,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    letterSpacing: 0.1 * 10,
+    letterSpacing: 1,
     textTransform: "uppercase",
     marginTop: 4,
     marginBottom: -4,
   },
-
-  // Logo upload card
   logoCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -678,11 +799,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-  },
-  logoBadgeText: {
-    fontSize: 9,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
   },
   logoInfo: { flex: 1 },
   logoTitle: {
@@ -724,8 +840,6 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
   },
-
-  // Input field
   inputField: {
     borderRadius: radius.lg,
     paddingVertical: 13,
@@ -736,7 +850,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    letterSpacing: 0.06 * 10,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     marginBottom: 4,
   },
@@ -760,8 +874,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 2,
   },
-
-  // Info card
   infoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -778,8 +890,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bold: { fontFamily: font.sans.bold, fontWeight: "700" },
-
-  // Save button
   saveShadow: {
     borderRadius: radius.full,
     shadowOffset: { width: 0, height: 8 },
@@ -789,7 +899,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   saveShadowDim: {
-    opacity: 0.5,
+    opacity: 0.6,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -802,10 +912,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 50,
   },
   saveBtnText: {
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

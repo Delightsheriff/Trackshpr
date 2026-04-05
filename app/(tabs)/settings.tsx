@@ -1,22 +1,19 @@
 /**
- * Settings tab — profile, plan upgrade, preferences, account.
- * Dark mode toggle wired to useThemeStore. DS §9.1, §7.4.
+ * Settings tab - profile, plan upgrade, preferences, account.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useProfile, useSession } from "@/src/hooks";
-import { queryKeys } from "@/src/lib/queryKeys";
 import { supabase } from "@/src/lib/supabase";
-import { useToastStore } from "@/src/stores/toastStore";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
+import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import * as FileSystem from "expo-file-system";
-// import * as Notifications from "expo-notifications"; // Disabled until ready
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -25,15 +22,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQueryClient } from "@tanstack/react-query";
 
-// ── Toggle switch (DS §8.7) ───────────────────────────────────────────────────
 function Toggle({
   value,
   onChange,
 }: {
   value: boolean;
-  onChange: (v: boolean) => void;
+  onChange: (value: boolean) => void;
 }) {
   const { colors } = useTheme();
 
@@ -62,7 +57,6 @@ function Toggle({
   );
 }
 
-// ── Setting row ───────────────────────────────────────────────────────────────
 function SettingRow({
   icon,
   iconColor,
@@ -83,6 +77,7 @@ function SettingRow({
   danger?: boolean;
 }) {
   const { colors } = useTheme();
+
   return (
     <Pressable
       onPress={onPress}
@@ -91,11 +86,7 @@ function SettingRow({
       style={styles.settingRow}
     >
       <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
-        <Feather
-          name={icon}
-          size={18}
-          color={iconColor ?? colors.textPrimary}
-        />
+        <Feather name={icon} size={18} color={iconColor ?? colors.textPrimary} />
       </View>
       <View style={styles.settingBody}>
         <Text
@@ -106,16 +97,16 @@ function SettingRow({
         >
           {label}
         </Text>
-        {sublabel && (
+        {sublabel ? (
           <Text style={[styles.settingSubLabel, { color: colors.textMuted }]}>
             {sublabel}
           </Text>
-        )}
+        ) : null}
       </View>
       {right ??
-        (onPress && (
+        (onPress ? (
           <Feather name="chevron-right" size={16} color={colors.textMuted} />
-        ))}
+        ) : null)}
     </Pressable>
   );
 }
@@ -137,6 +128,7 @@ function SettingGroup({ children }: { children: React.ReactNode }) {
         shadowRadius: 8,
         elevation: 1,
       };
+
   return (
     <View
       style={[
@@ -152,60 +144,178 @@ function SettingGroup({ children }: { children: React.ReactNode }) {
 
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
+
   return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-      {label}
-    </Text>
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
   );
 }
 
-// ── Screen ─────────────────────────────────────────────────────────────────────
+function StateCard({
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  sub,
+  cta,
+  ctaLabel,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  sub: string;
+  cta?: () => void;
+  ctaLabel?: string;
+}) {
+  const { colors, isDark } = useTheme();
+  const cardShadow = isDark
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      };
+
+  return (
+    <View style={[styles.stateCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+      <View style={[styles.stateIcon, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={22} color={iconColor} />
+      </View>
+      <Text style={[styles.stateTitle, { color: colors.textPrimary }]}>{title}</Text>
+      <Text style={[styles.stateSub, { color: colors.textMuted }]}>{sub}</Text>
+      {cta && ctaLabel ? (
+        <Pressable onPress={cta} style={[styles.retryButton, { backgroundColor: colors.primary }]}>
+          <Text style={styles.retryButtonText}>{ctaLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function formatCsvValue(value: string | number | null | undefined) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function formatExportDate(value: string | null) {
+  if (!value) return "";
+  return new Date(value).toISOString();
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { toggle } = useThemeStore();
+  const toggleTheme = useThemeStore((state) => state.toggle);
   const { userId } = useSession();
-  const { data: profile } = useProfile(userId);
-  const showToast = useToastStore((s) => s.show);
-  const queryClient = useQueryClient();
-
-  const [notifEnabled, setNotifEnabled] = useState(!!profile?.push_token);
+  const {
+    data: profile,
+    isLoading,
+    isError,
+    refetch,
+  } = useProfile(userId);
+  const showToast = useToastStore((state) => state.show);
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setNotifEnabled(!!profile?.push_token);
   }, [profile?.push_token]);
 
+  const businessName = profile?.business_name ?? "My Business";
+  const initials = useMemo(
+    () =>
+      businessName
+        .split(" ")
+        .map((word) => word[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+    [businessName],
+  );
+
   const exportCSV = async () => {
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select("id, item_description, customer_name, status, created_at, delivery_address")
-      .eq("seller_id", userId!)
-      .order("created_at", { ascending: false });
-    if (error || !orders?.length) {
-      showToast("No orders to export", "info");
-      return;
+    if (!userId || exporting) return;
+
+    setExporting(true);
+
+    try {
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select(
+          "order_number, item, customer_name, rider_name, status, delivery_fee, created_at, delivered_at",
+        )
+        .eq("seller_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!orders?.length) {
+        showToast("No order history to export yet.", "info");
+        return;
+      }
+
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (!sharingAvailable) {
+        showToast("Sharing is not available on this device.", "error");
+        return;
+      }
+
+      const header = [
+        "order number",
+        "item",
+        "customer name",
+        "rider name",
+        "status",
+        "delivery fee",
+        "created at",
+        "delivered at",
+      ]
+        .map(formatCsvValue)
+        .join(",");
+
+      const rows = orders
+        .map((order) =>
+          [
+            order.order_number,
+            order.item,
+            order.customer_name,
+            order.rider_name,
+            order.status,
+            order.delivery_fee,
+            formatExportDate(order.created_at),
+            formatExportDate(order.delivered_at),
+          ]
+            .map(formatCsvValue)
+            .join(","),
+        )
+        .join("\n");
+
+      const filePath = `${FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? ""}trackshpr-order-history.csv`;
+      await FileSystem.writeAsStringAsync(filePath, `${header}\n${rows}`);
+      await Sharing.shareAsync(filePath, {
+        mimeType: "text/csv",
+        dialogTitle: "Export order history",
+        UTI: "public.comma-separated-values-text",
+      });
+    } catch {
+      showToast("Couldn't export your order history. Please try again.", "error");
+    } finally {
+      setExporting(false);
     }
-    const header = "ID,Item,Customer,Status,Address,Date\n";
-    const rows = orders
-      .map((o) =>
-        [
-          o.id,
-          (o.item_description ?? "").replace(/,/g, ";"),
-          (o.customer_name ?? "").replace(/,/g, ";"),
-          o.status ?? "",
-          (o.delivery_address ?? "").replace(/,/g, ";"),
-          o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
-        ].join(",")
-      )
-      .join("\n");
-    const path = (FileSystem.documentDirectory ?? "") + "trackshpr-orders.csv";
-    await FileSystem.writeAsStringAsync(path, header + rows);
-    await Sharing.shareAsync(path, { mimeType: "text/csv", dialogTitle: "Export Orders" });
   };
 
-  const handleNotifToggle = async (_value: boolean) => {
-    // TODO: Re-enable when expo-notifications is configured
-    showToast("Notifications not yet available", "info");
+  const handleNotifToggle = () => {
+    showToast("Notifications are not available yet.", "info");
   };
 
   const profileSectionShadow = isDark
@@ -224,261 +334,250 @@ export default function SettingsScreen() {
         elevation: 2,
       };
 
-  const businessName = profile?.business_name ?? "My Business";
-  const initials = businessName
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Profile hero banner ───────────────────────────────────────── */}
-        <View>
-          <LinearGradient
-            colors={["#4647D3", "#5354e8", "#6366f1"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.profileBanner, { paddingTop: insets.top }]}
-          >
-            <View style={styles.bannerOrb1} />
-            <View style={styles.bannerOrb2} />
-          </LinearGradient>
+        {isLoading ? (
+          <StateCard
+            icon="loader"
+            iconBg={colors.primarySoft}
+            iconColor={colors.primary}
+            title="Loading settings"
+            sub="We&apos;re pulling your latest business details."
+          />
+        ) : isError ? (
+          <StateCard
+            icon="wifi-off"
+            iconBg={colors.errorBg}
+            iconColor={colors.error}
+            title="Couldn't load your settings"
+            sub="Check your connection and try again."
+            cta={() => refetch()}
+            ctaLabel="Try Again"
+          />
+        ) : (
+          <>
+            <View>
+              <LinearGradient
+                colors={["#4647D3", "#5354E8", "#6366F1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.profileBanner, { paddingTop: insets.top }]}
+              >
+                <View style={styles.bannerOrb1} />
+                <View style={styles.bannerOrb2} />
+              </LinearGradient>
 
-          {/* Avatar overlapping banner */}
-          <View
-            style={[
-              styles.profileSection,
-              { backgroundColor: colors.surfaceCard },
-              profileSectionShadow,
-            ]}
-          >
-            <View style={styles.profileAvatarWrap}>
-              {profile?.logo_url ? (
-                <Image
-                  source={{
-                    uri: `${profile.logo_url}?v=${new Date(profile.updated_at).getTime()}`,
-                  }}
-                  style={[
-                    styles.profileAvatar,
-                    styles.profileAvatarImg,
-                    { borderColor: colors.surfaceCard },
-                  ]}
-                  className="w-full h-full"
-                  // contentFit="cover"
-                  contentFit="cover"
-                />
-              ) : (
-                <LinearGradient
-                  colors={gradients.avatar}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.profileAvatar,
-                    { borderColor: colors.surfaceCard },
-                  ]}
-                >
-                  <Text style={styles.profileAvatarText}>{initials}</Text>
-                </LinearGradient>
-              )}
-            </View>
-            <View style={styles.profileMeta}>
-              <Text style={[styles.profileName, { color: colors.textPrimary }]}>
-                {businessName}
-              </Text>
-              <View style={styles.profileMetaRow}>
-                {!!profile?.city && (
-                  <Text
-                    style={[styles.profileCity, { color: colors.textMuted }]}
-                  >
-                    <Feather
-                      name="map-pin"
-                      size={12}
-                      color={colors.textMuted}
-                    />{" "}
-                    {profile.city}
+              <View
+                style={[
+                  styles.profileSection,
+                  { backgroundColor: colors.surfaceCard },
+                  profileSectionShadow,
+                ]}
+              >
+                <View style={styles.profileAvatarWrap}>
+                  {profile?.logo_url ? (
+                    <Image
+                      source={{
+                        uri: profile.updated_at
+                          ? `${profile.logo_url}?v=${new Date(profile.updated_at).getTime()}`
+                          : profile.logo_url,
+                      }}
+                      style={[
+                        styles.profileAvatar,
+                        styles.profileAvatarImg,
+                        { borderColor: colors.surfaceCard },
+                      ]}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <LinearGradient
+                      colors={gradients.avatar}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[
+                        styles.profileAvatar,
+                        { borderColor: colors.surfaceCard },
+                      ]}
+                    >
+                      <Text style={styles.profileAvatarText}>{initials}</Text>
+                    </LinearGradient>
+                  )}
+                </View>
+
+                <View style={styles.profileMeta}>
+                  <Text style={[styles.profileName, { color: colors.textPrimary }]}>
+                    {businessName}
                   </Text>
-                )}
-                <View
-                  style={[
-                    styles.planBadge,
-                    { backgroundColor: colors.primarySoft },
-                  ]}
-                >
-                  <Text
-                    style={[styles.planBadgeText, { color: colors.primary }]}
-                  >
-                    Free plan
-                  </Text>
+                  <View style={styles.profileMetaRow}>
+                    {profile?.city ? (
+                      <Text style={[styles.profileCity, { color: colors.textMuted }]}>
+                        {profile.city}
+                      </Text>
+                    ) : null}
+                    <View
+                      style={[
+                        styles.planBadge,
+                        {
+                          backgroundColor: profile?.is_pro
+                            ? colors.successBg
+                            : colors.primarySoft,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.planBadgeText,
+                          {
+                            color: profile?.is_pro ? colors.success : colors.primary,
+                          },
+                        ]}
+                      >
+                        {profile?.is_pro ? "Pro plan" : "Free plan"}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        </View>
 
-        {/* ── Upgrade banner ────────────────────────────────────────────── */}
-        <View
-          style={[
-            styles.upgradeBanner,
-            { backgroundColor: colors.primarySoft },
-          ]}
-        >
-          <View style={styles.upgradeBannerLeft}>
-            <Text
-              style={[styles.upgradeBannerTitle, { color: colors.primary }]}
-            >
-              Unlock Trackshpr Pro
-            </Text>
-            <Text
-              style={[styles.upgradeBannerSub, { color: colors.textSecondary }]}
-            >
-              Unlimited orders, custom branding, priority support
-            </Text>
-          </View>
-          <View
-            style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}
-          >
-            <Text style={styles.upgradeBtnText}>Upgrade</Text>
-          </View>
-        </View>
+            {!profile?.is_pro ? (
+              <Pressable onPress={() => router.push("/pro-upgrade")}>
+                <View style={[styles.upgradeBanner, { backgroundColor: colors.primarySoft }]}>
+                  <View style={styles.upgradeBannerLeft}>
+                    <Text style={[styles.upgradeBannerTitle, { color: colors.primary }]}>
+                      Unlock Trackshpr Pro
+                    </Text>
+                    <Text
+                      style={[
+                        styles.upgradeBannerSub,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Inventory tracking, voice entry, and white-label branding are coming soon.
+                    </Text>
+                  </View>
+                  <View style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.upgradeBtnText}>Upgrade</Text>
+                  </View>
+                </View>
+              </Pressable>
+            ) : null}
 
-        {/* ── Business ──────────────────────────────────────────────────── */}
-        <SectionLabel label="Business" />
-        <SettingGroup>
-          <SettingRow
-            icon="briefcase"
-            iconColor={colors.primary}
-            iconBg={colors.primarySoft}
-            label="Business details"
-            sublabel="Name, phone, city"
-            onPress={() => router.push("/(settings)/business-details")}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <SettingRow
-            icon="sliders"
-            iconColor={colors.warning}
-            iconBg={colors.warningBg}
-            label="Brand customization"
-            sublabel="Logo, colors"
-            onPress={() => router.push("/(settings)/brand-customization")}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <SettingRow
-            icon="book"
-            iconColor={colors.info}
-            iconBg={colors.infoBg}
-            label="Address Book"
-            sublabel="Customers & delivery contacts"
-            onPress={() => router.push("/(screens)/customers")}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <SettingRow
-            icon="download"
-            iconColor={colors.success}
-            iconBg={colors.successBg}
-            label="Export history"
-            sublabel="Download CSV"
-            onPress={exportCSV}
-          />
-        </SettingGroup>
+            <SectionLabel label="Business" />
+            <SettingGroup>
+              <SettingRow
+                icon="briefcase"
+                iconColor={colors.primary}
+                iconBg={colors.primarySoft}
+                label="Business details"
+                sublabel="Name, city, logo, contact numbers"
+                onPress={() => router.push("/(settings)/business-details")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="sliders"
+                iconColor={colors.warning}
+                iconBg={colors.warningBg}
+                label="Brand customization"
+                sublabel="Display name and accent colour"
+                onPress={() => router.push("/(settings)/brand-customization")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="package"
+                iconColor={colors.primary}
+                iconBg={colors.primarySoft}
+                label="Inventory"
+                sublabel="Products, stock levels, and restocks"
+                onPress={() => router.push("/(screens)/inventory")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="users"
+                iconColor={colors.info}
+                iconBg={colors.infoBg}
+                label="Customers"
+                sublabel="Saved delivery contacts"
+                onPress={() => router.push("/(screens)/customers")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="user"
+                iconColor={colors.textSecondary}
+                iconBg={colors.surfaceContainer}
+                label="Saved riders"
+                sublabel="Manage your rider list"
+                onPress={() => router.push("/(tabs)/riders")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="download"
+                iconColor={colors.success}
+                iconBg={colors.successBg}
+                label={exporting ? "Exporting history..." : "Export history"}
+                sublabel="Share all orders as CSV"
+                onPress={exportCSV}
+              />
+            </SettingGroup>
 
-        {/* ── Preferences ───────────────────────────────────────────────── */}
-        <SectionLabel label="Preferences" />
-        <SettingGroup>
-          <SettingRow
-            icon="moon"
-            iconColor={colors.textSecondary}
-            iconBg={colors.surfaceContainer}
-            label="Dark mode"
-            right={<Toggle value={isDark} onChange={toggle} />}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <SettingRow
-            icon="bell"
-            iconColor={colors.primary}
-            iconBg={colors.primarySoft}
-            label="Push notifications"
-            right={<Toggle value={notifEnabled} onChange={handleNotifToggle} />}
-          />
-        </SettingGroup>
+            <SectionLabel label="Preferences" />
+            <SettingGroup>
+              <SettingRow
+                icon="moon"
+                iconColor={colors.textSecondary}
+                iconBg={colors.surfaceContainer}
+                label="Dark mode"
+                right={<Toggle value={isDark} onChange={() => toggleTheme()} />}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="bell"
+                iconColor={colors.primary}
+                iconBg={colors.primarySoft}
+                label="Push notifications"
+                right={
+                  <Toggle value={notifEnabled} onChange={handleNotifToggle} />
+                }
+              />
+            </SettingGroup>
 
-        {/* ── Support ───────────────────────────────────────────────────── */}
-        <SectionLabel label="Support" />
-        <SettingGroup>
-          <SettingRow
-            icon="message-circle"
-            iconColor={colors.info}
-            iconBg={colors.infoBg}
-            label="Help & support"
-            sublabel="Chat with us"
-            onPress={() => Linking.openURL("mailto:support@trackshpr.app")}
-          />
-          <View
-            style={[
-              styles.rowDivider,
-              { backgroundColor: colors.surfaceContainer },
-            ]}
-          />
-          <SettingRow
-            icon="user"
-            iconColor={colors.textSecondary}
-            iconBg={colors.surfaceContainer}
-            label="Account"
-            sublabel="Sign out, delete account"
-            onPress={() => router.push("/(settings)/account")}
-          />
-        </SettingGroup>
+            <SectionLabel label="Support" />
+            <SettingGroup>
+              <SettingRow
+                icon="message-circle"
+                iconColor={colors.info}
+                iconBg={colors.infoBg}
+                label="Help & support"
+                sublabel="Chat with us"
+                onPress={() => Linking.openURL("mailto:support@trackshpr.app")}
+              />
+              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
+              <SettingRow
+                icon="user"
+                iconColor={colors.textSecondary}
+                iconBg={colors.surfaceContainer}
+                label="Account"
+                sublabel="Sign out, delete account"
+                onPress={() => router.push("/(settings)/account")}
+              />
+            </SettingGroup>
 
-        {/* ── Version ───────────────────────────────────────────────────── */}
-        <Text style={[styles.version, { color: colors.textMuted }]}>
-          v1.0.0
-        </Text>
+            <Text style={[styles.version, { color: colors.textMuted }]}>v1.0.0</Text>
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: {},
-
-  // Profile banner
   profileBanner: {
     height: 100,
     overflow: "hidden",
@@ -501,8 +600,6 @@ const styles = StyleSheet.create({
     bottom: -30,
     left: 24,
   },
-
-  // Profile section
   profileSection: {
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 16,
@@ -516,13 +613,12 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileAvatarImg: {
     borderWidth: 3,
     overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
   },
   profileAvatarText: {
     fontSize: 22,
@@ -558,8 +654,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
     textTransform: "uppercase",
   },
-
-  // Upgrade banner
   upgradeBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -595,8 +689,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
-
-  // Section label
   sectionLabel: {
     fontSize: 11,
     fontFamily: font.sans.bold,
@@ -607,8 +699,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
-
-  // Setting group
   settingGroup: {
     borderRadius: radius.xl,
     marginHorizontal: layout.screenPaddingH,
@@ -646,8 +736,6 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.regular,
     marginTop: 1,
   },
-
-  // Toggle switch (DS §8.7) — 40×22px
   toggleTrack: {
     width: 40,
     height: 22,
@@ -665,12 +753,50 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-
-  // Version
   version: {
     textAlign: "center",
     fontSize: 11,
     fontFamily: font.mono.regular,
     paddingTop: 8,
+  },
+  stateCard: {
+    marginHorizontal: layout.screenPaddingH,
+    marginTop: 24,
+    padding: 18,
+    borderRadius: radius.xl,
+    alignItems: "center",
+    gap: 8,
+  },
+  stateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stateTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+    textAlign: "center",
+  },
+  stateSub: {
+    fontSize: 13,
+    fontFamily: font.sans.regular,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  retryButton: {
+    borderRadius: radius.full,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

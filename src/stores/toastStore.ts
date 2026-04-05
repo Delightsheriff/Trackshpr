@@ -16,6 +16,7 @@ interface ToastState {
   toast: ToastEntry | null;
   show: (message: string, type?: ToastType) => void;
   hide: () => void;
+  reset: () => void;
 }
 
 export const useToastStore = create<ToastState>((set) => ({
@@ -23,4 +24,5 @@ export const useToastStore = create<ToastState>((set) => ({
   show: (message, type = "success") =>
     set({ toast: { id: Date.now(), message, type } }),
   hide: () => set({ toast: null }),
+  reset: () => set({ toast: null }),
 }));

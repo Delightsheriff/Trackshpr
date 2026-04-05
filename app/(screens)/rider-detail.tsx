@@ -84,7 +84,7 @@ export default function RiderDetailScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, item_description, status, created_at, customer_name')
+        .select('id, item, status, created_at, customer_name')
         .eq('rider_id', id)
         .eq('seller_id', userId!)
         .order('created_at', { ascending: false })
@@ -351,7 +351,7 @@ export default function RiderDetailScreen() {
                         style={[styles.deliveryTitle, { color: colors.textPrimary }]}
                         numberOfLines={1}
                       >
-                        {delivery.item_description}
+                        {delivery.item}
                       </Text>
                       <Text style={[styles.deliveryCustomer, { color: colors.textMuted }]}>
                         {delivery.customer_name ?? '—'}

@@ -5,9 +5,20 @@
  * Step 3: Confirm & send
  */
 import { zodResolver } from "@hookform/resolvers/zod";
+import QuickAddCustomerSheet from "@/src/components/orders/quick-add-customer-sheet";
+import QuickAddRiderSheet from "@/src/components/orders/quick-add-rider-sheet";
+import ProGate from "@/src/components/shared/ProGate";
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useCreateOrder } from "@/src/hooks/useOrders";
-import { useRiders } from "@/src/hooks/useRiders";
+import {
+  useCreateOrder,
+  useCustomerAddresses,
+  useCustomers,
+  useProducts,
+  useProfile,
+  useRiders,
+} from "@/src/hooks";
+import { formatNaira } from "@/src/lib/inventory";
+import type { CustomerAddress } from "@/src/lib/supabaseQueries";
 import { useSession } from "@/src/hooks/useSession";
 import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
@@ -17,9 +28,9 @@ import { z } from "zod";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -42,6 +53,77 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function buildProductSummary(products: { name: string; quantity: number }[]) {
+  return products
+    .map((product) => `${product.name} x${product.quantity}`)
+    .join(", ");
+}
+
+function formatFeeInput(value: string) {
+  const digitsOnly = value.replace(/[^0-9]/g, "");
+  if (!digitsOnly) return "";
+  return Number(digitsOnly).toLocaleString("en-NG");
+}
+
+function parseFeeInput(value: string) {
+  const digitsOnly = value.replace(/[^0-9]/g, "");
+  return digitsOnly ? Number(digitsOnly) : null;
+}
+
+function getDeliveryAddressSelection(
+  selectedAddress: CustomerAddress | null,
+  oneOffAddress: string,
+  oneOffCity: string,
+) {
+  if (oneOffAddress.trim()) {
+    return {
+      deliveryAddress: oneOffAddress.trim(),
+      city: oneOffCity.trim() || null,
+    };
+  }
+
+  return {
+    deliveryAddress: selectedAddress?.address?.trim() ?? "",
+    city: selectedAddress?.city ?? null,
+  };
+}
+
+function SearchField({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <View
+      style={[
+        styles.searchWrap,
+        {
+          backgroundColor: colors.surfaceCard,
+          borderColor: focused ? colors.primary : "transparent",
+        },
+      ]}
+    >
+      <Feather name="search" size={15} color={colors.textMuted} />
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        style={[styles.searchInput, { color: colors.textPrimary }]}
+      />
+    </View>
+  );
 }
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -136,29 +218,38 @@ function FieldInput({
   prefix,
   multiline,
   optional,
+  error,
+  editable = true,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  keyboardType?: "default" | "numeric" | "phone-pad";
+  keyboardType?: "default" | "number-pad" | "phone-pad";
   prefix?: string;
   multiline?: boolean;
   optional?: boolean;
+  error?: string;
+  editable?: boolean;
 }) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
-    <View
+    <View>
+      <View
       style={[
         fi.wrap,
         {
           backgroundColor: colors.surfaceCard,
-          borderColor: focused ? colors.primary : "transparent",
+          borderColor: error
+            ? colors.error
+            : focused
+              ? colors.primary
+              : "transparent",
         },
       ]}
-    >
-      <Text style={[fi.label, { color: colors.textMuted }]}>
+      >
+      <Text style={[fi.label, { color: error ? colors.error : colors.textMuted }]}>
         {label}
         {optional ? (
           <Text style={{ color: colors.textMuted }}> · Optional</Text>
@@ -181,10 +272,18 @@ function FieldInput({
           placeholderTextColor={colors.textMuted}
           keyboardType={keyboardType}
           multiline={multiline}
-          style={[fi.input, { color: colors.textPrimary }]}
+          editable={editable}
+          style={[
+            fi.input,
+            { color: colors.textPrimary },
+            multiline && { minHeight: 48, textAlignVertical: "top" },
+            !editable && { color: colors.textSecondary },
+          ]}
           returnKeyType="next"
         />
       </View>
+      </View>
+      {error ? <Text style={[styles.fieldError, { color: colors.error }]}>{error}</Text> : null}
     </View>
   );
 }
@@ -193,13 +292,8 @@ const fi = StyleSheet.create({
     borderRadius: radius.lg,
     padding: layout.cardPadding,
     borderWidth: 2,
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
   },
-  inputRow: { flexDirection: "row", alignItems: "center" },
+  inputRow: { flexDirection: "row", alignItems: "flex-start" },
   label: {
     fontSize: 10,
     fontFamily: font.sans.semiBold,
@@ -208,7 +302,7 @@ const fi = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 4,
   },
-  prefix: { fontSize: 14, fontFamily: font.sans.semiBold, marginRight: 4 },
+  prefix: { fontSize: 14, fontFamily: font.sans.semiBold, marginRight: 4, marginTop: 1 },
   input: {
     flex: 1,
     fontSize: 14,
@@ -317,9 +411,71 @@ function SectionLabel({ label }: { label: string }) {
   );
 }
 
+function EmptyStateCard({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onPress?: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.emptyCard, { backgroundColor: colors.surfaceCard }]}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft }]}>
+        <Feather name={icon} size={18} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{title}</Text>
+      <Text style={[styles.emptyDescription, { color: colors.textMuted }]}>
+        {description}
+      </Text>
+      {actionLabel && onPress ? (
+        <Pressable
+          onPress={onPress}
+          style={[styles.inlineAction, { backgroundColor: colors.surfaceContainer }]}
+        >
+          <Text style={[styles.inlineActionText, { color: colors.primary }]}>
+            {actionLabel}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function RetryCard({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.retryCard, { backgroundColor: colors.errorBg }]}>
+      <View style={[styles.retryIcon, { backgroundColor: colors.surfaceCard }]}>
+        <Feather name="wifi-off" size={16} color={colors.error} />
+      </View>
+      <View style={styles.retryBody}>
+        <Text style={[styles.retryTitle, { color: colors.error }]}>{message}</Text>
+        <Pressable onPress={onRetry}>
+          <Text style={[styles.retryLink, { color: colors.error }]}>Retry</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 // ── Validation ────────────────────────────────────────────────────────────────
 const step1Schema = z.object({
-  item: z.string().min(1, "Item description is required"),
+  item: z.string().optional(),
   deliveryFee: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -331,26 +487,169 @@ export default function NewDeliveryScreen() {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [sending, setSending] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [riderSearch, setRiderSearch] = useState("");
+  const [customerError, setCustomerError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [productError, setProductError] = useState<string | null>(null);
+  const [riderError, setRiderError] = useState<string | null>(null);
+  const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
+  const [riderSheetOpen, setRiderSheetOpen] = useState(false);
+
+  const {
+    prefillItem,
+    prefillCustomerName,
+    prefillCustomerPhone,
+    prefillAddress,
+    prefillCustomerId,
+  } = useLocalSearchParams<{
+    prefillItem?: string;
+    prefillCustomerName?: string;
+    prefillCustomerPhone?: string;
+    prefillAddress?: string;
+    prefillCustomerId?: string;
+  }>();
 
   const { userId } = useSession();
-  const { data: riders = [] } = useRiders(userId);
   const createOrder = useCreateOrder(userId);
+  const showToast = useToastStore((s) => s.show);
+  const { data: profile } = useProfile(userId);
+  const {
+    data: riders = [],
+    isLoading: ridersLoading,
+    isError: ridersFetchError,
+    refetch: refetchRiders,
+  } = useRiders(userId);
+  const {
+    data: customers = [],
+    isLoading: customersLoading,
+    isError: customersFetchError,
+    refetch: refetchCustomers,
+  } = useCustomers(userId);
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+    isError: productsFetchError,
+    refetch: refetchProducts,
+  } = useProducts(userId);
 
   const draft = useOrderStore((s) => s.draft);
   const addPhotoUri = useOrderStore((s) => s.addPhotoUri);
   const removePhotoUri = useOrderStore((s) => s.removePhotoUri);
   const setDirectPhone = useOrderStore((s) => s.setDirectPhone);
+  const setCustomer = useOrderStore((s) => s.setCustomer);
+  const setSelectedAddress = useOrderStore((s) => s.setSelectedAddress);
+  const setAddressInput = useOrderStore((s) => s.setAddressInput);
+  const setCityInput = useOrderStore((s) => s.setCityInput);
+  const setRider = useOrderStore((s) => s.setRider);
+  const upsertProduct = useOrderStore((s) => s.upsertProduct);
+  const updateProductQuantity = useOrderStore((s) => s.updateProductQuantity);
+  const removeProduct = useOrderStore((s) => s.removeProduct);
   const resetDraft = useOrderStore((s) => s.reset);
+  const {
+    data: customerAddresses = [],
+    isLoading: addressesLoading,
+    isError: addressesFetchError,
+    refetch: refetchAddresses,
+  } = useCustomerAddresses(draft.customer?.id ?? null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<Step1Values>({
+  const {
+    control,
+    handleSubmit,
+    reset,
+    clearErrors,
+    setError,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<Step1Values>({
     resolver: zodResolver(step1Schema),
     defaultValues: { item: draft.item, deliveryFee: draft.deliveryFee, notes: draft.notes },
   });
 
-  const showToast = useToastStore((s) => s.show);
+  const isPro = profile?.is_pro === true;
+  const derivedItem = buildProductSummary(draft.products);
+  const { deliveryAddress, city } = getDeliveryAddressSelection(
+    draft.selectedAddress,
+    draft.addressInput,
+    draft.cityInput,
+  );
+  const filteredCustomers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    if (!query) return customers;
+    return customers.filter((customer) =>
+      [customer.name, customer.phone]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(query)),
+    );
+  }, [customerSearch, customers]);
+  const filteredRiders = useMemo(() => {
+    const query = riderSearch.trim().toLowerCase();
+    if (!query) return riders;
+    return riders.filter((rider) => rider.name.toLowerCase().includes(query));
+  }, [riderSearch, riders]);
 
-  // Captured step-1 values after validation
-  const [step1Values, setStep1Values] = useState<Step1Values>({ item: "", deliveryFee: "", notes: "" });
+  useEffect(() => {
+    if (!prefillItem) return;
+    reset({ item: prefillItem, deliveryFee: "", notes: "" });
+    if (prefillCustomerName) {
+      setCustomer({
+        id: prefillCustomerId ?? "",
+        seller_id: userId ?? "",
+        name: prefillCustomerName,
+        phone: prefillCustomerPhone ?? "",
+        notes: null,
+        order_count: 0,
+        failed_count: 0,
+        address: prefillAddress ?? null,
+        city: null,
+        created_at: null,
+        updated_at: null,
+      });
+      setAddressInput(prefillAddress ?? "");
+    }
+  }, [
+    prefillAddress,
+    prefillCustomerId,
+    prefillCustomerName,
+    prefillCustomerPhone,
+    prefillItem,
+    reset,
+    setAddressInput,
+    setCustomer,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!isPro) return;
+    setValue("item", derivedItem);
+  }, [derivedItem, isPro, setValue]);
+
+  useEffect(() => {
+    if (!draft.customer?.id || draft.selectedAddress || draft.addressInput.trim()) return;
+
+    const defaultAddress =
+      customerAddresses.find((address) => address.is_default) ?? customerAddresses[0];
+    if (defaultAddress) {
+      setSelectedAddress(defaultAddress);
+      setAddressError(null);
+      return;
+    }
+
+    if (draft.customer.address) {
+      setAddressInput(draft.customer.address);
+      setCityInput(draft.customer.city ?? "");
+    }
+  }, [
+    customerAddresses,
+    draft.addressInput,
+    draft.customer,
+    draft.selectedAddress,
+    setAddressInput,
+    setCityInput,
+    setSelectedAddress,
+  ]);
 
   const handleBack = () => {
     if (step === 1) {
@@ -362,49 +661,109 @@ export default function NewDeliveryScreen() {
   const pickPhoto = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 0.8,
+      quality: 0.9,
       base64: false,
-      allowsMultipleSelection: true,
+      allowsMultipleSelection: false,
     });
-    if (!result.canceled) {
-      result.assets.forEach((asset) => addPhotoUri(asset.uri));
+    if (!result.canceled && result.assets[0]) {
+      draft.photoUris.forEach((uri) => removePhotoUri(uri));
+      addPhotoUri(result.assets[0].uri);
     }
-  }, [addPhotoUri]);
+  }, [addPhotoUri, draft.photoUris, removePhotoUri]);
 
   const handleStep1Next = handleSubmit((values) => {
-    setStep1Values(values);
+    let hasError = false;
+
+    if (!isPro && !values.item?.trim()) {
+      setError("item", { type: "manual", message: "Please describe the item" });
+      hasError = true;
+    } else {
+      clearErrors("item");
+    }
+
+    if (isPro && draft.products.length === 0) {
+      setProductError("Add at least one product");
+      hasError = true;
+    } else {
+      setProductError(null);
+    }
+
+    if (!draft.customer) {
+      setCustomerError("Select or save a customer");
+      hasError = true;
+    } else {
+      setCustomerError(null);
+    }
+
+    if (!deliveryAddress) {
+      setAddressError("Add a delivery address");
+      hasError = true;
+    } else {
+      setAddressError(null);
+    }
+
+    if (hasError) return;
+
+    setSubmitError(null);
     setStep(2);
   });
 
   const handleStep2Next = () => {
-    if (!draft.rider && !draft.directPhone.trim()) return;
+    if (!draft.rider && !draft.directPhone.trim()) {
+      setRiderError("Select a rider or enter a rider phone number");
+      return;
+    }
+    setRiderError(null);
+    setSubmitError(null);
     setStep(3);
   };
 
   const handleSend = async () => {
+    const values = getValues();
+    const finalItem = isPro ? derivedItem : values.item?.trim() ?? "";
+
+    if (!finalItem || !draft.customer || !deliveryAddress) {
+      showToast("Please complete the order details before sending.", "error");
+      return;
+    }
+
     setSending(true);
+    setSubmitError(null);
     try {
       const order = await createOrder.mutateAsync({
-        item: step1Values.item,
-        delivery_fee: step1Values.deliveryFee ? parseFloat(step1Values.deliveryFee) : null,
-        notes: step1Values.notes || null,
-        // customer_id references customers.id (customers table, post-migration from address_book)
-        customer_id: draft.customer?.id ?? null,
-        customer_name: draft.customer?.name ?? null,
-        customer_phone: draft.customer?.phone ?? null,
-        delivery_address: draft.customer?.address ?? null, // denormalized default address
-        city: draft.customer?.city ?? null,
+        item: finalItem,
+        delivery_fee: parseFeeInput(values.deliveryFee ?? ""),
+        notes: values.notes?.trim() || null,
+        customer_id: draft.customer.id,
+        customer_name: draft.customer.name,
+        customer_phone: draft.customer.phone,
+        delivery_address: deliveryAddress,
+        city,
         rider_id: draft.rider?.id ?? null,
         rider_name: draft.rider?.name ?? null,
-        rider_phone: draft.rider?.phone ?? null,
-        direct_phone: draft.directPhone || null,
+        rider_phone: (draft.rider?.phone ?? draft.directPhone.trim()) || null,
+        direct_phone: draft.directPhone.trim() || null,
+        photo_uri: draft.photoUris[0] ?? null,
+        order_items: draft.products.map((product) => ({
+          product_id: product.product_id,
+          quantity: product.quantity,
+          unit_price: product.unit_price,
+          name: product.name,
+        })),
       });
       showToast("Order created!", "success");
       resetDraft();
+      reset({ item: "", deliveryFee: "", notes: "" });
       router.dismissAll();
       router.push({ pathname: "/(screens)/order-detail", params: { id: order.id } });
-    } catch {
-      showToast("Failed to create order", "error");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Couldn't create the order. Please try again.";
+      setSubmitError(message);
+      showToast(message, "error");
+    } finally {
       setSending(false);
     }
   };
@@ -443,31 +802,142 @@ export default function NewDeliveryScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <SectionLabel label="Item details" />
+              {!isPro ? (
+                <>
               <Controller
                 control={control}
                 name="item"
                 render={({ field: { value, onChange } }) => (
                   <FieldInput
                     label="Item description"
-                    value={value}
+                    value={value ?? ""}
                     onChange={onChange}
                     placeholder="e.g. Adire Maxi Dress × 2"
+                    error={errors.item?.message}
                   />
                 )}
               />
-              {errors.item && (
-                <Text style={[styles.fieldError, { color: colors.error }]}>{errors.item.message}</Text>
+                </>
+              ) : null}
+              {isPro && (
+                <FieldInput
+                  label="Order item"
+                  value={derivedItem || "Selected products will appear here"}
+                  onChange={() => undefined}
+                  editable={false}
+                />
               )}
+              <ProGate feature="order_items">
+                <View style={styles.proSection}>
+                  <Text style={[styles.proSectionTitle, { color: colors.textPrimary }]}>
+                    Select products
+                  </Text>
+                  <Text style={[styles.proSectionSub, { color: colors.textMuted }]}>
+                    Add products with quantities and the item summary will update automatically.
+                  </Text>
+
+                  {productsLoading ? (
+                    <View style={[styles.loadingCard, { backgroundColor: colors.surfaceCard }]}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+                        Loading products...
+                      </Text>
+                    </View>
+                  ) : productsFetchError ? (
+                    <RetryCard
+                      message="Couldn't load products"
+                      onRetry={() => void refetchProducts()}
+                    />
+                  ) : products.length === 0 ? (
+                    <EmptyStateCard
+                      icon="box"
+                      title="No products yet"
+                      description="Create products in Inventory first, then add them to orders here."
+                    />
+                  ) : (
+                    <View style={styles.productList}>
+                      {products.map((product) => {
+                        const selectedProduct = draft.products.find(
+                          (entry) => entry.product_id === product.id,
+                        );
+                        const quantity = selectedProduct?.quantity ?? 0;
+
+                        return (
+                          <View
+                            key={product.id}
+                            style={[styles.productRow, { backgroundColor: colors.surfaceCard }]}
+                          >
+                            <View style={styles.productBody}>
+                              <Text style={[styles.listRowTitle, { color: colors.textPrimary }]}>
+                                {product.name}
+                              </Text>
+                              <Text style={[styles.listRowMeta, { color: colors.textMuted }]}>
+                                {formatNaira(product.price)} · {product.quantity} {product.unit} left
+                              </Text>
+                            </View>
+                            <View style={styles.quantityControls}>
+                              <Pressable
+                                onPress={() => {
+                                  if (quantity <= 1) {
+                                    removeProduct(product.id);
+                                  } else {
+                                    updateProductQuantity(product.id, quantity - 1);
+                                  }
+                                  setProductError(null);
+                                }}
+                                style={[styles.quantityBtn, { backgroundColor: colors.surfaceContainer }]}
+                              >
+                                <Feather name="minus" size={14} color={colors.textSecondary} />
+                              </Pressable>
+                              <Text style={[styles.quantityText, { color: colors.textPrimary }]}>
+                                {quantity}
+                              </Text>
+                              <Pressable
+                                onPress={() => {
+                                  upsertProduct(product, quantity + 1);
+                                  setProductError(null);
+                                }}
+                                disabled={quantity >= product.quantity}
+                                style={[
+                                  styles.quantityBtn,
+                                  {
+                                    backgroundColor:
+                                      quantity >= product.quantity
+                                        ? colors.surfaceContainer
+                                        : colors.primarySoft,
+                                  },
+                                ]}
+                              >
+                                <Feather
+                                  name="plus"
+                                  size={14}
+                                  color={quantity >= product.quantity ? colors.textMuted : colors.primary}
+                                />
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {productError ? (
+                    <Text style={[styles.fieldError, { color: colors.error }]}>
+                      {productError}
+                    </Text>
+                  ) : null}
+                </View>
+              </ProGate>
               <Controller
                 control={control}
                 name="deliveryFee"
                 render={({ field: { value, onChange } }) => (
                   <FieldInput
                     label="Delivery fee"
-                    value={value ? Number(value).toLocaleString("en-NG") : ""}
-                    onChange={(text) => onChange(text.replace(/,/g, "").replace(/[^0-9]/g, ""))}
+                    value={formatFeeInput(value ?? "")}
+                    onChange={(text) => onChange(text.replace(/[^0-9]/g, ""))}
                     placeholder="0"
-                    keyboardType="numeric"
+                    keyboardType="number-pad"
                     prefix="₦"
                     optional
                   />
@@ -524,53 +994,164 @@ export default function NewDeliveryScreen() {
               </ScrollView>
 
               <SectionLabel label="Customer" />
+              <SearchField
+                value={customerSearch}
+                onChange={setCustomerSearch}
+                placeholder="Search by customer name or phone"
+              />
 
-              {/* Customer selector */}
-              <Pressable
-                onPress={() => router.push("/(modals)/select-customer")}
-                style={[
-                  styles.selectorField,
-                  { backgroundColor: colors.surfaceCard },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[fi.label, { color: colors.textMuted }]}>
-                    Customer name & address
+              {customersLoading ? (
+                <View style={[styles.loadingCard, { backgroundColor: colors.surfaceCard }]}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+                    Loading customers...
                   </Text>
-                  {draft.customer ? (
-                    <>
-                      <Text
-                        style={[
-                          styles.selectorValue,
-                          { color: colors.textPrimary },
-                        ]}
-                      >
-                        {draft.customer.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.selectorSub,
-                          { color: colors.textMuted },
-                        ]}
-                      >
-                        {draft.customer.address}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text
-                      style={[
-                        styles.selectorPlaceholder,
-                        { color: colors.textMuted },
-                      ]}
-                    >
-                      Search address book or type new
-                    </Text>
-                  )}
                 </View>
-                <Feather name="user" size={18} color={colors.textMuted} />
-              </Pressable>
+              ) : customersFetchError ? (
+                <RetryCard
+                  message="Couldn't load customers"
+                  onRetry={() => void refetchCustomers()}
+                />
+              ) : customers.length === 0 ? (
+                <EmptyStateCard
+                  icon="user"
+                  title="No customers saved"
+                  description="Save a customer now and keep the order form open."
+                  actionLabel="Add customer"
+                  onPress={() => setCustomerSheetOpen(true)}
+                />
+              ) : filteredCustomers.length === 0 ? (
+                <EmptyStateCard
+                  icon="search"
+                  title="No customer match"
+                  description="Try a different name or phone number."
+                  actionLabel="Add customer"
+                  onPress={() => setCustomerSheetOpen(true)}
+                />
+              ) : (
+                <View style={[styles.listCard, { backgroundColor: colors.surfaceCard }]}>
+                  {filteredCustomers.map((customer) => {
+                    const selected = draft.customer?.id === customer.id;
+                    return (
+                      <Pressable
+                        key={customer.id}
+                        onPress={() => {
+                          setCustomer(customer);
+                          setSelectedAddress(null);
+                          setAddressInput("");
+                          setCityInput("");
+                          setCustomerError(null);
+                        }}
+                        style={[styles.listRow, selected && { backgroundColor: colors.primarySoft }]}
+                      >
+                        <View style={styles.listRowBody}>
+                          <Text style={[styles.listRowTitle, { color: colors.textPrimary }]}>
+                            {customer.name}
+                          </Text>
+                          <Text style={[styles.listRowMeta, { color: colors.textMuted }]}>
+                            {customer.phone} · {customer.order_count} orders
+                          </Text>
+                        </View>
+                        {selected ? <Feather name="check" size={16} color={colors.primary} /> : null}
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable
+                    onPress={() => setCustomerSheetOpen(true)}
+                    style={styles.addEntityRow}
+                  >
+                    <View style={[styles.addEntityIcon, { backgroundColor: colors.primarySoft }]}>
+                      <Feather name="plus" size={16} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.addEntityText, { color: colors.primary }]}>
+                      Add customer
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
 
-              <View style={{ height: 8 }} />
+              {customerError ? (
+                <Text style={[styles.fieldError, { color: colors.error }]}>
+                  {customerError}
+                </Text>
+              ) : null}
+
+              {draft.customer ? (
+                <>
+                  <SectionLabel label="Delivery address" />
+
+                  {addressesLoading ? (
+                    <View style={[styles.loadingCard, { backgroundColor: colors.surfaceCard }]}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+                        Loading saved addresses...
+                      </Text>
+                    </View>
+                  ) : addressesFetchError ? (
+                    <RetryCard
+                      message="Couldn't load addresses"
+                      onRetry={() => void refetchAddresses()}
+                    />
+                  ) : customerAddresses.length === 0 ? (
+                    <EmptyStateCard
+                      icon="map-pin"
+                      title="No saved addresses"
+                      description="Type a one-off delivery address for this order."
+                    />
+                  ) : (
+                    <View style={[styles.listCard, { backgroundColor: colors.surfaceCard }]}>
+                      {customerAddresses.map((address) => {
+                        const selected = draft.selectedAddress?.id === address.id;
+                        return (
+                          <Pressable
+                            key={address.id}
+                            onPress={() => {
+                              setSelectedAddress(address);
+                              setAddressError(null);
+                            }}
+                            style={[styles.listRow, selected && { backgroundColor: colors.primarySoft }]}
+                          >
+                            <View style={styles.listRowBody}>
+                              <Text style={[styles.listRowTitle, { color: colors.textPrimary }]}>
+                                {address.label || (address.is_default ? "Default address" : "Saved address")}
+                              </Text>
+                              <Text style={[styles.listRowMeta, { color: colors.textMuted }]}>
+                                {address.address}
+                                {address.city ? ` · ${address.city}` : ""}
+                              </Text>
+                            </View>
+                            {selected ? <Feather name="check" size={16} color={colors.primary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  <FieldInput
+                    label="One-off address"
+                    value={draft.addressInput}
+                    onChange={(value) => {
+                      setAddressInput(value);
+                      setAddressError(null);
+                    }}
+                    placeholder="Type a different address for this order"
+                    optional
+                  />
+                  <FieldInput
+                    label="City"
+                    value={draft.cityInput}
+                    onChange={setCityInput}
+                    placeholder="e.g. Lagos"
+                    optional
+                  />
+
+                  {addressError ? (
+                    <Text style={[styles.fieldError, { color: colors.error }]}>
+                      {addressError}
+                    </Text>
+                  ) : null}
+                </>
+              ) : null}
             </ScrollView>
           </KeyboardAvoidingView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
@@ -597,92 +1178,131 @@ export default function NewDeliveryScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <SectionLabel label="Saved riders" />
+              <SearchField
+                value={riderSearch}
+                onChange={setRiderSearch}
+                placeholder="Search rider by name"
+              />
               <View
                 style={[
                   styles.riderSelectCard,
                   { backgroundColor: colors.surfaceCard },
                 ]}
               >
-                {riders.map((r, i) => {
-                  const selected = draft.rider?.id === r.id;
-                  const ac = AVATAR_COLORS[i % AVATAR_COLORS.length];
-                  return (
+                {ridersLoading ? (
+                  <View style={[styles.loadingCard, { backgroundColor: colors.surfaceCard }]}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+                      Loading riders...
+                    </Text>
+                  </View>
+                ) : ridersFetchError ? (
+                  <RetryCard
+                    message="Couldn't load riders"
+                    onRetry={() => void refetchRiders()}
+                  />
+                ) : riders.length === 0 ? (
+                  <EmptyStateCard
+                    icon="user-plus"
+                    title="No riders saved"
+                    description="Save a rider now and keep this order form open."
+                    actionLabel="Add rider"
+                    onPress={() => setRiderSheetOpen(true)}
+                  />
+                ) : (riderSearch.trim() ? filteredRiders : riders).length === 0 ? (
+                  <EmptyStateCard
+                    icon="search"
+                    title="No rider match"
+                    description="Try a different rider name."
+                    actionLabel="Add rider"
+                    onPress={() => setRiderSheetOpen(true)}
+                  />
+                ) : (
+                  <>
+                    {(riderSearch.trim() ? filteredRiders : riders).map((r, i) => {
+                      const selected = draft.rider?.id === r.id;
+                      const ac = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                      return (
+                        <Pressable
+                          key={r.id}
+                          onPress={() => {
+                            setRider(r);
+                            setRiderError(null);
+                          }}
+                          style={[
+                            styles.riderSelItem,
+                            selected && { backgroundColor: colors.primarySoft },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.riderSelAvatar,
+                              { backgroundColor: ac.bg },
+                            ]}
+                          >
+                            <Text
+                              style={[styles.riderSelAvatarText, { color: ac.fg }]}
+                            >
+                              {initials(r.name)}
+                            </Text>
+                          </View>
+                          <View style={styles.riderSelInfo}>
+                            <Text
+                              style={[
+                                styles.riderSelName,
+                                { color: colors.textPrimary },
+                              ]}
+                            >
+                              {r.name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.riderSelMeta,
+                                { color: colors.textMuted },
+                              ]}
+                            >
+                              {r.total_deliveries} deliveries · {r.phone}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.radioDot,
+                              {
+                                borderColor: selected
+                                  ? colors.primary
+                                  : colors.surfaceContainer,
+                                backgroundColor: selected
+                                  ? colors.primary
+                                  : "transparent",
+                              },
+                            ]}
+                          >
+                            {selected && <View style={styles.radioDotInner} />}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
                     <Pressable
-                      key={r.id}
-                      onPress={() => useOrderStore.getState().setRider(r)}
+                      onPress={() => setRiderSheetOpen(true)}
                       style={[
-                        styles.riderSelItem,
-                        selected && { backgroundColor: colors.primarySoft },
+                        styles.addRiderRow,
+                        { borderTopColor: colors.surfaceContainer },
                       ]}
                     >
                       <View
                         style={[
-                          styles.riderSelAvatar,
-                          { backgroundColor: ac.bg },
+                          styles.addRiderPlus,
+                          { backgroundColor: colors.primarySoft },
                         ]}
                       >
-                        <Text
-                          style={[styles.riderSelAvatarText, { color: ac.fg }]}
-                        >
-                          {initials(r.name)}
-                        </Text>
+                        <Feather name="plus" size={18} color={colors.primary} />
                       </View>
-                      <View style={styles.riderSelInfo}>
-                        <Text
-                          style={[
-                            styles.riderSelName,
-                            { color: colors.textPrimary },
-                          ]}
-                        >
-                          {r.name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.riderSelMeta,
-                            { color: colors.textMuted },
-                          ]}
-                        >
-                          {r.delivered} deliveries · {r.phone}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.radioDot,
-                          {
-                            borderColor: selected
-                              ? colors.primary
-                              : colors.surfaceContainer,
-                            backgroundColor: selected
-                              ? colors.primary
-                              : "transparent",
-                          },
-                        ]}
-                      >
-                        {selected && <View style={styles.radioDotInner} />}
-                      </View>
+                      <Text style={[styles.addRiderTxt, { color: colors.primary }]}>
+                        Add a new rider
+                      </Text>
                     </Pressable>
-                  );
-                })}
-                {/* Add new rider row */}
-                <Pressable
-                  onPress={() => router.push("/(modals)/add-rider")}
-                  style={[
-                    styles.addRiderRow,
-                    { borderTopColor: colors.surfaceContainer },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.addRiderPlus,
-                      { backgroundColor: colors.primarySoft },
-                    ]}
-                  >
-                    <Feather name="plus" size={18} color={colors.primary} />
-                  </View>
-                  <Text style={[styles.addRiderTxt, { color: colors.primary }]}>
-                    Add a new rider
-                  </Text>
-                </Pressable>
+                  </>
+                )}
               </View>
 
               {/* OR divider */}
@@ -708,9 +1328,15 @@ export default function NewDeliveryScreen() {
               <FieldInput
                 label="Enter phone number directly"
                 value={draft.directPhone}
-                onChange={(v) => useOrderStore.getState().setDirectPhone(v)}
+                onChange={(v) => {
+                  setDirectPhone(v);
+                  if (v.trim()) {
+                    setRiderError(null);
+                  }
+                }}
                 placeholder="0800 000 0000"
                 keyboardType="phone-pad"
+                error={riderError ?? undefined}
               />
               <View style={{ height: 8 }} />
             </ScrollView>
@@ -745,17 +1371,17 @@ export default function NewDeliveryScreen() {
                 Order Summary
               </Text>
               {[
-                { label: "Item", value: step1Values.item || "—" },
+                { label: "Item", value: (isPro ? derivedItem : getValues("item")) || "—" },
                 { label: "Customer", value: draft.customer?.name ?? "—" },
-                { label: "Address", value: draft.customer?.address ?? "—" },
+                { label: "Address", value: deliveryAddress || "—" },
                 {
                   label: "Rider",
                   value: (draft.rider?.name ?? draft.directPhone) || "—",
                 },
                 {
                   label: "Amount",
-                  value: step1Values.deliveryFee
-                    ? `₦${Number(step1Values.deliveryFee).toLocaleString("en-NG")}`
+                  value: parseFeeInput(getValues("deliveryFee") ?? "")
+                    ? formatNaira(parseFeeInput(getValues("deliveryFee") ?? ""))
                     : "—",
                   isAmount: true,
                 },
@@ -818,6 +1444,16 @@ export default function NewDeliveryScreen() {
                 </Text>
               </View>
             </View>
+            {submitError ? (
+              <View style={[styles.submitErrorCard, { backgroundColor: colors.errorBg }]}>
+                <Text style={[styles.submitErrorTitle, { color: colors.error }]}>
+                  {submitError}
+                </Text>
+                <Pressable onPress={handleSend}>
+                  <Text style={[styles.retryLink, { color: colors.error }]}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <View style={{ height: 8 }} />
           </ScrollView>
           <View style={[styles.ctaRow, { paddingBottom: insets.bottom + 16 }]}>
@@ -830,6 +1466,28 @@ export default function NewDeliveryScreen() {
           </View>
         </>
       )}
+      <QuickAddCustomerSheet
+        open={customerSheetOpen}
+        sellerId={userId}
+        onClose={() => setCustomerSheetOpen(false)}
+        onSaved={(customer) => {
+          setCustomer(customer);
+          setSelectedAddress(null);
+          setAddressInput(customer.address ?? "");
+          setCityInput(customer.city ?? "");
+          setCustomerError(null);
+          setAddressError(null);
+        }}
+      />
+      <QuickAddRiderSheet
+        open={riderSheetOpen}
+        sellerId={userId}
+        onClose={() => setRiderSheetOpen(false)}
+        onSaved={(rider) => {
+          setRider(rider);
+          setRiderError(null);
+        }}
+      />
     </View>
   );
 }
@@ -856,6 +1514,184 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.semiBold,
     marginTop: -6,
     marginLeft: 4,
+  },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: font.sans.regular,
+    padding: 0,
+  },
+  emptyCard: {
+    borderRadius: radius.xl,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  emptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
+  emptyDescription: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  inlineAction: {
+    borderRadius: radius.full,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  inlineActionText: {
+    fontSize: 13,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  retryCard: {
+    borderRadius: radius.xl,
+    padding: 14,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  retryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  retryBody: {
+    flex: 1,
+    gap: 4,
+  },
+  retryTitle: {
+    fontSize: 12,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  retryLink: {
+    fontSize: 12,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
+  loadingCard: {
+    borderRadius: radius.xl,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+  },
+  listCard: {
+    borderRadius: radius.lg,
+    overflow: "hidden",
+  },
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  listRowBody: {
+    flex: 1,
+  },
+  listRowTitle: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.13,
+  },
+  listRowMeta: {
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    marginTop: 2,
+  },
+  addEntityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  addEntityIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addEntityText: {
+    fontSize: 13,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  proSection: {
+    gap: 10,
+  },
+  proSectionTitle: {
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.14,
+  },
+  proSectionSub: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    lineHeight: 18,
+  },
+  productList: {
+    gap: 8,
+  },
+  productRow: {
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  productBody: {
+    flex: 1,
+  },
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quantityBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quantityText: {
+    minWidth: 18,
+    textAlign: "center",
+    fontSize: 13,
+    fontFamily: font.mono.medium,
   },
   // Photo strip
   photoStrip: {
@@ -1044,4 +1880,14 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   waSub: { fontSize: 11, fontFamily: font.sans.regular, lineHeight: 15.4 },
+  submitErrorCard: {
+    borderRadius: radius.xl,
+    padding: 14,
+    gap: 6,
+  },
+  submitErrorTitle: {
+    fontSize: 12,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
 });

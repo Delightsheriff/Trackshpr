@@ -1,7 +1,7 @@
 /**
  * Delete Customer confirmation sheet (DS §11.4).
  * Receives customerId and customerName as search params.
- * TODO: replace deleteCustomer with Supabase delete.
+ * Deletes from customers table with seller_id RLS check + optimistic cache update.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
 import { supabase } from "@/src/lib/supabase";

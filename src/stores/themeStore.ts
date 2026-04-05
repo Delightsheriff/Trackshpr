@@ -1,7 +1,6 @@
 /**
- * Theme store — persisted Zustand store (DS §9.1).
+ * Theme store - persisted Zustand store (DS 9.1).
  * Drives all color tokens across the app.
- * Usage: const { colors, isDark } = useTheme()
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
@@ -13,28 +12,55 @@ type Colors = typeof lightColors;
 interface ThemeState {
   isDark: boolean;
   colors: Colors;
+  hasHydrated: boolean;
   toggle: () => void;
+  setMode: (isDark: boolean) => void;
+  setHydrated: (hasHydrated: boolean) => void;
+  reset: () => void;
 }
+
+const getColorsForMode = (isDark: boolean): Colors =>
+  (isDark ? darkColors : lightColors) as Colors;
+
+const initialThemeState = {
+  isDark: false,
+  colors: lightColors as Colors,
+  hasHydrated: false,
+};
 
 export const useThemeStore = create<ThemeState>()(
   persist(
-    (set, get) => ({
-      isDark: false,
-      colors: lightColors,
-      toggle: () => {
-        const next = !get().isDark;
-        set({ isDark: next, colors: next ? (darkColors as unknown as Colors) : lightColors });
-      },
+    (set) => ({
+      ...initialThemeState,
+      toggle: () =>
+        set((state) => {
+          const next = !state.isDark;
+          return { isDark: next, colors: getColorsForMode(next) };
+        }),
+      setMode: (isDark) => set({ isDark, colors: getColorsForMode(isDark) }),
+      setHydrated: (hasHydrated) => set({ hasHydrated }),
+      reset: () => set({ ...initialThemeState, hasHydrated: true }),
     }),
-    { name: "trackshpr-theme", storage: createJSONStorage(() => AsyncStorage) }
-  )
+    {
+      name: "trackshpr-theme",
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ isDark: state.isDark }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error || !state) {
+          useThemeStore.setState({ ...initialThemeState, hasHydrated: true });
+          return;
+        }
+        state.setMode(state.isDark);
+        state.setHydrated(true);
+      },
+    },
+  ),
 );
 
-// Use two separate selectors so each returns a stable primitive/reference.
-// A single selector returning `{ colors, isDark }` creates a new object every
-// getSnapshot call, which triggers React's "infinite loop" warning.
 export const useTheme = () => {
-  const colors = useThemeStore((s) => s.colors);
-  const isDark  = useThemeStore((s) => s.isDark);
-  return { colors, isDark };
+  const colors = useThemeStore((state) => state.colors);
+  const isDark = useThemeStore((state) => state.isDark);
+  const hasHydrated = useThemeStore((state) => state.hasHydrated);
+
+  return { colors, isDark, hasHydrated };
 };

@@ -1,26 +1,31 @@
-/**
- * Rider Link screen — magic-link action page for riders.
- * Always light mode. DS tokens only — no theme store.
- */
 import {
   colors,
-  font,
-  gradients,
   layout,
   radius,
+  type as typography,
 } from "@/src/constants/tokens";
+import {
+  fetchPublicRiderOrder,
+  markRiderOrderDelivered,
+  markRiderOrderFailed,
+  markRiderOrderPickedUp,
+  type OrderEvent,
+  type PublicTrackingOrder,
+} from "@/src/lib/supabaseQueries";
 import { supabase } from "@/src/lib/supabase";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,665 +35,604 @@ import {
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-type Status = "pending" | "picked_up" | "in_transit" | "delivered" | "failed";
+type RiderPageStatus =
+  | "pending"
+  | "picked_up"
+  | "in_transit"
+  | "delivered"
+  | "failed";
 
-interface TimelineEvent {
+type ReportOption = {
   label: string;
-  time: string;
-  type: string;
-}
+  subtitle: string;
+  icon: keyof typeof Feather.glyphMap;
+  tint: string;
+  tintBg: string;
+};
 
-// ── Progress step config ───────────────────────────────────────────────────────
-const STEPS = ["Confirmed", "Picked Up", "Transit", "Delivered"];
-
-// ── Report options ─────────────────────────────────────────────────────────────
-const REPORT_OPTIONS = [
+const REPORT_OPTIONS: ReportOption[] = [
   {
-    icon: "map-pin",
-    title: "Wrong address",
-    subtitle: "Address doesn't match or is incorrect",
-    iconBg: colors.warningBg,
-  },
-  {
+    label: "Customer not available",
+    subtitle: "The customer is not reachable or unavailable.",
     icon: "phone-off",
-    title: "Customer not available",
-    subtitle: "Customer not picking up or not home",
-    iconBg: colors.errorBg,
+    tint: colors.error,
+    tintBg: colors.errorBg,
   },
   {
+    label: "Wrong address",
+    subtitle: "The delivery address does not match the drop-off point.",
+    icon: "map-pin",
+    tint: colors.warning,
+    tintBg: colors.warningBg,
+  },
+  {
+    label: "Item damaged",
+    subtitle: "The package arrived damaged or unsafe to deliver.",
     icon: "alert-triangle",
-    title: "Traffic delay",
-    subtitle: "Will be late due to traffic",
-    iconBg: colors.infoBg,
+    tint: colors.error,
+    tintBg: colors.errorBg,
   },
   {
+    label: "Other",
+    subtitle: "Something else happened on this delivery.",
     icon: "message-circle",
-    title: "Other issue",
-    subtitle: "Something else is wrong",
-    iconBg: colors.surfaceContainer,
+    tint: colors.info,
+    tintBg: colors.infoBg,
   },
-] as const;
+];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function formatAmount(n: number): string {
-  return "₦" + n.toLocaleString("en-NG");
+const PUBLIC_APP_URL =
+  process.env.EXPO_PUBLIC_TRACKSHPR_WEB_URL?.replace(/\/$/, "") ??
+  "https://trackshpr.app";
+
+function formatAmount(value: number | null | undefined): string {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(Number(value ?? 0));
 }
 
-function getStepState(
-  stepIndex: number,
-  status: Status,
-): "done" | "now" | "pending" {
-  if (status === "pending") {
-    if (stepIndex === 0) return "done";
-    if (stepIndex === 1) return "now";
-    return "pending";
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "Just now";
+
+  return new Intl.DateTimeFormat("en-NG", {
+    hour: "numeric",
+    minute: "2-digit",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
+}
+
+function getBusinessName(order: PublicTrackingOrder): string {
+  return (
+    order.profile.brand_name?.trim() ||
+    order.profile.business_name?.trim() ||
+    "Trackshpr seller"
+  );
+}
+
+function getBrandColor(order: PublicTrackingOrder | null | undefined): string {
+  return order?.profile.brand_color?.trim() || "#16A34A";
+}
+
+function getStatusLabel(status: RiderPageStatus): string {
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "picked_up":
+      return "Picked Up";
+    case "in_transit":
+      return "In Transit";
+    case "delivered":
+      return "Delivered";
+    case "failed":
+      return "Failed";
   }
-  if (status === "picked_up" || status === "in_transit") {
-    if (stepIndex <= 1) return "done";
-    if (stepIndex === 2) return "now";
-    return "pending";
+}
+
+function getStatusTone(status: RiderPageStatus) {
+  switch (status) {
+    case "pending":
+      return {
+        color: colors.warning,
+        bg: colors.warningBg,
+      };
+    case "picked_up":
+      return {
+        color: colors.info,
+        bg: colors.infoBg,
+      };
+    case "in_transit":
+      return {
+        color: colors.warning,
+        bg: colors.warningBg,
+      };
+    case "delivered":
+      return {
+        color: colors.success,
+        bg: colors.successBg,
+      };
+    case "failed":
+      return {
+        color: colors.error,
+        bg: colors.errorBg,
+      };
   }
-  if (status === "delivered") {
-    return "done";
+}
+
+function mapTimelineLabel(status: string): string {
+  switch (status) {
+    case "pending":
+    case "created":
+      return "Order confirmed";
+    case "picked_up":
+      return "Item picked up";
+    case "in_transit":
+      return "In transit";
+    case "delivered":
+      return "Delivered";
+    case "failed":
+      return "Delivery failed";
+    default:
+      return status;
   }
-  return "pending";
 }
 
-function getStatusLabel(status: Status): string {
-  if (status === "pending") return "Pending";
-  if (status === "picked_up") return "Picked Up";
-  if (status === "in_transit") return "In Transit";
-  if (status === "delivered") return "Delivered";
-  return "Failed";
-}
-
-function mapEventLabel(evStatus: string): string {
-  if (evStatus === "pending" || evStatus === "created") return "Order created";
-  if (evStatus === "picked_up") return "Item picked up";
-  if (evStatus === "in_transit") return "In transit";
-  if (evStatus === "delivered") return "Delivered";
-  if (evStatus === "failed") return "Delivery failed";
-  return evStatus;
-}
-
-function mapEventsToTimeline(
-  rawEvents: { id: string; status: string; note: string | null; created_at: string | null }[],
-): TimelineEvent[] {
-  return rawEvents.map((ev) => ({
-    label: mapEventLabel(ev.status),
-    time: new Date(ev.created_at ?? "").toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    type: ev.status,
+function getRiderTimeline(events: OrderEvent[]) {
+  return events.map((event) => ({
+    id: event.id,
+    label: mapTimelineLabel(event.status),
+    note: event.note,
+    time: formatDateTime(event.created_at),
+    isComplete: event.status !== "failed",
+    isFailure: event.status === "failed",
   }));
 }
 
-// ── Detail row ────────────────────────────────────────────────────────────────
-function DetailRow({
-  label,
-  value,
-  isAmount,
-  isLast,
+function DetailCard({
+  order,
 }: {
-  label: string;
-  value: string;
-  isAmount?: boolean;
-  isLast?: boolean;
+  order: PublicTrackingOrder;
 }) {
+  const sections = [
+    {
+      label: "Customer",
+      value: order.customer_name || "Customer",
+    },
+    {
+      label: "Delivery address",
+      value: order.delivery_address || "No address added",
+    },
+    {
+      label: "Item",
+      value: order.item || "No item added",
+    },
+    {
+      label: "Amount to collect",
+      value: formatAmount(order.delivery_fee),
+      isAmount: true,
+    },
+  ];
+
   return (
-    <View style={[ss.detailRow, !isLast && ss.detailRowBorder]}>
-      <Text style={ss.detailLabel}>{label}</Text>
-      <Text
-        style={[ss.detailValue, isAmount && ss.detailValueAmount]}
-        numberOfLines={2}
-      >
-        {value}
-      </Text>
+    <View style={ss.card}>
+      {sections.map((section, index) => (
+        <View
+          key={section.label}
+          style={[
+            ss.detailRow,
+            index < sections.length - 1 && ss.detailRowAlt,
+          ]}
+        >
+          <Text style={ss.detailLabel}>{section.label}</Text>
+          <Text
+            style={[ss.detailValue, section.isAmount && ss.detailValueAmount]}
+          >
+            {section.value}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+function Timeline({
+  events,
+}: {
+  events: ReturnType<typeof getRiderTimeline>;
+}) {
+  return (
+    <View style={ss.section}>
+      <Text style={ss.sectionTitle}>Delivery timeline</Text>
+      <View style={ss.timelineCard}>
+        {events.length === 0 ? (
+          <Text style={ss.helperText}>No delivery updates yet.</Text>
+        ) : null}
+        {events.map((event, index) => {
+          const last = index === events.length - 1;
+          const dotColor = event.isFailure
+            ? colors.error
+            : event.isComplete
+              ? colors.success
+              : colors.info;
+
+          return (
+            <View key={event.id || `${event.label}-${index}`} style={ss.eventRow}>
+              <View style={ss.eventRail}>
+                <View
+                  style={[
+                    ss.eventDot,
+                    {
+                      backgroundColor: dotColor,
+                    },
+                  ]}
+                />
+                {!last ? <View style={ss.eventConnector} /> : null}
+              </View>
+              <View style={ss.eventBody}>
+                <Text style={ss.eventLabel}>{event.label}</Text>
+                {event.note ? (
+                  <Text style={ss.eventNote}>{event.note}</Text>
+                ) : null}
+                <Text style={ss.eventTime}>{event.time}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+async function getOptionalCoordinates() {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      return null;
+    }
+
+    const result = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    return {
+      latitude: result.coords.latitude,
+      longitude: result.coords.longitude,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function RiderLinkScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useLocalSearchParams<{ token?: string }>();
   const queryClient = useQueryClient();
-  const showToast = useToastStore((s) => s.show);
-
+  const showToast = useToastStore((state) => state.show);
   const [reportOpen, setReportOpen] = useState(false);
 
-  // ── Data query ───────────────────────────────────────────────────────────────
-  const { data: order, isLoading, error } = useQuery({
-    queryKey: ["rider-order", token],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `*, order_status_events(id,status,note,created_at), location_pings(id,latitude,longitude,created_at)`,
-        )
-        .eq("rider_token", token)
-        .order("created_at", {
-          referencedTable: "order_status_events",
-          ascending: true,
-        })
-        .single();
-      if (error) throw error;
-      return data;
-    },
+  const {
+    data: order,
+    error,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["public-rider-order", token],
+    queryFn: () => fetchPublicRiderOrder(token!),
     enabled: !!token,
     retry: 1,
+    refetchInterval: 15000,
   });
-
-  // ── Derived display values ───────────────────────────────────────────────────
-  const status: Status = order ? (order.status as Status) : "pending";
-  const events: TimelineEvent[] =
-    order?.order_status_events
-      ? mapEventsToTimeline(order.order_status_events)
-      : [];
-
-  // ── Pickup mutation ──────────────────────────────────────────────────────────
-  const pickupMutation = useMutation({
-    mutationFn: async () => {
-      let coords: { latitude: number; longitude: number } | null = null;
-      try {
-        const { status: locStatus } =
-          await Location.requestForegroundPermissionsAsync();
-        if (locStatus === "granted") {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          coords = loc.coords;
-        }
-      } catch {}
-      if (coords) {
-        await supabase.from("location_pings").insert({
-          order_id: order!.id,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        });
-      }
-      await supabase.from("order_status_events").insert({
-        order_id: order!.id,
-        status: "picked_up",
-        note: coords
-          ? "Rider confirmed pickup"
-          : "Rider confirmed pickup (no GPS)",
-      });
-      await supabase
-        .from("orders")
-        .update({ status: "picked_up" })
-        .eq("id", order!.id);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["rider-order", token] }),
-    onError: () => showToast("Could not update status. Try again.", "error"),
-  });
-
-  // ── Delivery mutation ────────────────────────────────────────────────────────
-  const deliveryMutation = useMutation({
-    mutationFn: async () => {
-      let coords: { latitude: number; longitude: number } | null = null;
-      try {
-        const { status: locStatus } =
-          await Location.requestForegroundPermissionsAsync();
-        if (locStatus === "granted") {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          coords = loc.coords;
-        }
-      } catch {}
-      if (coords) {
-        await supabase.from("location_pings").insert({
-          order_id: order!.id,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        });
-      }
-      await supabase.from("order_status_events").insert({
-        order_id: order!.id,
-        status: "delivered",
-        note: "Rider confirmed delivery",
-      });
-      await supabase
-        .from("orders")
-        .update({ status: "delivered", delivered_at: new Date().toISOString() })
-        .eq("id", order!.id);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["rider-order", token] }),
-    onError: () => showToast("Could not update status. Try again.", "error"),
-  });
-
-  // ── Report mutation ──────────────────────────────────────────────────────────
-  const reportMutation = useMutation({
-    mutationFn: async (problem: string) => {
-      await supabase.from("order_status_events").insert({
-        order_id: order!.id,
-        status: "failed",
-        note: problem,
-      });
-      await supabase
-        .from("orders")
-        .update({ status: "failed" })
-        .eq("id", order!.id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rider-order", token] });
-      showToast("Problem reported", "success");
-      closeReport();
-    },
-    onError: () => showToast("Could not submit report.", "error"),
-  });
-
-  // ── CTA handler ──────────────────────────────────────────────────────────────
-  function handleCta() {
-    if (status === "pending" || status === "picked_up") {
-      pickupMutation.mutate();
-    } else if (status === "in_transit") {
-      deliveryMutation.mutate();
-    }
-  }
-
-  const ctaBusy = pickupMutation.isPending || deliveryMutation.isPending;
-
-  // Blinking dot for in_transit / picked_up status pill
-  const blinkOpacity = useSharedValue(1);
-  const blinkStyle = useAnimatedStyle(() => ({
-    opacity: blinkOpacity.value,
-  }));
 
   useEffect(() => {
-    if (status === "in_transit" || status === "picked_up") {
-      blinkOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: 750 }),
-          withTiming(1, { duration: 750 }),
-        ),
-        -1,
-        false,
-      );
-    } else {
-      blinkOpacity.value = 1;
+    if (!token) {
+      return;
     }
-  }, [status]);
 
-  // Report sheet slide-up — start off-screen at 400
-  const sheetY = useSharedValue(400);
+    const channel = supabase
+      .channel(`public:rider:${token}`)
+      .on("broadcast", { event: "order_update" }, () => {
+        queryClient.invalidateQueries({
+          queryKey: ["public-rider-order", token],
+        });
+      })
+      .subscribe();
+
+    const cleanup = () => {
+      supabase.removeChannel(channel);
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("beforeunload", cleanup);
+    }
+
+    return () => {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.removeEventListener("beforeunload", cleanup);
+      }
+      cleanup();
+    };
+  }, [queryClient, token]);
+
+  const pickupMutation = useMutation({
+    mutationFn: async () => {
+      const coords = await getOptionalCoordinates();
+      return markRiderOrderPickedUp({
+        riderToken: token!,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
+      });
+    },
+    onSuccess: (nextOrder) => {
+      queryClient.setQueryData(["public-rider-order", token], nextOrder);
+    },
+    onError: (mutationError: Error) => {
+      showToast(
+        mutationError.message || "Couldn't update this delivery. Try again.",
+        "error",
+      );
+    },
+  });
+
+  const deliverMutation = useMutation({
+    mutationFn: async () => {
+      const coords = await getOptionalCoordinates();
+      return markRiderOrderDelivered({
+        riderToken: token!,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
+      });
+    },
+    onSuccess: (nextOrder) => {
+      queryClient.setQueryData(["public-rider-order", token], nextOrder);
+    },
+    onError: (mutationError: Error) => {
+      showToast(
+        mutationError.message || "Couldn't complete this delivery. Try again.",
+        "error",
+      );
+    },
+  });
+
+  const failMutation = useMutation({
+    mutationFn: async (note: string) => {
+      const coords = await getOptionalCoordinates();
+      return markRiderOrderFailed({
+        riderToken: token!,
+        note,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
+      });
+    },
+    onSuccess: (nextOrder) => {
+      queryClient.setQueryData(["public-rider-order", token], nextOrder);
+      setReportOpen(false);
+      showToast("Problem reported.", "success");
+    },
+    onError: (mutationError: Error) => {
+      showToast(
+        mutationError.message || "Couldn't report this issue. Try again.",
+        "error",
+      );
+    },
+  });
+
+  const busy =
+    pickupMutation.isPending ||
+    deliverMutation.isPending ||
+    failMutation.isPending;
+
+  const status = (order?.status ?? "pending") as RiderPageStatus;
+  const businessName = order ? getBusinessName(order) : "Trackshpr seller";
+  const brandColor = getBrandColor(order);
+  const orderTimeline = useMemo(
+    () => getRiderTimeline(order?.events ?? []),
+    [order?.events],
+  );
+  const sheetY = useSharedValue(420);
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetY.value }],
   }));
 
-  function openReport() {
-    setReportOpen(true);
-    sheetY.value = withSpring(0, { damping: 22, stiffness: 280 });
+  useEffect(() => {
+    sheetY.value = withSpring(reportOpen ? 0 : 420, {
+      damping: 22,
+      stiffness: 280,
+    });
+  }, [reportOpen, sheetY]);
+
+  const ctaLabel =
+    status === "pending"
+      ? "I've Picked Up the Item"
+      : status === "picked_up" || status === "in_transit"
+        ? "Delivery Complete"
+        : null;
+
+  function handlePrimaryAction() {
+    if (status === "pending") {
+      pickupMutation.mutate();
+      return;
+    }
+
+    if (status === "picked_up" || status === "in_transit") {
+      deliverMutation.mutate();
+    }
   }
 
-  function closeReport() {
-    sheetY.value = withSpring(400, { damping: 22, stiffness: 280 });
-    setTimeout(() => setReportOpen(false), 320);
+  function renderHeader(currentOrder: PublicTrackingOrder) {
+    return (
+      <View style={ss.header}>
+        {currentOrder.profile.logo_url ? (
+          <Image
+            source={{ uri: currentOrder.profile.logo_url }}
+            style={ss.logo}
+            resizeMode="cover"
+          />
+        ) : null}
+        <View style={ss.headerCopy}>
+          <Text style={ss.brandName}>{businessName}</Text>
+          <Text style={ss.brandSub}>Rider delivery link</Text>
+        </View>
+      </View>
+    );
   }
 
-  // Progress line fill: fraction 0–1 of the inner track width
-  function getLineFillRatio(): number {
-    if (status === "pending") return 1 / 3;
-    if (status === "picked_up" || status === "in_transit") return 2 / 3;
-    if (status === "delivered") return 1;
-    return 0;
-  }
-
-  // ── Loading state ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
         <StatusBar style="dark" />
-        <ActivityIndicator color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={ss.loadingText}>Loading your delivery...</Text>
       </View>
     );
   }
 
-  // ── Error / invalid link state ────────────────────────────────────────────────
   if (error || !order) {
     return (
       <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
         <StatusBar style="dark" />
-        <View style={ss.invalidIconContainer}>
-          <Feather name="link-2" size={48} color={colors.primary} />
+        <View style={ss.errorIcon}>
+          <Feather name="link-2" size={32} color={colors.info} />
         </View>
-        <Text style={ss.invalidTitle}>This link isn't valid</Text>
-        <Text style={ss.invalidSub}>
-          This tracking link may have expired. Contact the seller directly.
+        <Text style={ss.errorTitle}>This link isn&apos;t valid</Text>
+        <Text style={ss.errorBody}>
+          This rider link may have expired or already been used.
         </Text>
+        <Pressable style={ss.secondaryButton} onPress={() => refetch()}>
+          <Text style={ss.secondaryButtonText}>Try again</Text>
+        </Pressable>
       </View>
     );
   }
 
-  // ── Derived display strings ───────────────────────────────────────────────────
-  const orderId = `TRK-${order.id.substring(0, 6).toUpperCase()}`;
-  const itemDescription = order.item_description ?? "";
-  const customerName = order.customer_name ?? "";
-  const customerPhone = order.customer_phone ?? "";
-  const deliveryAddress = order.delivery_address ?? "";
+  const tone = getStatusTone(status);
 
   return (
     <View style={[ss.root, { paddingTop: insets.top }]}>
       <StatusBar style="dark" />
+      {renderHeader(order)}
 
-      {/* ── Header ── */}
-      <View style={ss.header}>
-        <LinearGradient
-          colors={["#4647D3", "#6366F1"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={ss.headerIcon}
-        >
-          <Feather name="package" size={16} color={colors.white} />
-        </LinearGradient>
-        <View style={ss.headerTextCol}>
-          <Text style={ss.headerBrand}>Trackshpr</Text>
-          <Text style={ss.headerSub}>Delivery management</Text>
-        </View>
-      </View>
-
-      {/* ── Scrollable content ── */}
       <ScrollView
         style={ss.scroll}
         contentContainerStyle={[
-          ss.scrollContent,
-          { paddingBottom: status !== "delivered" ? 120 : 40 },
+          ss.content,
+          { paddingBottom: ctaLabel ? insets.bottom + 120 : insets.bottom + 40 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Status Hero Card ── */}
         <View style={ss.heroCard}>
-          {/* Top row: status pill + order ID */}
           <View style={ss.heroTopRow}>
-            {/* Status pill */}
-            {status === "pending" && (
-              <View
-                style={[
-                  ss.pill,
-                  {
-                    backgroundColor: colors.warningBg,
-                    borderColor: colors.warning,
-                  },
-                ]}
-              >
-                <Text style={[ss.pillText, { color: colors.warning }]}>
-                  {getStatusLabel(status)}
-                </Text>
-              </View>
-            )}
-            {(status === "picked_up" || status === "in_transit") && (
-              <View
-                style={[
-                  ss.pill,
-                  {
-                    backgroundColor: colors.primarySoft,
-                    borderColor: colors.primary,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                  },
-                ]}
-              >
-                <Animated.View style={[ss.blinkDot, blinkStyle]} />
-                <Text style={[ss.pillText, { color: colors.primary }]}>
-                  {getStatusLabel(status)}
-                </Text>
-              </View>
-            )}
-            {status === "delivered" && (
-              <View
-                style={[
-                  ss.pill,
-                  {
-                    backgroundColor: colors.successBg,
-                    borderColor: colors.success,
-                  },
-                ]}
-              >
-                <Text style={[ss.pillText, { color: colors.success }]}>
-                  {getStatusLabel(status)}
-                </Text>
-              </View>
-            )}
-            {status === "failed" && (
-              <View
-                style={[
-                  ss.pill,
-                  {
-                    backgroundColor: colors.errorBg,
-                    borderColor: colors.error,
-                  },
-                ]}
-              >
-                <Text style={[ss.pillText, { color: colors.error }]}>
-                  {getStatusLabel(status)}
-                </Text>
-              </View>
-            )}
-
-            <Text style={ss.orderId}>{orderId}</Text>
-          </View>
-
-          {/* Item name */}
-          <Text style={ss.itemName}>{itemDescription}</Text>
-
-          {/* Address */}
-          <View style={ss.addressRow}>
-            <Feather
-              name="map-pin"
-              size={12}
-              color={colors.textMuted}
-              style={ss.pinIcon}
-            />
-            <Text style={ss.addressText} numberOfLines={2}>
-              {deliveryAddress}
+            <View style={[ss.statusPill, { backgroundColor: tone.bg }]}>
+              <View style={[ss.statusDot, { backgroundColor: tone.color }]} />
+              <Text style={[ss.statusPillText, { color: tone.color }]}>
+                {getStatusLabel(status)}
+              </Text>
+            </View>
+            <Text style={ss.orderCode}>
+              #{order.order_number ?? order.id.slice(0, 6).toUpperCase()}
             </Text>
           </View>
-
-          {/* Progress steps */}
-          <View
-            style={ss.stepsOuter}
-            onLayout={() => {
-              // layout driven by flex, no measurement needed
-            }}
-          >
-            {/* Track background */}
-            <View style={ss.progressTrackBg} />
-            {/* Active gradient fill */}
-            <LinearGradient
-              colors={[colors.primary, colors.primaryContainer]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                ss.progressTrackFill,
-                { width: `${Math.round(getLineFillRatio() * 100)}%` },
-              ]}
-            />
-
-            {/* Dots row */}
-            <View style={ss.stepsRow}>
-              {STEPS.map((label, i) => {
-                const state = getStepState(i, status);
-                return (
-                  <View key={label} style={ss.stepItem}>
-                    <View
-                      style={[
-                        ss.stepDot,
-                        state === "done" && ss.stepDotDone,
-                        state === "now" && ss.stepDotNow,
-                        state === "pending" && ss.stepDotPending,
-                      ]}
-                    >
-                      {state === "done" && (
-                        <Text style={ss.stepCheckText}>✓</Text>
-                      )}
-                      {state === "now" && (
-                        <Text
-                          style={[ss.stepNumText, { color: colors.primary }]}
-                        >
-                          {i + 1}
-                        </Text>
-                      )}
-                      {state === "pending" && (
-                        <Text
-                          style={[ss.stepNumText, { color: colors.textMuted }]}
-                        >
-                          {i + 1}
-                        </Text>
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        ss.stepLabel,
-                        state === "done" && { color: colors.success },
-                        state === "now" && { color: colors.primary },
-                        state === "pending" && { color: colors.textMuted },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
+          <Text style={ss.heroTitle}>{order.item}</Text>
+          <Text style={ss.heroMeta}>Deliver to {order.customer_name || "Customer"}</Text>
+          <View style={ss.addressWrap}>
+            <Feather name="map-pin" size={14} color={colors.textMuted} />
+            <Text style={ss.addressText}>
+              {order.delivery_address || "No address added"}
+              {order.city ? `, ${order.city}` : ""}
+            </Text>
           </View>
+          {(status === "delivered" || status === "failed") && (
+            <View
+              style={[
+                ss.completionBanner,
+                {
+                  backgroundColor:
+                    status === "delivered" ? colors.successBg : colors.errorBg,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  ss.completionText,
+                  {
+                    color: status === "delivered" ? colors.success : colors.error,
+                  },
+                ]}
+              >
+                {status === "delivered"
+                  ? "Delivery is complete."
+                  : "This delivery was marked as failed."}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* ── Detail Card ── */}
-        <View style={ss.detailCard}>
-          <DetailRow label="Customer" value={customerName} />
-          <DetailRow label="Phone" value={customerPhone} />
-          <DetailRow label="Address" value={deliveryAddress} />
-          <DetailRow
-            label="Collect on delivery"
-            value={formatAmount(0)}
-            isAmount
-            isLast
-          />
-        </View>
+        <DetailCard order={order} />
+        <Timeline events={orderTimeline} />
 
-        {/* ── Timeline ── */}
-        <View style={ss.timelineSection}>
-          <Text style={ss.timelineTitle}>Delivery timeline</Text>
-          {events.map((ev, i) => {
-            const isLast = i === events.length - 1;
-            const isDone =
-              ev.type === "created" ||
-              ev.type === "pending" ||
-              ev.type === "picked_up" ||
-              ev.type === "delivered";
-            const isActive = isLast && !isDone;
-
-            return (
-              <View key={`${ev.type}-${i}`} style={ss.eventRow}>
-                {/* Spine */}
-                <View style={ss.eventSpineCol}>
-                  <View
-                    style={[
-                      ss.eventDot,
-                      isDone && {
-                        backgroundColor: colors.successBg,
-                        borderColor: colors.success,
-                      },
-                      isActive && {
-                        backgroundColor: colors.primarySoft,
-                        borderColor: colors.primary,
-                      },
-                      !isDone &&
-                        !isActive && {
-                          backgroundColor: colors.surfaceContainer,
-                          borderColor: colors.surfaceContainer,
-                        },
-                    ]}
-                  >
-                    {isDone && <Text style={ss.eventDotCheck}>✓</Text>}
-                    {isActive && <View style={ss.eventDotInner} />}
-                  </View>
-                  {!isLast && <View style={ss.eventConnector} />}
-                </View>
-                {/* Content */}
-                <View style={ss.eventBody}>
-                  <Text style={ss.eventLabel}>{ev.label}</Text>
-                  <Text style={ss.eventTime}>{ev.time}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* ── Viral Footer ── */}
-        <View style={ss.viralFooter}>
+        <Pressable
+          style={ss.viralCard}
+          onPress={() => Linking.openURL(PUBLIC_APP_URL)}
+        >
           <View>
-            <Text style={ss.viralPowered}>Powered by Trackshpr</Text>
-            <Text style={ss.viralCta}>Track your own deliveries →</Text>
+            <Text style={ss.viralLabel}>Powered by Trackshpr</Text>
+            <Text style={ss.viralAction}>Track yours →</Text>
           </View>
           <Feather name="package" size={18} color={colors.primary} />
-        </View>
+        </Pressable>
       </ScrollView>
 
-      {/* ── CTA Section (floated above bottom) ── */}
-      {status !== "delivered" && status !== "failed" && (
-        <View style={[ss.ctaSection, { paddingBottom: insets.bottom + 14 }]}>
+      {ctaLabel ? (
+        <View
+          style={[
+            ss.actionBar,
+            { paddingBottom: insets.bottom + 14 },
+          ]}
+        >
           <Pressable
-            onPress={handleCta}
-            disabled={ctaBusy}
-            style={({ pressed }) => [
-              { opacity: pressed || ctaBusy ? 0.72 : 1 },
+            onPress={handlePrimaryAction}
+            disabled={busy}
+            style={[
+              ss.primaryButton,
+              {
+                backgroundColor: brandColor,
+                opacity: busy ? 0.7 : 1,
+              },
             ]}
           >
-            <LinearGradient
-              colors={
-                status === "in_transit" || status === "picked_up"
-                  ? (gradients.success as [string, string])
-                  : (gradients.primary as [string, string])
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={ss.ctaButton}
-            >
-              {ctaBusy ? (
-                <ActivityIndicator color={colors.white} size="small" />
-              ) : (
-                <Text style={ss.ctaText}>
-                  {status === "pending"
-                    ? "I've Picked Up the Item"
-                    : "Delivery Complete"}
-                </Text>
-              )}
-            </LinearGradient>
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={ss.primaryButtonText}>{ctaLabel}</Text>
+            )}
           </Pressable>
 
-          <Text style={ss.reportRow}>
-            Having trouble?{" "}
-            <Text style={ss.reportLink} onPress={openReport}>
-              Report a problem
-            </Text>
-          </Text>
+          <Pressable
+            onPress={() => setReportOpen(true)}
+            disabled={busy}
+            style={ss.problemLink}
+          >
+            <Text style={ss.problemLinkText}>Report a problem</Text>
+          </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {/* ── Report Problem Bottom Sheet ── */}
       <Modal
         visible={reportOpen}
         transparent
         animationType="none"
-        onRequestClose={closeReport}
+        onRequestClose={() => setReportOpen(false)}
       >
         <View style={ss.modalRoot}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeReport} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setReportOpen(false)}
+          />
           <Animated.View
             style={[
               ss.sheet,
@@ -696,52 +640,40 @@ export default function RiderLinkScreen() {
               { paddingBottom: insets.bottom + 16 },
             ]}
           >
-            {/* Handle */}
             <View style={ss.sheetHandle} />
-
-            {/* Title */}
             <Text style={ss.sheetTitle}>Report a problem</Text>
-
-            {/* Options */}
-            <View style={ss.reportOptions}>
-              {REPORT_OPTIONS.map((opt, i) => (
+            <Text style={ss.sheetBody}>
+              This will mark the order as failed and notify the seller in the
+              timeline.
+            </Text>
+            <View style={ss.optionsList}>
+              {REPORT_OPTIONS.map((option) => (
                 <Pressable
-                  key={i}
-                  style={({ pressed }) => [
-                    ss.reportOption,
-                    { opacity: pressed ? 0.7 : 1 },
-                  ]}
-                  onPress={() => reportMutation.mutate(opt.title)}
+                  key={option.label}
+                  onPress={() => failMutation.mutate(option.label)}
+                  style={ss.optionCard}
+                  disabled={busy}
                 >
                   <View
                     style={[
-                      ss.reportIconContainer,
-                      { backgroundColor: opt.iconBg },
+                      ss.optionIcon,
+                      { backgroundColor: option.tintBg },
                     ]}
                   >
-                    <Feather
-                      name={opt.icon}
-                      size={16}
-                      color={colors.textPrimary}
-                    />
+                    <Feather name={option.icon} size={16} color={option.tint} />
                   </View>
-                  <View style={ss.reportOptionBody}>
-                    <Text style={ss.reportOptionTitle}>{opt.title}</Text>
-                    <Text style={ss.reportOptionSub}>{opt.subtitle}</Text>
+                  <View style={ss.optionCopy}>
+                    <Text style={ss.optionTitle}>{option.label}</Text>
+                    <Text style={ss.optionSubtitle}>{option.subtitle}</Text>
                   </View>
                 </Pressable>
               ))}
             </View>
-
-            {/* Cancel */}
             <Pressable
-              style={({ pressed }) => [
-                ss.cancelBtn,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-              onPress={closeReport}
+              onPress={() => setReportOpen(false)}
+              style={ss.secondaryButton}
             >
-              <Text style={ss.cancelBtnText}>Cancel</Text>
+              <Text style={ss.secondaryButtonText}>Cancel</Text>
             </Pressable>
           </Animated.View>
         </View>
@@ -750,8 +682,7 @@ export default function RiderLinkScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-const ss = StyleSheet.create({
+const ss = StyleSheet.create<any>({
   root: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -761,441 +692,325 @@ const ss = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: layout.screenPaddingH,
   },
-
-  // Invalid link state
-  invalidIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+  loadingText: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+    marginTop: 12,
+  },
+  errorIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     backgroundColor: colors.infoBg,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
-  invalidTitle: {
-    fontSize: 18,
-    fontFamily: font.sans.bold,
+  errorTitle: {
+    ...typography.headingSm,
     color: colors.textPrimary,
-    letterSpacing: -0.36,
-    marginBottom: 8,
     textAlign: "center",
+    marginBottom: 8,
   },
-  invalidSub: {
-    fontSize: 13,
-    fontFamily: font.sans.regular,
+  errorBody: {
+    ...typography.bodySm,
     color: colors.textMuted,
     textAlign: "center",
-    lineHeight: 19,
+    lineHeight: 20,
+    marginBottom: 20,
   },
-
-  // Header
   header: {
-    backgroundColor: colors.surfaceCard,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: layout.screenPaddingH,
-    paddingVertical: 12,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 14,
+    gap: 12,
+    backgroundColor: colors.surfaceCard,
   },
-  headerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
   },
-  headerTextCol: {
-    gap: 1,
+  headerCopy: {
+    flex: 1,
   },
-  headerBrand: {
-    fontSize: 15,
-    fontFamily: font.sans.bold,
+  brandName: {
+    ...typography.labelLg,
     color: colors.textPrimary,
-    letterSpacing: -0.2,
   },
-  headerSub: {
-    fontSize: 10,
-    fontFamily: font.sans.regular,
+  brandSub: {
+    ...typography.bodySm,
     color: colors.textMuted,
   },
-
-  // Scroll
   scroll: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop: 16,
-    gap: 12,
+  content: {
+    padding: layout.screenPaddingH,
+    gap: 16,
   },
-
-  // Hero card
   heroCard: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.card,
     padding: 16,
-    boxShadow: "0 1px 8px rgba(48, 41, 80, 0.05)",
-    gap: 8,
+    gap: 12,
   },
   heroTopRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
   },
-  pill: {
-    borderWidth: 1,
+  statusPill: {
     borderRadius: radius.full,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
   },
-  pillText: {
-    fontSize: 11,
-    fontFamily: font.sans.semiBold,
-    letterSpacing: 0.1,
-  },
-  blinkDot: {
+  statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.primary,
   },
-  orderId: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
+  statusPillText: {
+    ...typography.capsSm,
+  },
+  orderCode: {
+    ...typography.monoXs,
     color: colors.textMuted,
-    letterSpacing: 0.3,
   },
-  itemName: {
-    fontSize: 17,
-    fontFamily: font.sans.bold,
+  heroTitle: {
+    ...typography.headingSm,
     color: colors.textPrimary,
-    letterSpacing: -0.34,
   },
-  addressRow: {
+  heroMeta: {
+    ...typography.bodySm,
+    color: colors.textSecondary,
+  },
+  addressWrap: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 3,
-  },
-  pinIcon: {
-    marginTop: 1,
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   addressText: {
-    fontSize: 12,
-    fontFamily: font.sans.regular,
-    color: colors.textMuted,
+    ...typography.bodySm,
+    color: colors.textPrimary,
     flex: 1,
-    lineHeight: 17,
+    lineHeight: 20,
   },
-
-  // Progress steps
-  stepsOuter: {
-    marginTop: 10,
-    position: "relative",
-    paddingTop: 10,
+  completionBanner: {
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  progressTrackBg: {
-    position: "absolute",
-    top: 20,
-    left: "10%",
-    right: "10%",
-    height: 2,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: 1,
+  completionText: {
+    ...typography.labelSm,
   },
-  progressTrackFill: {
-    position: "absolute",
-    top: 20,
-    left: "10%",
-    height: 2,
-    borderRadius: 1,
-  },
-  stepsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  stepItem: {
-    alignItems: "center",
-    gap: 5,
-    flex: 1,
-  },
-  stepDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
-  stepDotDone: {
-    backgroundColor: colors.successBg,
-    borderColor: colors.success,
-  },
-  stepDotNow: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
-  },
-  stepDotPending: {
-    backgroundColor: colors.surfaceCard,
-    borderColor: colors.surfaceContainer,
-  },
-  stepCheckText: {
-    fontSize: 10,
-    color: colors.success,
-    fontFamily: font.sans.bold,
-  },
-  stepNumText: {
-    fontSize: 9,
-    fontFamily: font.sans.bold,
-  },
-  stepLabel: {
-    fontSize: 9,
-    fontFamily: font.sans.semiBold,
-    textAlign: "center",
-  },
-
-  // Detail card
-  detailCard: {
+  card: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.xl,
     overflow: "hidden",
-    boxShadow: "0 1px 8px rgba(48, 41, 80, 0.05)",
   },
   detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 13,
-    gap: 12,
+    paddingVertical: 14,
+    gap: 6,
+    backgroundColor: colors.surfaceCard,
   },
-  detailRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceContainer,
+  detailRowAlt: {
+    backgroundColor: colors.surface,
   },
   detailLabel: {
-    fontSize: 12,
-    fontFamily: font.sans.regular,
+    ...typography.labelXs,
     color: colors.textMuted,
-    flex: 1,
   },
   detailValue: {
-    fontSize: 13,
-    fontFamily: font.sans.semiBold,
+    ...typography.bodyLg,
     color: colors.textPrimary,
-    textAlign: "right",
-    flexShrink: 1,
-    marginLeft: 8,
   },
   detailValueAmount: {
-    fontSize: 15,
-    fontFamily: font.mono.medium,
+    ...typography.monoSm,
     color: colors.success,
   },
-
-  // Timeline
-  timelineSection: {
-    gap: 0,
+  section: {
+    gap: 10,
   },
-  timelineTitle: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
+  sectionTitle: {
+    ...typography.labelMd,
     color: colors.textPrimary,
-    marginBottom: 10,
-    letterSpacing: -0.12,
+  },
+  timelineCard: {
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radius.xl,
+    padding: 16,
+    gap: 14,
+  },
+  helperText: {
+    ...typography.bodySm,
+    color: colors.textMuted,
   },
   eventRow: {
     flexDirection: "row",
-    gap: 10,
-    minHeight: 36,
+    gap: 12,
   },
-  eventSpineCol: {
+  eventRail: {
+    width: 18,
     alignItems: "center",
-    width: 22,
   },
   eventDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  eventDotCheck: {
-    fontSize: 10,
-    color: colors.success,
-    fontFamily: font.sans.bold,
-  },
-  eventDotInner: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 6,
   },
   eventConnector: {
-    width: 1.5,
+    width: 2,
     flex: 1,
     backgroundColor: colors.surfaceContainer,
-    marginTop: 2,
-    marginBottom: 2,
+    marginTop: 4,
+    minHeight: 24,
   },
   eventBody: {
     flex: 1,
-    paddingBottom: 14,
-    gap: 2,
-    paddingTop: 2,
+    paddingBottom: 4,
+    gap: 3,
   },
   eventLabel: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
+    ...typography.labelSm,
     color: colors.textPrimary,
-    letterSpacing: -0.12,
+  },
+  eventNote: {
+    ...typography.bodySm,
+    color: colors.textSecondary,
   },
   eventTime: {
-    fontSize: 10,
-    fontFamily: font.mono.regular,
+    ...typography.monoXs,
     color: colors.textMuted,
   },
-
-  // Viral footer
-  viralFooter: {
+  viralCard: {
     backgroundColor: colors.surfaceContainer,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  viralPowered: {
-    fontSize: 10,
-    fontFamily: font.sans.regular,
+  viralLabel: {
+    ...typography.bodySm,
     color: colors.textMuted,
     marginBottom: 2,
   },
-  viralCta: {
-    fontSize: 12,
-    fontFamily: font.sans.bold,
+  viralAction: {
+    ...typography.labelSm,
     color: colors.primary,
-    letterSpacing: -0.12,
   },
-
-  // CTA section
-  ctaSection: {
+  actionBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: colors.surfaceCard,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingHorizontal: layout.screenPaddingH,
     paddingTop: 14,
     gap: 10,
   },
-  ctaButton: {
+  primaryButton: {
+    minHeight: 48,
     borderRadius: radius.full,
-    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  primaryButtonText: {
+    ...typography.labelLg,
+    color: colors.white,
+  },
+  problemLink: {
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  ctaText: {
-    fontSize: 15,
-    fontFamily: font.sans.bold,
-    color: colors.white,
-    letterSpacing: -0.15,
-  },
-  reportRow: {
-    textAlign: "center",
-    fontSize: 12,
-    fontFamily: font.sans.regular,
-    color: colors.textMuted,
-    alignSelf: "center",
-  },
-  reportLink: {
-    fontSize: 12,
-    fontFamily: font.sans.semiBold,
+  problemLinkText: {
+    ...typography.labelSm,
     color: colors.error,
-    textDecorationLine: "underline",
-    textDecorationStyle: "dotted",
   },
-
-  // Report bottom sheet
   modalRoot: {
     flex: 1,
-    backgroundColor: "rgba(48, 41, 80, 0.4)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: colors.surfaceCard,
+    backgroundColor: colors.surfaceElevated,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     paddingHorizontal: 16,
     paddingTop: 12,
-    boxShadow: "0 -4px 20px rgba(48, 41, 80, 0.08)",
     gap: 14,
   },
   sheetHandle: {
     width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.full,
     alignSelf: "center",
-    marginBottom: 2,
+    backgroundColor: colors.surfaceContainer,
   },
   sheetTitle: {
-    fontSize: 17,
-    fontFamily: font.sans.bold,
+    ...typography.headingSm,
     color: colors.textPrimary,
-    letterSpacing: -0.34,
   },
-  reportOptions: {
-    gap: 8,
+  sheetBody: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
-  reportOption: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+  optionsList: {
+    gap: 10,
+  },
+  optionCard: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 13,
-    paddingHorizontal: 14,
     gap: 12,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceCard,
   },
-  reportIconContainer: {
+  optionIcon: {
     width: 40,
     height: 40,
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
-  reportOptionBody: {
+  optionCopy: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
-  reportOptionTitle: {
-    fontSize: 13,
-    fontFamily: font.sans.semiBold,
+  optionTitle: {
+    ...typography.labelSm,
     color: colors.textPrimary,
-    letterSpacing: -0.13,
   },
-  reportOptionSub: {
-    fontSize: 11,
-    fontFamily: font.sans.regular,
+  optionSubtitle: {
+    ...typography.bodySm,
     color: colors.textMuted,
-    lineHeight: 15,
+    lineHeight: 18,
   },
-  cancelBtn: {
-    backgroundColor: colors.surfaceContainer,
+  secondaryButton: {
+    minHeight: 48,
     borderRadius: radius.full,
-    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: colors.surfaceContainer,
   },
-  cancelBtnText: {
-    fontSize: 14,
-    fontFamily: font.sans.semiBold,
+  secondaryButtonText: {
+    ...typography.labelMd,
     color: colors.textSecondary,
-    letterSpacing: -0.14,
   },
 });

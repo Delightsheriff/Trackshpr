@@ -1,18 +1,28 @@
 /**
  * Brand Customization settings screen.
- * Free state: upgrade banner + locked preview + feature list.
- * Pro state: live preview card, colour swatches, display options, save.
  */
+import { ProGate } from "@/src/components/shared";
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
 import { useProfile, useSaveProfile, useSession } from "@/src/hooks";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { fetchProfile } from "@/src/lib/supabaseQueries";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,7 +31,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// ── Colour options (data, not UI tokens) ─────────────────────────────────────
 const ACCENT_COLORS: { name: string; hex: string; end: string }[] = [
   { name: "Indigo", hex: "#4647D3", end: "#6366F1" },
   { name: "Burnt Orange", hex: "#C2410C", end: "#EA580C" },
@@ -39,30 +48,79 @@ const ACCENT_COLORS: { name: string; hex: string; end: string }[] = [
 
 type DisplayOption = "logo_name" | "name_only";
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
+
   return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-      {label}
-    </Text>
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
   );
 }
 
-/** Live preview card — header bg uses selected accent color */
+function FormInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const { colors, isDark } = useTheme();
+  const [focused, setFocused] = useState(false);
+
+  const fieldShadow = isDark
+    ? {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 4,
+      }
+    : {
+        shadowColor: "rgba(48,41,80,1)",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
+      };
+
+  return (
+    <View
+      style={[
+        styles.inputField,
+        {
+          backgroundColor: focused ? colors.surfaceCard : colors.surfaceContainer,
+          borderColor: focused ? colors.primary : "transparent",
+        },
+        !focused && fieldShadow,
+      ]}
+    >
+      <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        style={[styles.inputValue, { color: colors.textPrimary }]}
+      />
+    </View>
+  );
+}
+
 function PreviewCard({
   accentHex,
   accentEnd,
-  isPro,
-  businessName,
+  brandName,
   displayOption,
 }: {
   accentHex: string;
   accentEnd: string;
-  isPro: boolean;
-  businessName?: string;
-  displayOption?: DisplayOption;
+  brandName: string;
+  displayOption: DisplayOption;
 }) {
   const { colors, isDark } = useTheme();
 
@@ -84,71 +142,30 @@ function PreviewCard({
 
   return (
     <View style={[styles.previewCard, cardShadow]}>
-      {/* Header */}
       <LinearGradient
         colors={[accentHex, accentEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.previewHeader}
       >
-        {/* Decorative orb */}
-        <View
-          style={[
-            styles.previewOrb,
-            { backgroundColor: "rgba(255,255,255,0.08)" },
-          ]}
-        />
-
+        <View style={styles.previewOrb} />
         <View style={styles.previewBrandRow}>
-          {(!isPro || displayOption !== "name_only") && (
-            <View
-              style={[
-                styles.previewLogo,
-                { backgroundColor: "rgba(255,255,255,0.15)" },
-              ]}
-            >
-              <Feather
-                name={isPro ? "shopping-bag" : "package"}
-                size={16}
-                color="#FFFFFF"
-              />
+          {displayOption !== "name_only" ? (
+            <View style={styles.previewLogo}>
+              <Feather name="briefcase" size={16} color="#FFFFFF" />
             </View>
-          )}
+          ) : null}
           <View style={{ flex: 1 }}>
-            <Text style={[styles.previewBrandName, { color: "#fff" }]}>
-              {isPro ? (businessName ?? "Your Business") : "Trackshpr"}
-            </Text>
-            <Text
-              style={[
-                styles.previewBrandTag,
-                { color: "rgba(255,255,255,0.55)" },
-              ]}
-            >
-              {isPro ? "Delivery tracking" : "Delivery tracking"}
-            </Text>
+            <Text style={styles.previewBrandName}>{brandName}</Text>
+            <Text style={styles.previewBrandTag}>Delivery tracking</Text>
           </View>
-          <View
-            style={[
-              styles.previewVerified,
-              { backgroundColor: "rgba(255,255,255,0.12)" },
-            ]}
-          >
-            <Text
-              style={[
-                styles.previewVerifiedText,
-                { color: "rgba(255,255,255,0.7)" },
-              ]}
-            >
-              {isPro ? "✓ Verified" : "Free"}
-            </Text>
+          <View style={styles.previewVerified}>
+            <Text style={styles.previewVerifiedText}>Pro</Text>
           </View>
         </View>
       </LinearGradient>
 
-      {/* Body */}
-      <View
-        style={[styles.previewBody, { backgroundColor: colors.surfaceCard }]}
-      >
+      <View style={[styles.previewBody, { backgroundColor: colors.surfaceCard }]}>
         <Text style={[styles.previewBodyLabel, { color: colors.textMuted }]}>
           Customer sees this
         </Text>
@@ -158,24 +175,15 @@ function PreviewCard({
             { backgroundColor: colors.surfaceContainer },
           ]}
         >
-          <View
-            style={[styles.previewProgressFill, { backgroundColor: accentHex }]}
-          />
+          <View style={[styles.previewProgressFill, { backgroundColor: accentHex }]} />
         </View>
         <View style={styles.previewPillRow}>
           <Text style={[styles.previewStatusText, { color: colors.textMuted }]}>
-            In Transit → Lekki
+            In Transit to Lekki
           </Text>
           <View style={[styles.previewPill, { backgroundColor: accentHex }]}>
-            <View
-              style={[
-                styles.previewPillDot,
-                { backgroundColor: "rgba(255,255,255,0.7)" },
-              ]}
-            />
-            <Text style={[styles.previewPillText, { color: "#fff" }]}>
-              Tracking
-            </Text>
+            <View style={styles.previewPillDot} />
+            <Text style={styles.previewPillText}>Tracking</Text>
           </View>
         </View>
       </View>
@@ -183,53 +191,6 @@ function PreviewCard({
   );
 }
 
-/** Feature list row used in free tier */
-function FeatureRow({
-  icon,
-  iconColor,
-  bg,
-  title,
-  sub,
-  divider,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  iconColor?: string;
-  bg: string;
-  title: string;
-  sub: string;
-  divider?: boolean;
-}) {
-  const { colors } = useTheme();
-  return (
-    <View
-      style={[
-        styles.featureRow,
-        divider && [
-          styles.featureRowDivider,
-          { borderBottomColor: colors.surfaceContainer },
-        ],
-      ]}
-    >
-      <View style={[styles.featureIcon, { backgroundColor: bg }]}>
-        <Feather
-          name={icon}
-          size={15}
-          color={iconColor ?? colors.textPrimary}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.featureTitle, { color: colors.textPrimary }]}>
-          {title}
-        </Text>
-        <Text style={[styles.featureSub, { color: colors.textMuted }]}>
-          {sub}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-/** Single swatch cell */
 function Swatch({
   color,
   selected,
@@ -248,24 +209,19 @@ function Swatch({
         selected && styles.swatchSelected,
       ]}
     >
-      {selected ? (
-        <Text style={[styles.swatchCheck, { color: "#fff" }]}>✓</Text>
-      ) : null}
+      {selected ? <Text style={styles.swatchCheck}>✓</Text> : null}
     </Pressable>
   );
 }
 
-/** Radio option row for display type */
 function DisplayOptionRow({
   icon,
-  iconColor,
   label,
   sub,
   selected,
   onPress,
 }: {
   icon: keyof typeof Feather.glyphMap;
-  iconColor?: string;
   label: string;
   sub: string;
   selected: boolean;
@@ -297,7 +253,6 @@ function DisplayOptionRow({
         { backgroundColor: selected ? colors.primarySoft : colors.surfaceCard },
         !selected && rowShadow,
       ]}
-      android_ripple={{ color: colors.primarySoft, borderless: false }}
     >
       <View
         style={[
@@ -312,15 +267,11 @@ function DisplayOptionRow({
         <Feather
           name={icon}
           size={16}
-          color={
-            iconColor ?? (selected ? colors.primary : colors.textSecondary)
-          }
+          color={selected ? colors.primary : colors.textSecondary}
         />
       </View>
       <View style={{ flex: 1 }}>
-        <Text
-          style={[styles.displayOptionLabel, { color: colors.textPrimary }]}
-        >
+        <Text style={[styles.displayOptionLabel, { color: colors.textPrimary }]}>
           {label}
         </Text>
         <Text style={[styles.displayOptionSub, { color: colors.textMuted }]}>
@@ -334,48 +285,49 @@ function DisplayOptionRow({
           selected && { backgroundColor: colors.primary },
         ]}
       >
-        {selected ? (
-          <View style={[styles.radioDot, { backgroundColor: colors.white }]} />
-        ) : null}
+        {selected ? <View style={styles.radioDot} /> : null}
       </View>
     </Pressable>
   );
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
-export default function BrandCustomizationScreen() {
+function BrandCustomizationContent() {
   const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
-  const showToast = useToastStore((s) => s.show);
+  const showToast = useToastStore((state) => state.show);
+  const queryClient = useQueryClient();
   const { userId } = useSession();
-
   const { data: profile } = useProfile(userId);
   const saveProfileMutation = useSaveProfile();
 
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [displayOption, setDisplayOption] =
     useState<DisplayOption>("logo_name");
-  const [saved, setSaved] = useState(false);
+  const [brandDisplayName, setBrandDisplayName] = useState("");
 
   const bannerY = useSharedValue(-40);
   const bannerOp = useSharedValue(0);
 
-  // Pre-fill from profile
   useEffect(() => {
-    if (profile) {
-      if (profile.brand_color) {
-        const idx = ACCENT_COLORS.findIndex((c) => c.hex === profile.brand_color);
-        if (idx !== -1) setSelectedIdx(idx);
-      }
-      if (profile.display_option === "name_only" || profile.display_option === "logo_name") {
-        setDisplayOption(profile.display_option);
+    if (!profile) return;
+
+    if (profile.brand_color) {
+      const idx = ACCENT_COLORS.findIndex((color) => color.hex === profile.brand_color);
+      if (idx >= 0) {
+        setSelectedIdx(idx);
       }
     }
+
+    if (
+      profile.display_option === "name_only" ||
+      profile.display_option === "logo_name"
+    ) {
+      setDisplayOption(profile.display_option);
+    }
+
+    setBrandDisplayName(profile.brand_name ?? "");
   }, [profile]);
 
-  const isPro = false; // hardcoded until payments land
   const accent = ACCENT_COLORS[selectedIdx];
-
   const cardShadow = isDark
     ? {
         shadowColor: "#000",
@@ -391,6 +343,177 @@ export default function BrandCustomizationScreen() {
         shadowRadius: 6,
         elevation: 1,
       };
+
+  const showBanner = () => {
+    bannerY.value = -40;
+    bannerOp.value = 0;
+    bannerY.value = withSpring(0, { damping: 22, stiffness: 320 });
+    bannerOp.value = withTiming(1, { duration: 250 });
+    setTimeout(() => {
+      bannerOp.value = withTiming(0, { duration: 200 });
+    }, 2800);
+  };
+
+  const handleSave = async () => {
+    if (!userId) return;
+
+    const normalizedBrandName = brandDisplayName.trim() || null;
+
+    try {
+      await saveProfileMutation.mutateAsync({
+        id: userId,
+        brand_name: normalizedBrandName,
+        brand_color: accent.hex,
+        display_option: displayOption,
+      });
+
+      const latest = await queryClient.fetchQuery({
+        queryKey: queryKeys.profile(userId),
+        queryFn: () => fetchProfile(userId),
+      });
+
+      if (
+        latest?.brand_color !== accent.hex ||
+        (latest?.brand_name ?? null) !== normalizedBrandName
+      ) {
+        throw new Error("verification_failed");
+      }
+
+      showBanner();
+      showToast("Brand settings saved.", "success");
+    } catch {
+      showToast("Couldn't save your brand settings. Please try again.", "error");
+    }
+  };
+
+  const bannerStyle = useAnimatedStyle(() => ({
+    opacity: bannerOp.value,
+    transform: [{ translateY: bannerY.value }],
+  }));
+
+  const previewBrandName = useMemo(
+    () =>
+      brandDisplayName.trim() ||
+      profile?.brand_name ||
+      profile?.business_name ||
+      "Your Business",
+    [brandDisplayName, profile?.brand_name, profile?.business_name],
+  );
+
+  return (
+    <>
+      <Animated.View
+        style={[
+          styles.savedBanner,
+          { backgroundColor: colors.successBg },
+          bannerStyle,
+        ]}
+        pointerEvents="none"
+      >
+        <Feather name="check-circle" size={16} color={colors.success} />
+        <Text style={[styles.savedBannerText, { color: colors.success }]}>
+          Brand settings saved and verified
+        </Text>
+      </Animated.View>
+
+      <SectionLabel label="Brand display name" />
+      <FormInput
+        label="Display name"
+        value={brandDisplayName}
+        onChange={setBrandDisplayName}
+        placeholder={profile?.business_name ?? "Your business name"}
+      />
+
+      <SectionLabel label="Live preview" />
+      <PreviewCard
+        accentHex={accent.hex}
+        accentEnd={accent.end}
+        brandName={previewBrandName}
+        displayOption={displayOption}
+      />
+
+      <SectionLabel label="Accent colour" />
+      <View style={[styles.swatchCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+        <View style={styles.swatchGrid}>
+          {ACCENT_COLORS.map((color, index) => (
+            <Swatch
+              key={color.hex}
+              color={color}
+              selected={index === selectedIdx}
+              onPress={() => setSelectedIdx(index)}
+            />
+          ))}
+        </View>
+
+        <View style={[styles.swatchDivider, { backgroundColor: colors.surfaceContainer }]} />
+
+        <View style={styles.swatchLabel}>
+          <View style={[styles.swatchLabelDot, { backgroundColor: accent.hex }]} />
+          <Text style={[styles.swatchLabelName, { color: colors.textPrimary }]}>
+            {accent.name}
+          </Text>
+          <Text style={[styles.swatchLabelHex, { color: colors.textMuted }]}>
+            {accent.hex}
+          </Text>
+        </View>
+      </View>
+
+      <SectionLabel label="What shows on tracking pages" />
+      <DisplayOptionRow
+        icon="briefcase"
+        label="Logo + display name"
+        sub="Show your logo and display name together"
+        selected={displayOption === "logo_name"}
+        onPress={() => setDisplayOption("logo_name")}
+      />
+      <DisplayOptionRow
+        icon="type"
+        label="Display name only"
+        sub="Hide the logo and keep the name front and center"
+        selected={displayOption === "name_only"}
+        onPress={() => setDisplayOption("name_only")}
+      />
+
+      <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
+        <Feather
+          name="link-2"
+          size={16}
+          color={colors.primary}
+          style={styles.infoCardIcon}
+        />
+        <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
+          Your saved colour and display name will appear on new tracking links as
+          soon as Pro is enabled for your profile.
+        </Text>
+      </View>
+
+      <View style={[styles.saveShadow, { backgroundColor: colors.primary }]}>
+        <Pressable
+          onPress={handleSave}
+          disabled={saveProfileMutation.isPending}
+          style={styles.savePressable}
+        >
+          <LinearGradient
+            colors={gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.saveBtn}
+          >
+            {saveProfileMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Brand Settings</Text>
+            )}
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
+export default function BrandCustomizationScreen() {
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const backBtnShadow = isDark
     ? {
@@ -408,48 +531,6 @@ export default function BrandCustomizationScreen() {
         elevation: 1,
       };
 
-  const lockOverlayBg = isDark
-    ? "rgba(15,14,26,0.88)"
-    : "rgba(250,244,255,0.88)";
-
-  const showBanner = () => {
-    bannerY.value = -40;
-    bannerOp.value = 0;
-    bannerY.value = withSpring(0, { damping: 22, stiffness: 320 });
-    bannerOp.value = withTiming(1, { duration: 250 });
-    setTimeout(() => {
-      bannerOp.value = withTiming(0, { duration: 200 });
-    }, 2800);
-  };
-
-  const handleSave = () => {
-    if (!userId || !profile) return;
-    saveProfileMutation.mutate(
-      {
-        id: userId,
-        business_name: profile.business_name ?? "",
-        phone: profile.phone ?? "",
-        brand_color: accent.hex,
-        display_option: displayOption,
-      },
-      {
-        onSuccess: () => {
-          setSaved(true);
-          showBanner();
-          setTimeout(() => setSaved(false), 3000);
-        },
-        onError: () => {
-          showToast("Could not save brand settings. Please try again.", "error");
-        },
-      },
-    );
-  };
-
-  const bannerStyle = useAnimatedStyle(() => ({
-    opacity: bannerOp.value,
-    transform: [{ translateY: bannerY.value }],
-  }));
-
   return (
     <View
       style={[
@@ -459,7 +540,6 @@ export default function BrandCustomizationScreen() {
     >
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: colors.surfaceCard }]}>
         <Pressable
           onPress={() => router.back()}
@@ -468,7 +548,6 @@ export default function BrandCustomizationScreen() {
             { backgroundColor: colors.surfaceContainer },
             backBtnShadow,
           ]}
-          android_ripple={{ color: colors.surfaceContainer, borderless: false }}
         >
           <Feather name="arrow-left" size={18} color={colors.textPrimary} />
         </Pressable>
@@ -478,23 +557,6 @@ export default function BrandCustomizationScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* ── Saved banner ── */}
-      {isPro ? (
-        <Animated.View
-          style={[
-            styles.savedBanner,
-            { backgroundColor: colors.successBg },
-            bannerStyle,
-          ]}
-          pointerEvents="none"
-        >
-          <Feather name="check-circle" size={16} color={colors.success} />
-          <Text style={[styles.savedBannerText, { color: colors.success }]}>
-            Brand settings saved · Changes are live
-          </Text>
-        </Animated.View>
-      ) : null}
-
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -502,282 +564,16 @@ export default function BrandCustomizationScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ══════════════════════════════
-            FREE STATE
-        ══════════════════════════════ */}
-        {!isPro ? (
-          <>
-            {/* Upgrade banner */}
-            <LinearGradient
-              colors={gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.upgradeBanner}
-            >
-              <View
-                style={[
-                  styles.upgradeBannerOrb,
-                  { backgroundColor: "rgba(255,255,255,0.07)" },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.upgradeBannerCaps,
-                  { color: "rgba(255,255,255,0.6)" },
-                ]}
-              >
-                Pro Feature
-              </Text>
-              <Text style={[styles.upgradeBannerTitle, { color: "#fff" }]}>
-                Make it yours
-              </Text>
-              <Text
-                style={[
-                  styles.upgradeBannerSub,
-                  { color: "rgba(255,255,255,0.65)" },
-                ]}
-              >
-                Remove Trackshpr branding from every customer tracking page.
-                Show your logo, your colours, your name.
-              </Text>
-              <View style={styles.upgradeCtaShadow}>
-                <Pressable
-                  style={styles.upgradeCtaPressable}
-                  android_ripple={{
-                    color: colors.primarySoft,
-                    borderless: false,
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.upgradeCta,
-                      { backgroundColor: colors.white },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.upgradeCtaText, { color: colors.primary }]}
-                    >
-                      Upgrade to Pro — ₦3,500/mo
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            </LinearGradient>
-
-            {/* Locked preview */}
-            <SectionLabel label="Preview" />
-            <View style={styles.proLock}>
-              <PreviewCard
-                accentHex={colors.primary}
-                accentEnd={ACCENT_COLORS[0].end}
-                isPro={false}
-              />
-              {/* Overlay */}
-              <View
-                style={[
-                  styles.proLockOverlay,
-                  { backgroundColor: lockOverlayBg },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.proLockBadge,
-                    { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <Feather name="zap" size={12} color={colors.white} />
-                  <Text
-                    style={[styles.proLockBadgeText, { color: colors.white }]}
-                  >
-                    Pro only
-                  </Text>
-                </View>
-                <Text style={[styles.proLockText, { color: colors.textMuted }]}>
-                  Upgrade to customise
-                </Text>
-              </View>
-            </View>
-
-            {/* Feature list */}
-            <View
-              style={[
-                styles.featureList,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              <FeatureRow
-                icon="droplet"
-                iconColor={colors.primary}
-                bg={colors.primarySoft}
-                title="Custom accent colour"
-                sub="12 colours to match your brand"
-                divider
-              />
-              <FeatureRow
-                icon="briefcase"
-                iconColor={colors.warning}
-                bg={colors.warningBg}
-                title="Your logo on tracking pages"
-                sub="Replaces Trackshpr branding"
-                divider
-              />
-              <FeatureRow
-                icon="star"
-                iconColor={colors.success}
-                bg={colors.successBg}
-                title="Look like a big brand"
-                sub="Customers trust sellers who look professional"
-              />
-            </View>
-          </>
-        ) : null}
-
-        {/* ══════════════════════════════
-            PRO STATE
-        ══════════════════════════════ */}
-        {isPro ? (
-          <>
-            {/* Live preview */}
-            <SectionLabel label="Live preview" />
-            <PreviewCard
-              accentHex={accent.hex}
-              accentEnd={accent.end}
-              isPro={true}
-              businessName={profile?.business_name ?? undefined}
-              displayOption={displayOption}
-            />
-
-            {/* Colour picker */}
-            <SectionLabel label="Accent colour" />
-            <View
-              style={[
-                styles.swatchCard,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              <View style={styles.swatchGrid}>
-                {ACCENT_COLORS.map((c, i) => (
-                  <Swatch
-                    key={c.hex}
-                    color={c}
-                    selected={i === selectedIdx}
-                    onPress={() => setSelectedIdx(i)}
-                  />
-                ))}
-              </View>
-
-              {/* Divider */}
-              <View
-                style={[
-                  styles.swatchDivider,
-                  { backgroundColor: colors.surfaceContainer },
-                ]}
-              />
-
-              {/* Selected label */}
-              <View style={styles.swatchLabel}>
-                <View
-                  style={[
-                    styles.swatchLabelDot,
-                    { backgroundColor: accent.hex },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.swatchLabelName,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  {accent.name}
-                </Text>
-                <Text
-                  style={[styles.swatchLabelHex, { color: colors.textMuted }]}
-                >
-                  {accent.hex}
-                </Text>
-              </View>
-            </View>
-
-            {/* Display options */}
-            <SectionLabel label="What shows on tracking pages" />
-            <DisplayOptionRow
-              icon="briefcase"
-              iconColor={colors.primary}
-              label="Logo + business name"
-              sub="Replaces all Trackshpr branding"
-              selected={displayOption === "logo_name"}
-              onPress={() => setDisplayOption("logo_name")}
-            />
-            <DisplayOptionRow
-              icon="type"
-              iconColor={colors.textSecondary}
-              label="Business name only"
-              sub="No logo, just your name"
-              selected={displayOption === "name_only"}
-              onPress={() => setDisplayOption("name_only")}
-            />
-
-            {/* Info card (shown after save) */}
-            {saved ? (
-              <View
-                style={[
-                  styles.infoCard,
-                  { backgroundColor: colors.primarySoft },
-                ]}
-              >
-                <Feather
-                  name="link-2"
-                  size={16}
-                  color={colors.primary}
-                  style={styles.infoCardIcon}
-                />
-                <Text
-                  style={[styles.infoCardText, { color: colors.textSecondary }]}
-                >
-                  All <Text style={styles.bold}>new tracking links</Text> you
-                  send will use these brand settings immediately.
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Save button */}
-            <View
-              style={[styles.saveShadow, { backgroundColor: colors.primary }]}
-            >
-              <Pressable
-                onPress={handleSave}
-                style={styles.savePressable}
-                android_ripple={{
-                  color: "rgba(255,255,255,0.2)",
-                  borderless: false,
-                }}
-              >
-                <LinearGradient
-                  colors={gradients.primary}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.saveBtn}
-                >
-                  <Text style={[styles.saveBtnText, { color: "#fff" }]}>
-                    Save Brand Settings
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </>
-        ) : null}
+        <ProGate feature="brand-customization">
+          <BrandCustomizationContent />
+        </ProGate>
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -802,13 +598,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.34,
   },
   headerSpacer: { width: 34 },
-
-  // Saved banner
   savedBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginHorizontal: layout.screenPaddingH,
     marginBottom: 4,
     borderRadius: radius.lg,
     paddingVertical: 11,
@@ -819,156 +612,41 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
   },
-
-  // Scroll
   scroll: {
     paddingHorizontal: layout.screenPaddingH,
     paddingTop: 8,
     gap: 12,
-    flexDirection: "column",
   },
-
-  // Section label
   sectionLabel: {
     fontSize: 10,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    letterSpacing: 0.1 * 10,
+    letterSpacing: 1,
     textTransform: "uppercase",
     marginTop: 4,
     marginBottom: -2,
   },
-
-  // ── FREE: Upgrade banner ─────────────────────────────────────────────────
-  upgradeBanner: {
-    borderRadius: radius.xl,
-    padding: 16,
-    overflow: "hidden",
-    position: "relative",
-  },
-  upgradeBannerOrb: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    top: -30,
-    right: -15,
-  },
-  upgradeBannerCaps: {
-    fontSize: 11,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: 0.55,
-    textTransform: "uppercase",
-    marginBottom: 6,
-  },
-  upgradeBannerTitle: {
-    fontSize: 17,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: -0.34,
-    marginBottom: 6,
-  },
-  upgradeBannerSub: {
-    fontSize: 12,
-    fontFamily: font.sans.regular,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  upgradeCtaShadow: {
-    borderRadius: radius.full,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
-    alignSelf: "flex-start",
-  },
-  upgradeCtaPressable: {
-    borderRadius: radius.full,
-    overflow: "hidden",
-  },
-  upgradeCta: {
-    borderRadius: radius.full,
-    paddingVertical: 9,
-    paddingHorizontal: 20,
-  },
-  upgradeCtaText: {
-    fontSize: 13,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-  },
-
-  // ── Pro lock overlay ─────────────────────────────────────────────────────
-  proLock: {
-    borderRadius: radius.xl,
-    overflow: "hidden",
-    position: "relative",
-  },
-  proLockOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  proLockBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: radius.full,
-    paddingVertical: 6,
+  inputField: {
+    borderRadius: radius.lg,
+    paddingVertical: 13,
     paddingHorizontal: 14,
+    borderWidth: 2,
   },
-  proLockBadgeText: {
-    fontSize: 12,
+  inputLabel: {
+    fontSize: 10,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
-  proLockText: {
-    fontSize: 12,
+  inputValue: {
+    fontSize: 14,
     fontFamily: font.sans.semiBold,
     fontWeight: "500",
+    padding: 0,
+    margin: 0,
   },
-
-  // ── Feature list ─────────────────────────────────────────────────────────
-  featureList: {
-    borderRadius: radius.xl,
-    overflow: "hidden",
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  featureRowDivider: {
-    borderBottomWidth: 1,
-  },
-  featureIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  featureTitle: {
-    fontSize: 13,
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    letterSpacing: -0.13,
-  },
-  featureSub: {
-    fontSize: 11,
-    fontFamily: font.sans.regular,
-    marginTop: 1,
-  },
-
-  // ── Preview card (shared) ────────────────────────────────────────────────
   previewCard: {
     borderRadius: radius.xl,
     overflow: "hidden",
@@ -986,6 +664,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     top: -30,
     right: -15,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   previewBrandRow: {
     flexDirection: "row",
@@ -1000,28 +679,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
   previewBrandName: {
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: -0.15,
+    color: "#FFFFFF",
   },
   previewBrandTag: {
     fontSize: 11,
     fontFamily: font.sans.regular,
     marginTop: 1,
+    color: "rgba(255,255,255,0.65)",
   },
   previewVerified: {
     marginLeft: "auto",
     borderRadius: radius.full,
     paddingVertical: 3,
     paddingHorizontal: 8,
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   previewVerifiedText: {
     fontSize: 10,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
+    color: "rgba(255,255,255,0.75)",
   },
   previewBody: {
     paddingVertical: 14,
@@ -1031,7 +715,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    letterSpacing: 0.08 * 9,
+    letterSpacing: 0.72,
     textTransform: "uppercase",
     marginBottom: 8,
   },
@@ -1068,14 +752,14 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: radius.full,
+    backgroundColor: "rgba(255,255,255,0.7)",
   },
   previewPillText: {
     fontSize: 11,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    color: "#FFFFFF",
   },
-
-  // ── Colour swatches ──────────────────────────────────────────────────────
   swatchCard: {
     borderRadius: radius.xl,
     padding: 14,
@@ -1103,6 +787,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    color: "#FFFFFF",
   },
   swatchDivider: {
     height: 1,
@@ -1129,8 +814,6 @@ const styles = StyleSheet.create({
     fontFamily: font.mono.regular,
     marginLeft: "auto",
   },
-
-  // ── Display options ──────────────────────────────────────────────────────
   displayOption: {
     flexDirection: "row",
     alignItems: "center",
@@ -1172,9 +855,8 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: radius.full,
+    backgroundColor: "#FFFFFF",
   },
-
-  // ── Info card ────────────────────────────────────────────────────────────
   infoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1190,9 +872,6 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.regular,
     lineHeight: 18,
   },
-  bold: { fontFamily: font.sans.bold, fontWeight: "700" },
-
-  // ── Save button ──────────────────────────────────────────────────────────
   saveShadow: {
     borderRadius: radius.full,
     shadowOffset: { width: 0, height: 8 },
@@ -1210,10 +889,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 50,
   },
   saveBtnText: {
     fontSize: 15,
     fontFamily: font.sans.bold,
     fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

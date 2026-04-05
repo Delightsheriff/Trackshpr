@@ -1,74 +1,79 @@
 /**
- * Analytics screen — period-based delivery stats, bar chart, leaderboard (DS §8.1).
+ * Analytics screen - server-driven delivery stats, chart, and leaderboard.
  */
+import ProGate from "@/src/components/shared/ProGate";
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useSession } from "@/src/hooks/useSession";
+import {
+  useAnalyticsDailyChart,
+  useAnalyticsOverview,
+  useAnalyticsTopRiders,
+  useSession,
+} from "@/src/hooks";
 import { supabase } from "@/src/lib/supabase";
-import { queryKeys } from "@/src/lib/queryKeys";
+import type {
+  AnalyticsDailyChartPoint,
+  AnalyticsTopRider,
+} from "@/src/lib/supabaseQueries";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type Period = "7" | "30" | "90";
+const CHART_DELIVERED_COLOR = "#16A34A";
+const BAR_MAX_H = 72;
 
-const PERIOD_TABS: { key: Period; label: string }[] = [
-  { key: "7", label: "7 days" },
-  { key: "30", label: "30 days" },
-  { key: "90", label: "90 days" },
-];
+function formatAverageMinutes(value: number) {
+  if (!value || value <= 0) return "0m";
 
-// ── Rank badge config ─────────────────────────────────────────────────────────
+  const hours = Math.floor(value / 60);
+  const minutes = Math.round(value % 60);
+
+  if (hours <= 0) return `${minutes}m`;
+  if (minutes <= 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function formatChartDay(day: string) {
+  return new Date(day).getDate().toString();
+}
+
 function rankBadgeColors(
   rank: number,
   colors: ReturnType<typeof useTheme>["colors"],
 ): { bg: string; fg: string } {
   if (rank === 1) return { bg: colors.warningBg, fg: colors.warning };
-  if (rank === 2)
+  if (rank === 2) {
     return { bg: colors.surfaceContainer, fg: colors.textSecondary };
+  }
+
   return { bg: colors.errorBg, fg: colors.error };
 }
 
-// ── Bar Chart ─────────────────────────────────────────────────────────────────
-const BAR_MAX_H = 72;
-
-type ChartEntry = { day: number; total: number; delivered: number };
-
-function BarChart({ data }: { data: ChartEntry[] }) {
-  const { colors, isDark } = useTheme();
-  const cardShadow = isDark
-    ? {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 4,
-      }
-    : {
-        shadowColor: "rgba(48,41,80,1)",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-      };
-  const maxVal = Math.max(...data.map((d) => d.total), 1);
+function EmptyChartState() {
+  const { colors } = useTheme();
 
   return (
-    <View
-      style={[
-        styles.chartCard,
-        { backgroundColor: colors.surfaceCard },
-        cardShadow,
-      ]}
-    >
-      {/* Header */}
+    <View style={styles.emptyChartState}>
+      <Text style={[styles.lbMeta, { color: colors.textMuted }]}>
+        No delivery activity yet.
+      </Text>
+    </View>
+  );
+}
+
+function BarChart({ data }: { data: AnalyticsDailyChartPoint[] }) {
+  const { colors } = useTheme();
+  const maxVal = Math.max(...data.map((entry) => entry.total), 1);
+  const hasActivity = data.some((entry) => entry.total > 0);
+
+  return (
+    <View style={[styles.chartCard, { backgroundColor: colors.surfaceCard }]}>
       <View style={styles.chartHeader}>
         <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>
           Daily deliveries
@@ -89,271 +94,347 @@ function BarChart({ data }: { data: ChartEntry[] }) {
             <View
               style={[
                 styles.legendDot,
-                { backgroundColor: colors.primary, opacity: 0.85 },
+                { backgroundColor: CHART_DELIVERED_COLOR },
               ]}
             />
             <Text style={[styles.legendLabel, { color: colors.textMuted }]}>
-              Done
+              Delivered
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Bars */}
       <View style={styles.chartArea}>
-        {data.map((d, i) => {
-          const totalH =
-            maxVal > 0 ? Math.max(4, (d.total / maxVal) * BAR_MAX_H) : 4;
-          const doneH =
-            maxVal > 0
-              ? Math.max(4, (d.delivered / maxVal) * BAR_MAX_H)
-              : 4;
+        {data.map((entry) => {
+          const totalHeight =
+            entry.total > 0 ? Math.max(8, (entry.total / maxVal) * BAR_MAX_H) : 6;
+          const deliveredHeight =
+            entry.delivered > 0
+              ? Math.max(8, (entry.delivered / maxVal) * BAR_MAX_H)
+              : 0;
+
           return (
-            <View key={i} style={styles.barGroup}>
+            <View key={entry.day} style={styles.barGroup}>
               <View
                 style={[
-                  styles.bar,
-                  { height: totalH, backgroundColor: colors.surfaceContainer },
+                  styles.barTrack,
+                  { backgroundColor: colors.surfaceContainer },
                 ]}
-              />
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: doneH,
-                    backgroundColor: colors.primary,
-                    opacity: 0.85,
-                  },
-                ]}
-              />
+              >
+                <View
+                  style={[
+                    styles.bar,
+                    {
+                      height: totalHeight,
+                      backgroundColor: colors.textMuted,
+                      opacity: 0.28,
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.bar,
+                    {
+                      height: deliveredHeight,
+                      backgroundColor: CHART_DELIVERED_COLOR,
+                    },
+                  ]}
+                />
+              </View>
             </View>
           );
         })}
       </View>
 
-      {/* Labels */}
       <View style={styles.chartLabelsRow}>
-        {data.map((d, i) => (
+        {data.map((entry) => (
           <Text
-            key={i}
+            key={entry.day}
             style={[styles.chartLabel, { color: colors.textMuted }]}
           >
-            {d.day}
+            {formatChartDay(entry.day)}
           </Text>
         ))}
       </View>
+
+      {!hasActivity ? <EmptyChartState /> : null}
     </View>
   );
 }
 
-// ── Leaderboard item ──────────────────────────────────────────────────────────
-type LeaderboardRider = {
-  id: string;
-  name: string;
-  initials: string;
-  successRate: string;
-  count: number;
-  rank: number;
-};
-
 function LeaderboardItem({
   rider,
+  rank,
   isLast,
 }: {
-  rider: LeaderboardRider;
+  rider: AnalyticsTopRider;
+  rank: number;
   isLast: boolean;
 }) {
   const { colors } = useTheme();
-  const badge = rankBadgeColors(rider.rank, colors);
-
-  const AVATAR_COLORS: Record<string, { bg: string; fg: string }> = {
-    "1": { bg: colors.primarySoft, fg: colors.primary },
-    "2": { bg: colors.successBg, fg: colors.success },
-    "3": { bg: colors.warningBg, fg: colors.warning },
-  };
-  const avatarCfg = AVATAR_COLORS[String(rider.rank)] ?? {
-    bg: colors.surfaceContainer,
-    fg: colors.textMuted,
-  };
+  const badge = rankBadgeColors(rank, colors);
+  const initials = rider.rider_name
+    .split(" ")
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <>
       <View style={styles.lbRow}>
-        {/* Rank badge */}
         <View style={[styles.lbRank, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.lbRankText, { color: badge.fg }]}>
-            {rider.rank}
+          <Text style={[styles.lbRankText, { color: badge.fg }]}>{rank}</Text>
+        </View>
+
+        <View style={[styles.lbAvatar, { backgroundColor: colors.primarySoft }]}>
+          <Text style={[styles.lbAvatarText, { color: colors.primary }]}>
+            {initials}
           </Text>
         </View>
 
-        {/* Avatar */}
-        <View style={[styles.lbAvatar, { backgroundColor: avatarCfg.bg }]}>
-          <Text style={[styles.lbAvatarText, { color: avatarCfg.fg }]}>
-            {rider.initials}
-          </Text>
-        </View>
-
-        {/* Body */}
         <View style={styles.lbBody}>
           <Text style={[styles.lbName, { color: colors.textPrimary }]}>
-            {rider.name}
+            {rider.rider_name}
           </Text>
           <Text style={[styles.lbMeta, { color: colors.textMuted }]}>
-            {rider.successRate} success rate
+            {rider.success_rate}% success rate
           </Text>
         </View>
 
-        {/* Count */}
         <Text style={[styles.lbCount, { color: colors.textPrimary }]}>
-          {rider.count}
+          {rider.delivered_count}
         </Text>
       </View>
 
-      {/* Separator */}
-      {!isLast && (
+      {!isLast ? (
         <View
           style={[
             styles.lbSeparator,
             { backgroundColor: colors.surfaceContainer },
           ]}
         />
-      )}
+      ) : null}
     </>
   );
 }
 
-// ── Screen ─────────────────────────────────────────────────────────────────────
+function LoadingSkeleton() {
+  const { colors } = useTheme();
+
+  return (
+    <>
+      <View style={styles.statsGrid}>
+        {[0, 1, 2, 3].map((item) => (
+          <View
+            key={item}
+            style={[
+              styles.statCard,
+              styles.skeletonCard,
+              { backgroundColor: colors.surfaceCard },
+            ]}
+          >
+            <View
+              style={[styles.skeletonLineSm, { backgroundColor: colors.surfaceContainer }]}
+            />
+            <View
+              style={[styles.skeletonLineLg, { backgroundColor: colors.surfaceContainer }]}
+            />
+            <View
+              style={[styles.skeletonLineMd, { backgroundColor: colors.surfaceContainer }]}
+            />
+          </View>
+        ))}
+      </View>
+
+      <View style={[styles.highlightCard, { backgroundColor: colors.surfaceCard }]}>
+        <View
+          style={[styles.skeletonLineSm, { backgroundColor: colors.surfaceContainer }]}
+        />
+        <View
+          style={[styles.skeletonLineLg, { backgroundColor: colors.surfaceContainer }]}
+        />
+      </View>
+
+      <View style={[styles.chartCard, { backgroundColor: colors.surfaceCard }]}>
+        <View
+          style={[styles.skeletonLineSm, { backgroundColor: colors.surfaceContainer }]}
+        />
+        <View style={styles.chartSkeletonBars}>
+          {Array.from({ length: 14 }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.chartSkeletonBar,
+                { backgroundColor: colors.surfaceContainer },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.errorCard, { backgroundColor: colors.errorBg }]}>
+      <View style={[styles.errorIcon, { backgroundColor: colors.surfaceCard }]}>
+        <Feather name="wifi-off" size={18} color={colors.error} />
+      </View>
+      <View style={styles.errorBody}>
+        <Text style={[styles.errorTitle, { color: colors.error }]}>
+          Couldn&apos;t load analytics
+        </Text>
+        <Text style={[styles.errorSub, { color: colors.textSecondary }]}>
+          Check your connection and try again.
+        </Text>
+      </View>
+      <Pressable onPress={onRetry}>
+        <Text style={[styles.retryText, { color: colors.error }]}>Retry</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function InventoryAnalyticsPlaceholder() {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.inventoryCard, { backgroundColor: colors.surfaceCard }]}>
+      <Text style={[styles.inventoryTitle, { color: colors.textPrimary }]}>
+        Inventory analytics
+      </Text>
+      <Text style={[styles.inventorySub, { color: colors.textMuted }]}>
+        Top-selling products, product-linked revenue, and low-stock pressure will
+        appear here.
+      </Text>
+      {/* TODO: Replace this placeholder with real inventory analytics built from order_items, stock_movements, and delivered product revenue. */}
+      <View style={styles.inventoryStatsRow}>
+        <View
+          style={[
+            styles.inventoryStat,
+            { backgroundColor: colors.surfaceContainer },
+          ]}
+        >
+          <Text style={[styles.inventoryStatLabel, { color: colors.textMuted }]}>
+            Top product
+          </Text>
+          <Text style={[styles.inventoryStatValue, { color: colors.textPrimary }]}>
+            Coming soon
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.inventoryStat,
+            { backgroundColor: colors.surfaceContainer },
+          ]}
+        >
+          <Text style={[styles.inventoryStatLabel, { color: colors.textMuted }]}>
+            Revenue
+          </Text>
+          <Text style={[styles.inventoryStatValue, { color: colors.textPrimary }]}>
+            Coming soon
+          </Text>
+        </View>
+      </View>
+      <View
+        style={[
+          styles.inventoryFooter,
+          { backgroundColor: colors.surfaceContainer },
+        ]}
+      >
+        <Feather name="alert-circle" size={14} color={colors.textMuted} />
+        <Text style={[styles.inventoryFooterText, { color: colors.textMuted }]}>
+          Low stock alerts will be shown here once inventory analytics is enabled.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function AnalyticsScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const [period, setPeriod] = useState<Period>("7");
   const { userId } = useSession();
-  const showToast = useToastStore((s) => s.show);
+  const showToast = useToastStore((state) => state.show);
+  const [exporting, setExporting] = useState(false);
 
-  // ── Fetch orders ─────────────────────────────────────────────────────────
-  const { data: orders, isLoading } = useQuery({
-    queryKey: queryKeys.orders(userId ?? ""),
-    queryFn: async () => {
+  const overviewQuery = useAnalyticsOverview(userId);
+  const chartQuery = useAnalyticsDailyChart(userId);
+  const topRidersQuery = useAnalyticsTopRiders(userId);
+
+  const monthLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-NG", {
+        month: "long",
+      }).format(new Date()),
+    [],
+  );
+
+  const isLoading =
+    overviewQuery.isLoading || chartQuery.isLoading || topRidersQuery.isLoading;
+  const isError =
+    overviewQuery.isError || chartQuery.isError || topRidersQuery.isError;
+
+  const exportCSV = async () => {
+    if (!userId) return;
+
+    try {
+      setExporting(true);
       const { data, error } = await supabase
         .from("orders")
-        .select(
-          "id, item_description, status, created_at, rider_id, customer_name, delivery_address",
-        )
-        .eq("seller_id", userId!)
+        .select("id, item, customer_name, status, created_at")
+        .eq("seller_id", userId)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
 
-  // ── Fetch riders ─────────────────────────────────────────────────────────
-  const { data: riders } = useQuery({
-    queryKey: queryKeys.riders(userId ?? ""),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("riders")
-        .select("id, name")
-        .eq("seller_id", userId!);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!userId,
-  });
+      if (error) {
+        throw new Error(error.message ?? "Couldn't export analytics orders.");
+      }
 
-  // ── Period-filtered orders ────────────────────────────────────────────────
-  const periodOrders = useMemo(() => {
-    if (!orders) return [];
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - Number(period));
-    return orders.filter((o) => new Date(o.created_at ?? "") >= cutoff);
-  }, [orders, period]);
+      if (!data?.length) {
+        showToast("No orders to export yet.", "info");
+        return;
+      }
 
-  const stats = useMemo(() => {
-    const total = periodOrders.length;
-    const delivered = periodOrders.filter(
-      (o) => o.status === "delivered",
-    ).length;
-    const failed = periodOrders.filter((o) => o.status === "failed").length;
-    const rate = total > 0 ? Math.round((delivered / total) * 100) : 0;
-    return { total, delivered, failed, rate };
-  }, [periodOrders]);
+      const header = "ID,Item,Customer,Status,Date\n";
+      const rows = data
+        .map((order) =>
+          [
+            order.id,
+            (order.item ?? "").replace(/,/g, ";"),
+            (order.customer_name ?? "").replace(/,/g, ";"),
+            order.status ?? "",
+            order.created_at
+              ? new Date(order.created_at).toLocaleDateString("en-NG")
+              : "",
+          ].join(","),
+        )
+        .join("\n");
 
-  // ── Chart data (last 14 days) ─────────────────────────────────────────────
-  const chartData = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (13 - i));
-      const dayOrders = (orders ?? []).filter((o) => {
-        if (!o.created_at) return false;
-        return (
-          new Date(o.created_at).toDateString() === date.toDateString()
-        );
+      const path = `${FileSystem.documentDirectory ?? ""}trackshpr-analytics.csv`;
+      await FileSystem.writeAsStringAsync(path, header + rows);
+      await Sharing.shareAsync(path, {
+        mimeType: "text/csv",
+        dialogTitle: "Export Analytics",
       });
-      return {
-        day: date.getDate(),
-        total: dayOrders.length,
-        delivered: dayOrders.filter((o) => o.status === "delivered").length,
-      };
-    });
-  }, [orders]);
-
-  // ── Leaderboard ───────────────────────────────────────────────────────────
-  const leaderboard = useMemo<LeaderboardRider[]>(() => {
-    if (!riders || !orders) return [];
-    return riders
-      .map((r) => {
-        const riderOrders = orders.filter((o) => o.rider_id === r.id);
-        const delivered = riderOrders.filter(
-          (o) => o.status === "delivered",
-        ).length;
-        const total = riderOrders.length;
-        const rate =
-          total > 0 ? Math.round((delivered / total) * 100) : 0;
-        const nameParts = (r.name ?? "").trim().split(/\s+/);
-        const initials =
-          nameParts.length >= 2
-            ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
-            : (r.name ?? "").slice(0, 2).toUpperCase();
-        return { id: r.id, name: r.name ?? "", initials, delivered, total, rate };
-      })
-      .sort((a, b) => b.delivered - a.delivered)
-      .slice(0, 5)
-      .map((r, i) => ({
-        id: r.id,
-        name: r.name,
-        initials: r.initials,
-        successRate: r.total > 0 ? `${r.rate}%` : "0%",
-        count: r.delivered,
-        rank: i + 1,
-      }));
-  }, [riders, orders]);
-
-  // ── CSV export ────────────────────────────────────────────────────────────
-  const exportCSV = async () => {
-    if (!orders?.length) {
-      showToast("No orders to export", "info");
-      return;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Couldn't export analytics right now.";
+      showToast(message, "error");
+    } finally {
+      setExporting(false);
     }
-    const header = "ID,Item,Customer,Status,Date\n";
-    const rows = orders
-      .map((o) =>
-        [
-          o.id,
-          (o.item_description ?? "").replace(/,/g, ";"),
-          (o.customer_name ?? "").replace(/,/g, ";"),
-          o.status ?? "",
-          o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
-        ].join(","),
-      )
-      .join("\n");
-    const path =
-      (FileSystem.documentDirectory ?? "") + "trackshpr-orders.csv";
-    await FileSystem.writeAsStringAsync(path, header + rows);
-    await Sharing.shareAsync(path, {
-      mimeType: "text/csv",
-      dialogTitle: "Export Orders",
-    });
+  };
+
+  const retryAll = () => {
+    void overviewQuery.refetch();
+    void chartQuery.refetch();
+    void topRidersQuery.refetch();
   };
 
   const cardShadow = isDark
@@ -372,18 +453,19 @@ export default function AnalyticsScreen() {
         elevation: 2,
       };
 
+  const overview = overviewQuery.data;
+  const chartData = chartQuery.data ?? [];
+  const topRiders = topRidersQuery.data ?? [];
+
+  const noOrders = (overview?.last_30_total ?? 0) === 0;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable
-          style={[
-            styles.iconBtn,
-            { backgroundColor: colors.surfaceCard },
-            cardShadow,
-          ]}
+          style={[styles.iconBtn, { backgroundColor: colors.surfaceCard }, cardShadow]}
           onPress={() => router.back()}
           hitSlop={8}
         >
@@ -395,19 +477,19 @@ export default function AnalyticsScreen() {
         </Text>
 
         <Pressable
-          style={[
-            styles.iconBtn,
-            { backgroundColor: colors.surfaceCard },
-            cardShadow,
-          ]}
+          style={[styles.iconBtn, { backgroundColor: colors.surfaceCard }, cardShadow]}
           onPress={exportCSV}
+          disabled={exporting}
           hitSlop={8}
         >
-          <Feather name="download" size={16} color={colors.textPrimary} />
+          {exporting ? (
+            <Feather name="loader" size={16} color={colors.textPrimary} />
+          ) : (
+            <Feather name="download" size={16} color={colors.textPrimary} />
+          )}
         </Pressable>
       </View>
 
-      {/* ── Scrollable body ─────────────────────────────────────────────────── */}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -415,193 +497,152 @@ export default function AnalyticsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Period selector ───────────────────────────────────────────────── */}
-        <View
-          style={[
-            styles.periodContainer,
-            { backgroundColor: colors.surfaceContainer },
-          ]}
-        >
-          {PERIOD_TABS.map(({ key, label }) => {
-            const active = period === key;
-            return (
-              <Pressable
-                key={key}
-                style={[
-                  styles.periodTab,
-                  active && [
-                    styles.periodTabActive,
-                    { backgroundColor: colors.surfaceCard },
-                    isDark
-                      ? {
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 4,
-                          elevation: 1,
-                        }
-                      : {
-                          shadowColor: "rgba(48,41,80,1)",
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 4,
-                          elevation: 1,
-                        },
-                  ],
-                ]}
-                onPress={() => setPeriod(key)}
-              >
-                <Text
-                  style={[
-                    styles.periodTabText,
-                    { color: colors.textMuted },
-                    active && { color: colors.textPrimary },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {isError ? <ErrorState onRetry={retryAll} /> : null}
 
-        {/* ── 2x2 Stat cards (or skeletons) ───────────────────────────────── */}
         {isLoading ? (
-          <View style={styles.statsGrid}>
-            {[0, 1, 2, 3].map((i) => (
+          <LoadingSkeleton />
+        ) : (
+          <>
+            <View style={styles.statsGrid}>
               <View
-                key={i}
                 style={[
                   styles.statCard,
-                  styles.skeleton,
-                  { backgroundColor: colors.surfaceContainer },
+                  { backgroundColor: colors.surfaceCard },
+                  cardShadow,
                 ]}
-              />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.statsGrid}>
-            {/* Total Orders */}
+              >
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  TOTAL DELIVERIES
+                </Text>
+                <Text style={[styles.statValue, { color: colors.textPrimary }]}>
+                  {overview?.last_30_total ?? 0}
+                </Text>
+                <Text style={[styles.statTrend, { color: colors.textMuted }]}>
+                  Last 30 days
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.statCard,
+                  { backgroundColor: colors.surfaceCard },
+                  cardShadow,
+                ]}
+              >
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  SUCCESS RATE
+                </Text>
+                <Text style={[styles.statValue, { color: colors.success }]}>
+                  {overview?.success_rate ?? 0}%
+                </Text>
+                <Text style={[styles.statTrend, { color: colors.success }]}>
+                  Delivered
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.statCard,
+                  { backgroundColor: colors.surfaceCard },
+                  cardShadow,
+                ]}
+              >
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  AVG DELIVERY TIME
+                </Text>
+                <Text style={[styles.statValue, { color: colors.info }]}>
+                  {formatAverageMinutes(overview?.avg_delivery_minutes ?? 0)}
+                </Text>
+                <Text style={[styles.statTrend, { color: colors.textMuted }]}>
+                  Delivered orders
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.statCard,
+                  { backgroundColor: colors.surfaceCard },
+                  cardShadow,
+                ]}
+              >
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  FAILED
+                </Text>
+                <Text style={[styles.statValue, { color: colors.error }]}>
+                  {overview?.last_30_failed ?? 0}
+                </Text>
+                <Text style={[styles.statTrend, { color: colors.error }]}>
+                  Last 30 days
+                </Text>
+              </View>
+            </View>
+
             <View
               style={[
-                styles.statCard,
+                styles.highlightCard,
                 { backgroundColor: colors.surfaceCard },
                 cardShadow,
               ]}
             >
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                TOTAL ORDERS
+              <Text style={[styles.highlightEyebrow, { color: colors.textMuted }]}>
+                THIS MONTH
               </Text>
-              <Text style={[styles.statValue, { color: colors.textPrimary }]}>
-                {stats.total}
+              <Text style={[styles.highlightTitle, { color: colors.textPrimary }]}>
+                {monthLabel}
               </Text>
-              <Text style={[styles.statTrend, { color: colors.textMuted }]}>
-                Last {period} days
+              <Text style={[styles.highlightValue, { color: colors.primary }]}>
+                {overview?.month_total ?? 0}
               </Text>
-            </View>
-
-            {/* Success Rate */}
-            <View
-              style={[
-                styles.statCard,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                SUCCESS RATE
-              </Text>
-              <Text style={[styles.statValue, { color: colors.success }]}>
-                {stats.rate}%
-              </Text>
-              <Text style={[styles.statTrend, { color: colors.success }]}>
-                Delivered
+              <Text style={[styles.highlightSub, { color: colors.textMuted }]}>
+                Deliveries created this calendar month
               </Text>
             </View>
 
-            {/* Delivered */}
-            <View
-              style={[
-                styles.statCard,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                DELIVERED
-              </Text>
-              <Text style={[styles.statValue, { color: colors.info }]}>
-                {stats.delivered}
-              </Text>
-              <Text style={[styles.statTrend, { color: colors.textMuted }]}>
-                Completed
-              </Text>
-            </View>
+            <BarChart data={chartData} />
 
-            {/* Failed Orders */}
-            <View
-              style={[
-                styles.statCard,
-                { backgroundColor: colors.surfaceCard },
-                cardShadow,
-              ]}
-            >
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                FAILED
-              </Text>
-              <Text style={[styles.statValue, { color: colors.error }]}>
-                {stats.failed}
-              </Text>
-              <Text style={[styles.statTrend, { color: colors.error }]}>
-                Not delivered
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Bar chart ────────────────────────────────────────────────────── */}
-        <BarChart data={chartData} />
-
-        {/* ── Leaderboard ──────────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-          TOP RIDERS
-        </Text>
-        <View
-          style={[
-            styles.lbCard,
-            { backgroundColor: colors.surfaceCard },
-            cardShadow,
-          ]}
-        >
-          {leaderboard.length === 0 ? (
-            <Text
-              style={[
-                styles.lbMeta,
-                { color: colors.textMuted, paddingVertical: 12 },
-              ]}
-            >
-              No rider data yet.
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              TOP RIDERS
             </Text>
-          ) : (
-            leaderboard.map((rider, i) => (
-              <LeaderboardItem
-                key={rider.id}
-                rider={rider}
-                isLast={i === leaderboard.length - 1}
-              />
-            ))
-          )}
-        </View>
+            <View
+              style={[
+                styles.lbCard,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              {topRiders.length === 0 ? (
+                <Text style={[styles.lbMeta, { color: colors.textMuted }]}>
+                  {noOrders
+                    ? "No rider delivery history yet."
+                    : "No delivered rider activity in the last 30 days."}
+                </Text>
+              ) : (
+                topRiders.map((rider, index) => (
+                  <LeaderboardItem
+                    key={rider.rider_id}
+                    rider={rider}
+                    rank={index + 1}
+                    isLast={index === topRiders.length - 1}
+                  />
+                ))
+              )}
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              INVENTORY ANALYTICS
+            </Text>
+            <ProGate feature="inventory_analytics">
+              <InventoryAnalyticsPlaceholder />
+            </ProGate>
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -623,48 +664,53 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.34,
   },
-
-  // Scroll
   scroll: {
     paddingHorizontal: layout.screenPaddingH,
+    gap: 10,
   },
-
-  // Period selector
-  periodContainer: {
+  errorCard: {
+    borderRadius: radius.xl,
+    padding: 14,
     flexDirection: "row",
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 14,
-  },
-  periodTab: {
-    flex: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
     alignItems: "center",
-    borderRadius: 9,
+    gap: 10,
+    marginBottom: 12,
   },
-  periodTabActive: {},
-  periodTabText: {
+  errorIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorBody: {
+    flex: 1,
+    gap: 2,
+  },
+  errorTitle: {
+    fontSize: 12,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
+  errorSub: {
     fontSize: 11,
-    fontFamily: font.sans.semiBold,
-    fontWeight: "600",
+    fontFamily: font.sans.regular,
   },
-
-  // Stats grid
+  retryText: {
+    fontSize: 12,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+  },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 10,
   },
   statCard: {
     width: "48%",
     borderRadius: radius.xl,
     padding: layout.cardPadding,
-  },
-  skeleton: {
-    height: 90,
-    borderRadius: radius.xl,
+    gap: 6,
   },
   statLabel: {
     fontSize: 9,
@@ -672,33 +718,75 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.07,
     textTransform: "uppercase",
-    marginBottom: 5,
   },
   statValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontFamily: font.mono.medium,
     fontWeight: "700",
-    letterSpacing: -0.78,
+    letterSpacing: -0.72,
     lineHeight: 26,
   },
   statTrend: {
     fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    marginTop: 4,
   },
-
-  // Bar chart card
+  skeletonCard: {
+    minHeight: 96,
+  },
+  skeletonLineSm: {
+    width: 72,
+    height: 10,
+    borderRadius: radius.full,
+  },
+  skeletonLineLg: {
+    width: "82%",
+    height: 24,
+    borderRadius: radius.md,
+  },
+  skeletonLineMd: {
+    width: "64%",
+    height: 12,
+    borderRadius: radius.md,
+  },
+  highlightCard: {
+    borderRadius: radius.xl,
+    padding: 16,
+    gap: 4,
+  },
+  highlightEyebrow: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 0.08,
+    textTransform: "uppercase",
+  },
+  highlightTitle: {
+    fontSize: 17,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.34,
+  },
+  highlightValue: {
+    fontSize: 30,
+    fontFamily: font.mono.medium,
+    fontWeight: "700",
+    letterSpacing: -0.9,
+  },
+  highlightSub: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    lineHeight: 18,
+  },
   chartCard: {
     borderRadius: radius.xl,
     padding: layout.cardPadding,
-    marginBottom: 10,
+    gap: 12,
   },
   chartHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
   },
   chartTitle: {
     fontSize: 13,
@@ -708,6 +796,7 @@ const styles = StyleSheet.create({
   },
   legendRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   legendItem: {
@@ -729,24 +818,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 4,
-    paddingHorizontal: 4,
   },
   barGroup: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 2,
+    justifyContent: "flex-end",
+  },
+  barTrack: {
+    height: BAR_MAX_H,
+    justifyContent: "flex-end",
+    alignItems: "center",
   },
   bar: {
-    flex: 1,
+    width: "100%",
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
+    position: "absolute",
+    bottom: 0,
   },
   chartLabelsRow: {
     flexDirection: "row",
     gap: 4,
-    marginTop: 6,
-    paddingHorizontal: 4,
   },
   chartLabel: {
     flex: 1,
@@ -754,15 +845,27 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: font.mono.regular,
   },
-
-  // Leaderboard
+  emptyChartState: {
+    paddingTop: 4,
+  },
+  chartSkeletonBars: {
+    height: 80,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  chartSkeletonBar: {
+    flex: 1,
+    height: 40,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
   sectionLabel: {
     fontSize: 10,
     fontFamily: font.sans.bold,
     fontWeight: "700",
     letterSpacing: 0.1,
     textTransform: "uppercase",
-    marginBottom: 10,
   },
   lbCard: {
     borderRadius: radius.xl,
@@ -804,7 +907,10 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
   },
-  lbBody: { flex: 1, minWidth: 0 },
+  lbBody: {
+    flex: 1,
+    minWidth: 0,
+  },
   lbName: {
     fontSize: 13,
     fontFamily: font.sans.bold,
@@ -814,12 +920,63 @@ const styles = StyleSheet.create({
   lbMeta: {
     fontSize: 11,
     fontFamily: font.sans.regular,
-    marginTop: 1,
+    lineHeight: 16,
   },
   lbCount: {
     fontSize: 16,
     fontFamily: font.mono.medium,
     fontWeight: "700",
     flexShrink: 0,
+  },
+  inventoryCard: {
+    borderRadius: radius.xl,
+    padding: 16,
+    gap: 10,
+  },
+  inventoryTitle: {
+    fontSize: 15,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.15,
+  },
+  inventorySub: {
+    fontSize: 12,
+    fontFamily: font.sans.regular,
+    lineHeight: 18,
+  },
+  inventoryStatsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  inventoryStat: {
+    flex: 1,
+    borderRadius: radius.lg,
+    padding: 12,
+    gap: 4,
+  },
+  inventoryStatLabel: {
+    fontSize: 10,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: 0.08,
+    textTransform: "uppercase",
+  },
+  inventoryStatValue: {
+    fontSize: 12,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+  },
+  inventoryFooter: {
+    borderRadius: radius.lg,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  inventoryFooterText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    lineHeight: 16,
   },
 });

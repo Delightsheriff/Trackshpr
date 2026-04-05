@@ -2,12 +2,18 @@ import React from "react";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/src/stores/themeStore";
 
-export type OrderStatus = "in_transit" | "pending" | "delivered" | "failed";
+export type OrderStatus = "in_transit" | "picked_up" | "pending" | "delivered" | "failed";
 
 export function getStatusMap(colors: ReturnType<typeof useTheme>["colors"]) {
   return {
     in_transit: {
-      label: "Transit",
+      label: "In Transit",
+      fg: colors.info,
+      bg: colors.infoBg,
+      icon: "truck" as const,
+    },
+    picked_up: {
+      label: "Picked Up",
       fg: colors.info,
       bg: colors.infoBg,
       icon: "truck" as const,

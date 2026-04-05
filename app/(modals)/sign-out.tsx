@@ -2,8 +2,8 @@
  * Sign out confirmation bottom sheet.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
-import { signOut } from "@/src/lib/auth";
-import { useOrderStore } from "@/src/stores/orderStore";
+import { resetLocalSessionState } from "@/src/lib/sessionReset";
+import { supabase } from "@/src/lib/supabase";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
@@ -23,7 +23,6 @@ export default function SignOutSheet() {
   const sheetRef = useRef<BottomSheet>(null);
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
-  const resetDraft = useOrderStore((s) => s.reset);
   const showToast = useToastStore((s) => s.show);
 
   const handleClose = useCallback(() => router.back(), []);
@@ -43,10 +42,10 @@ export default function SignOutSheet() {
   const handleSignOut = async () => {
     setLoading(true);
     try {
-      await signOut();
-      queryClient.clear();
-      resetDraft();
-      // navigation is handled by onAuthStateChange in useAuthState
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      await resetLocalSessionState(queryClient);
+      router.replace("/(auth)/sign-in");
     } catch {
       setLoading(false);
       showToast("Sign out failed. Please try again.", "error");

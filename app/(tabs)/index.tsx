@@ -215,7 +215,7 @@ export default function HomeScreen() {
           <OrderCard
             key={o.id}
             id={o.id}
-            item={o.item_description}
+            item={o.item}
             customer={o.customer_name ?? "Unknown"}
             area={o.delivery_address?.split(",").pop()?.trim() ?? "—"}
             status={(o.status ?? "pending") as OrderStatus}

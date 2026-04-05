@@ -2,7 +2,6 @@
  * Account screen — sign out and delete account.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
-import { useSession } from "@/src/hooks";
 import { supabase } from "@/src/lib/supabase";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
@@ -56,7 +55,6 @@ function SettingRow({
 export default function AccountScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const { userId } = useSession();
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {

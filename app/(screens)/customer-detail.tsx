@@ -66,7 +66,7 @@ export default function CustomerDetailScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, item_description, status, created_at, delivery_address")
+        .select("id, item, status, created_at, delivery_address")
         .eq("customer_id", id!)
         .eq("seller_id", userId!)
         .order("created_at", { ascending: false })
@@ -311,7 +311,7 @@ export default function CustomerDetailScreen() {
                 <View style={[styles.orderDot, { backgroundColor: statusColor }]} />
                 <View style={styles.orderMiddle}>
                   <Text style={[styles.orderTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {order.item_description}
+                    {order.item}
                   </Text>
                   <Text style={[styles.orderAddress, { color: colors.textMuted }]} numberOfLines={1}>
                     {order.delivery_address ?? "—"}

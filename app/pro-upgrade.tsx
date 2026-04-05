@@ -78,9 +78,15 @@ export default function ProUpgradeScreen() {
         throw error;
       }
 
-      showToast("You're on the Pro waitlist. We'll keep you posted.", "success");
+      showToast(
+        "You're on the Pro waitlist. We'll keep you posted.",
+        "success",
+      );
     } catch {
-      showToast("Couldn't save your interest right now. Please try again.", "error");
+      showToast(
+        "Couldn't save your interest right now. Please try again.",
+        "error",
+      );
     } finally {
       setIsPending(false);
     }
@@ -134,7 +140,13 @@ export default function ProUpgradeScreen() {
           </Text>
         </LinearGradient>
 
-        <View style={[styles.featureCard, { backgroundColor: colors.surfaceCard }, cardShadow]}>
+        <View
+          style={[
+            styles.featureCard,
+            { backgroundColor: colors.surfaceCard },
+            cardShadow,
+          ]}
+        >
           {FEATURE_LIST.map((feature, index) => (
             <View key={feature.title}>
               {index > 0 ? (
@@ -146,14 +158,23 @@ export default function ProUpgradeScreen() {
                 />
               ) : null}
               <View style={styles.featureRow}>
-                <View style={[styles.featureIcon, { backgroundColor: colors.primarySoft }]}>
+                <View
+                  style={[
+                    styles.featureIcon,
+                    { backgroundColor: colors.primarySoft },
+                  ]}
+                >
                   <Feather name="zap" size={15} color={colors.primary} />
                 </View>
                 <View style={styles.featureBody}>
-                  <Text style={[styles.featureTitle, { color: colors.textPrimary }]}>
+                  <Text
+                    style={[styles.featureTitle, { color: colors.textPrimary }]}
+                  >
                     {feature.title}
                   </Text>
-                  <Text style={[styles.featureSub, { color: colors.textMuted }]}>
+                  <Text
+                    style={[styles.featureSub, { color: colors.textMuted }]}
+                  >
                     {feature.description}
                   </Text>
                 </View>
@@ -162,7 +183,9 @@ export default function ProUpgradeScreen() {
           ))}
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
+        <View
+          style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}
+        >
           <Feather
             name="bell"
             size={16}
@@ -170,13 +193,17 @@ export default function ProUpgradeScreen() {
             style={styles.infoIcon}
           />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            The notify button stores your interest against your seller account so
-            we can prioritize the right launch list.
+            The notify button stores your interest against your seller account
+            so we can prioritize the right launch list.
           </Text>
         </View>
 
         <View style={[styles.saveShadow, { backgroundColor: colors.primary }]}>
-          <Pressable onPress={handleNotifyMe} disabled={isPending} style={styles.savePressable}>
+          <Pressable
+            onPress={handleNotifyMe}
+            disabled={isPending}
+            style={styles.savePressable}
+          >
             <LinearGradient
               colors={gradients.primary}
               start={{ x: 0, y: 0 }}

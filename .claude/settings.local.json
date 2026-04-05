@@ -16,7 +16,8 @@
       "Bash(ls \"C:\\\\Users\\\\delig\\\\Documents\\\\Trackshpr\\\\app/\\(screens\\)\")",
       "Bash(ls:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find \"C:\\\\Users\\\\delig\\\\Documents\\\\Code\\\\Trackshpr\\\\app\" -name \"settings.tsx\" -exec grep -n \"Saved Riders\\\\|rider\\\\|Rider\" {} \\\\;)"
     ]
   }
 }

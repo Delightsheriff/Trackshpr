@@ -1,7 +1,13 @@
 /**
  * Tab navigator shell.
- * Custom tab bar: liquid glass (BlurView iOS / opaque fallback Android),
- * raised gradient FAB center (52×52 r18), active dot, Feather icons. DS §8.5.
+ * Custom tab bar: liquid glass (BlurView iOS / opaque Android),
+ * raised center FAB (52×52 r18), active dot, Feather icons. DS §8.5.
+ *
+ * Layout strategy for raised FAB:
+ *   The container includes a transparent overhang at the top (FAB_ABOVE px).
+ *   The glass background starts at FAB_ABOVE, not at container top.
+ *   The FAB is positioned absolutely at y=0, so it straddles the bar border.
+ *   This keeps the FAB fully inside the container — no overflow clipping.
  */
 import {
   font,
@@ -19,23 +25,20 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BAR_HEIGHT = 68; // visible icon zone (px), NOT including safe area
-const FAB_SIZE = 52;
-const FAB_FLOAT = 14; // px the FAB rises above the bar's top border
+const BAR_HEIGHT = 68;  // visible bar zone height (px)
+const FAB_SIZE   = 52;  // FAB button size (px)
+const FAB_ABOVE  = 16;  // transparent zone above the bar border where FAB floats
 
 type TabRoute = "index" | "orders" | "riders" | "settings";
-type TabIcon = "home" | "package" | "user" | "settings" | "plus";
 
-const VISUAL_TABS: {
-  routeName: TabRoute | "fab";
-  icon: TabIcon;
+const TABS: {
+  routeName: TabRoute;
+  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
-  isFab?: boolean;
 }[] = [
-  { routeName: "index", icon: "home", label: "Home" },
-  { routeName: "orders", icon: "package", label: "Orders" },
-  { routeName: "fab", icon: "plus", label: "", isFab: true },
-  { routeName: "riders", icon: "user", label: "Riders" },
+  { routeName: "index",    icon: "home",     label: "Home"     },
+  { routeName: "orders",   icon: "package",  label: "Orders"   },
+  { routeName: "riders",   icon: "user",     label: "Riders"   },
   { routeName: "settings", icon: "settings", label: "Settings" },
 ];
 
@@ -50,176 +53,183 @@ function CustomTabBar({
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
-  const totalHeight = BAR_HEIGHT + insets.bottom;
   const fabShadow = isDark ? shadowsDark.fab : shadowsLight.fab;
+  const blurTint  = isDark ? "dark" : "light";
+  const overlayColor = isDark ? "rgba(15,14,26,0.55)" : "rgba(250,244,255,0.55)";
+  const androidBg   = isDark ? "rgba(15,14,26,0.97)"  : "rgba(250,244,255,0.97)";
 
-  // FAB marginTop calculation:
-  // With alignItems:"center" in BAR_HEIGHT zone, FAB(52px) top is at (68-52)/2 = 8px from bar top.
-  // We want FAB to float FAB_FLOAT px above the top border.
-  // So marginTop = -(8 + FAB_FLOAT) = -(8 + 18) = -26
-  const fabMarginTop = -((BAR_HEIGHT - FAB_SIZE) / 2 + FAB_FLOAT);
+  // Total container height: transparent FAB zone + bar + safe area
+  const totalHeight = FAB_ABOVE + BAR_HEIGHT + insets.bottom;
 
-  // Tint colors for BlurView
-  const blurTint = isDark ? "dark" : "light";
-  // Overlay tints the blur slightly toward the surface color
-  const overlayColor = isDark
-    ? "rgba(15, 14, 26, 0.55)"
-    : "rgba(250, 244, 255, 0.55)";
-  // Android fallback (no blur support)
-  const androidBg = isDark
-    ? "rgba(15, 14, 26, 0.97)"
-    : "rgba(250, 244, 255, 0.97)";
+  // Bar zone rect (absolute coords within container)
+  const barTop = FAB_ABOVE;
+
+  // Left/right halves of the tab items (FAB occupies the centre slot)
+  const leftTabs  = TABS.slice(0, 2);  // Home, Orders
+  const rightTabs = TABS.slice(2);     // Riders, Settings
+
+  function isActive(routeName: TabRoute) {
+    const idx = state.routes.findIndex((r) => r.name === routeName);
+    return idx === state.index;
+  }
+
+  function renderTab(tab: (typeof TABS)[number]) {
+    const active = isActive(tab.routeName);
+    return (
+      <Pressable
+        key={tab.routeName}
+        onPress={() => navigation.navigate(tab.routeName)}
+        style={styles.tabItem}
+        android_ripple={{ color: colors.primarySoft, borderless: true }}
+      >
+        <Feather
+          name={tab.icon}
+          size={22}
+          color={active ? colors.primary : colors.textMuted}
+        />
+        <Text
+          style={[
+            styles.tabLabel,
+            {
+              color:      active ? colors.primary    : colors.textMuted,
+              fontFamily: active ? font.sans.bold    : font.sans.regular,
+              fontWeight: active ? "700"             : "400",
+            },
+          ]}
+        >
+          {tab.label}
+        </Text>
+        {active && (
+          <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+        )}
+      </Pressable>
+    );
+  }
 
   return (
-    <View style={[styles.container, { height: totalHeight, borderTopColor: colors.border }]}>
-      {/* Background: liquid glass on iOS, opaque on Android */}
-      {Platform.OS === "ios" ? (
-        <>
-          <BlurView intensity={72} tint={blurTint} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: overlayColor }]} />
-        </>
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: androidBg }]} />
-      )}
-
-      {/* Icon zone — exactly BAR_HEIGHT tall, items vertically centered */}
-      <View style={styles.row}>
-        {VISUAL_TABS.map((tab) => {
-          if (tab.isFab) {
-            return (
-              <View key="fab" style={[styles.fabWrap, { marginTop: fabMarginTop }]}>
-                <View
-                  style={[
-                    styles.fabShadowWrap,
-                    {
-                      backgroundColor: colors.primary,
-                      shadowColor: fabShadow.shadowColor,
-                      shadowOffset: fabShadow.shadowOffset,
-                      shadowOpacity: fabShadow.shadowOpacity,
-                      shadowRadius: fabShadow.shadowRadius,
-                      elevation: fabShadow.elevation,
-                    },
-                  ]}
-                >
-                  <Pressable
-                    onPress={() => router.push("/(modals)/new-delivery")}
-                    android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
-                    style={styles.fabPressable}
-                  >
-                    <LinearGradient
-                      colors={gradients.primary}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.fab}
-                    >
-                      <Feather name="plus" size={24} color="#FFFFFF" />
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          }
-
-          const routeIndex = state.routes.findIndex(
-            (r) => r.name === tab.routeName,
-          );
-          const isActive = routeIndex === state.index;
-
-          return (
-            <Pressable
-              key={tab.routeName}
-              onPress={() =>
-                tab.routeName !== "fab" &&
-                navigation.navigate(tab.routeName)
-              }
-              style={styles.tabItem}
-              android_ripple={{ color: colors.primarySoft, borderless: true }}
-            >
-              <Feather
-                name={tab.icon}
-                size={22}
-                color={isActive ? colors.primary : colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  {
-                    color: isActive ? colors.primary : colors.textMuted,
-                    fontFamily: isActive
-                      ? font.sans.bold
-                      : font.sans.regular,
-                    fontWeight: isActive ? "700" : "400",
-                  },
-                ]}
-              >
-                {tab.label}
-              </Text>
-              {isActive && (
-                <View
-                  style={[
-                    styles.activeDot,
-                    { backgroundColor: colors.primary },
-                  ]}
-                />
-              )}
-            </Pressable>
-          );
-        })}
+    <View style={{ height: totalHeight }}>
+      {/* ── Glass background — starts at barTop, NOT at container top ── */}
+      <View
+        style={[
+          styles.barBackground,
+          {
+            top:            barTop,
+            borderTopColor: colors.border,
+          },
+        ]}
+      >
+        {Platform.OS === "ios" ? (
+          <>
+            <BlurView intensity={72} tint={blurTint} style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: overlayColor }]} />
+          </>
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: androidBg }]} />
+        )}
       </View>
 
-      {/* Safe area spacer — fills the home indicator zone below the icon row */}
-      {insets.bottom > 0 && <View style={{ height: insets.bottom }} />}
+      {/* ── Tab items row — sits in the bar zone ── */}
+      <View
+        style={[
+          styles.tabRow,
+          { top: barTop, height: BAR_HEIGHT },
+        ]}
+      >
+        {leftTabs.map(renderTab)}
+        {/* Centre placeholder — same flex as each tab item */}
+        <View style={styles.tabItem} />
+        {rightTabs.map(renderTab)}
+      </View>
+
+      {/* ── FAB — absolutely positioned at top, straddles bar border ── */}
+      <View style={[styles.fabContainer, { top: 0 }]}>
+        <View
+          style={[
+            styles.fabShadowWrap,
+            {
+              backgroundColor:  colors.primary,
+              shadowColor:      fabShadow.shadowColor,
+              shadowOffset:     fabShadow.shadowOffset,
+              shadowOpacity:    fabShadow.shadowOpacity,
+              shadowRadius:     fabShadow.shadowRadius,
+              elevation:        fabShadow.elevation,
+            },
+          ]}
+        >
+          <Pressable
+            onPress={() => router.push("/(modals)/new-delivery")}
+            android_ripple={{ color: "rgba(255,255,255,0.2)", borderless: false }}
+            style={styles.fabPressable}
+          >
+            <LinearGradient
+              colors={gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fab}
+            >
+              <Feather name="plus" size={24} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    // total height = BAR_HEIGHT + insets.bottom (set inline)
+  barBackground: {
+    position:      "absolute",
+    left:          0,
+    right:         0,
+    bottom:        0,
     borderTopWidth: 1,
-    overflow: "visible", // allows FAB to float above
+    overflow:      "hidden",
   },
-  row: {
-    flexDirection: "row",
-    height: BAR_HEIGHT, // fixed 68px — never affected by safe area
-    alignItems: "center",
+  tabRow: {
+    position:        "absolute",
+    left:            0,
+    right:           0,
+    flexDirection:   "row",
+    alignItems:      "center",
     paddingHorizontal: 8,
   },
   tabItem: {
-    flex: 1,
+    flex:       1,
     alignItems: "center",
-    gap: 3,
+    gap:        3,
   },
   tabLabel: {
-    fontSize: 9,
+    fontSize:      9,
     letterSpacing: 0.27,
   },
   activeDot: {
-    width: 4,
-    height: 4,
+    width:        4,
+    height:       4,
     borderRadius: radius.full,
-    marginTop: 1,
+    marginTop:    1,
   },
-  fabWrap: {
-    flex: 1,
+  // FAB: horizontally centred over the middle column, vertically at top of container
+  fabContainer: {
+    position:   "absolute",
+    left:       0,
+    right:      0,
     alignItems: "center",
-    // marginTop applied inline (floats FAB above border)
   },
   fabShadowWrap: {
     borderRadius: 18,
-    // shadow and bg applied inline (theme-aware)
+    marginTop:    0, // aligns to top of container (FAB_ABOVE zone)
   },
   fabPressable: {
     borderRadius: 18,
-    overflow: "hidden",
+    overflow:     "hidden",
   },
   fab: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+    width:           FAB_SIZE,
+    height:          FAB_SIZE,
+    borderRadius:    18,
+    alignItems:      "center",
+    justifyContent:  "center",
   },
 });
 
@@ -232,9 +242,9 @@ export default function TabsLayout() {
       )}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="orders" options={{ title: "Orders" }} />
-      <Tabs.Screen name="riders" options={{ title: "Riders" }} />
+      <Tabs.Screen name="index"    options={{ title: "Home"     }} />
+      <Tabs.Screen name="orders"   options={{ title: "Orders"   }} />
+      <Tabs.Screen name="riders"   options={{ title: "Riders"   }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
     </Tabs>
   );

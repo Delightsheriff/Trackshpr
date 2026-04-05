@@ -194,23 +194,8 @@ function InventoryContent() {
       : "Add your first product to start tracking stock.";
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.surface }]}>
-      <View style={[styles.header, { paddingTop: insets.top + layout.screenPaddingTop }]}>
-        <View style={styles.headerTop}>
-          <Pressable
-            onPress={() => router.back()}
-            style={[styles.backBtn, { backgroundColor: colors.surfaceCard }]}
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </Pressable>
-          <View style={styles.titleBlock}>
-            <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Inventory</Text>
-            <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
-              {isLoading ? "Loading..." : `${products.length} active product${products.length === 1 ? "" : "s"}`}
-            </Text>
-          </View>
-        </View>
-
+    <View style={[styles.contentRoot, { backgroundColor: colors.surface }]}>
+      <View style={styles.searchSection}>
         <View style={[styles.searchBar, { backgroundColor: colors.surfaceCard }, searchBarShadow]}>
           <Feather name="search" size={15} color={colors.textMuted} />
           <TextInput
@@ -343,10 +328,29 @@ function InventoryContent() {
 
 export default function InventoryScreen() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const backBtnShadow = isDark
+    ? { shadowColor: "#000" as const, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 4 }
+    : { shadowColor: "rgba(48,41,80,1)" as const, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
+      {/* Navigation header — always visible regardless of pro status */}
+      <View style={[styles.navHeader, { backgroundColor: colors.surfaceCard }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={[styles.backBtn, { backgroundColor: colors.surfaceContainer }, backBtnShadow]}
+          android_ripple={{ color: colors.surfaceContainer, borderless: false }}
+        >
+          <Feather name="arrow-left" size={18} color={colors.textPrimary} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Inventory
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
       <ProGate feature="inventory">
         <InventoryContent />
       </ProGate>
@@ -356,12 +360,15 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { paddingHorizontal: layout.screenPaddingH },
-  headerTop: {
+  contentRoot: { flex: 1 },
+  // Navigation header — matches settings screen style exactly
+  navHeader: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: layout.screenPaddingH,
+    paddingTop: 10,
+    paddingBottom: 16,
     gap: 12,
-    marginBottom: 14,
   },
   backBtn: {
     width: 34,
@@ -369,25 +376,18 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "rgba(48,41,80,1)",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
     flexShrink: 0,
   },
-  titleBlock: { flex: 1 },
-  pageTitle: {
-    fontSize: 20,
+  headerTitle: {
+    flex: 1,
+    fontSize: 17,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    letterSpacing: -0.6,
-    marginBottom: 2,
+    letterSpacing: -0.34,
   },
-  pageSubtitle: {
-    fontSize: 12,
-    fontFamily: font.sans.regular,
-  },
+  headerSpacer: { width: 34 },
+  // Search + filter section inside content
+  searchSection: { paddingHorizontal: layout.screenPaddingH, paddingTop: 12 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",

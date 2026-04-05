@@ -507,15 +507,6 @@ export default function SettingsScreen() {
               />
               <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
               <SettingRow
-                icon="user"
-                iconColor={colors.textSecondary}
-                iconBg={colors.surfaceContainer}
-                label="Saved riders"
-                sublabel="Manage your rider list"
-                onPress={() => router.push("/(tabs)/riders")}
-              />
-              <View style={[styles.rowDivider, { backgroundColor: colors.surfaceContainer }]} />
-              <SettingRow
                 icon="download"
                 iconColor={colors.success}
                 iconBg={colors.successBg}

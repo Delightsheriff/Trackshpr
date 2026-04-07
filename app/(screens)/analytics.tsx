@@ -2,7 +2,7 @@
  * Analytics screen - server-driven delivery stats, chart, and leaderboard.
  */
 import ProGate from "@/src/components/shared/ProGate";
-import { font, layout, radius } from "@/src/constants/tokens";
+import { font, layout, radius, shadowsDark, shadowsLight } from "@/src/constants/tokens";
 import {
   useAnalyticsDailyChart,
   useAnalyticsOverview,

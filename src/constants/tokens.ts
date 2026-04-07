@@ -1,4 +1,4 @@
-// ─── Trackshpr Design System Tokens v1.1 ─────────────────────────────────────
+// ─── Trackshpr Design System Tokens v1.2 ─────────────────────────────────────
 // Source of truth for all colors, typography, spacing, radius, shadows, and
 // animation values. No component may hardcode a value defined here.
 
@@ -69,9 +69,10 @@ export const darkColors = {
   infoBg:    '#0d1f38',
 
   // Misc
-  border:  'rgba(99, 102, 241, 0.1)',
-  overlay: 'rgba(0, 0, 0, 0.6)',
-  white:   '#FFFFFF',
+  border:     'rgba(99, 102, 241, 0.1)',
+  overlay:    'rgba(0, 0, 0, 0.6)',
+  white:      '#FFFFFF',
+  cardShine:  'rgba(255, 255, 255, 0.03)',
 } as const
 
 // ── Default export (light) — kept for backwards compat ──────────────────────
@@ -148,9 +149,10 @@ export const signInColors = {
 // ── Gradients ─────────────────────────────────────────────────────────────────
 // Rule: max 2 gradient elements visible on screen at once.
 export const gradients = {
-  primary: ['#4647D3', '#6366F1'] as [string, string],
-  success: ['#00873A', '#00A347'] as [string, string],
-  avatar:  ['#4647D3', '#9396FF'] as [string, string],
+  primary:     ['#4647D3', '#5354e8', '#6366F1'] as string[],
+  primaryHero: ['#1e1f4a', '#2d2f6b', '#3a3b82'] as string[],
+  success:     ['#00873A', '#00A347'] as string[],
+  avatar:      ['#4647D3', '#9396FF'] as string[],
 }
 
 // ── Shadows — Light Mode ──────────────────────────────────────────────────────
@@ -315,6 +317,16 @@ export const shadows = {
   sheet:      { boxShadow: '0 -4px 20px rgba(48, 41, 80, 0.08)' },
   actorCard:  { boxShadow: '0 2px 16px rgba(48, 41, 80, 0.06)' },
 } as const
+
+// ── Icon Container Sizes ──────────────────────────────────────────────────────
+export const iconContainerSize = {
+  settings: { size: 36, radius: 12 },
+  order:    { size: 42, radius: 13 },
+  action:   { size: 32, radius: 10 },
+} as const
+
+// ── Typography alias (spec compliance) ───────────────────────────────────────
+export const typography = type
 
 // ── Animation ─────────────────────────────────────────────────────────────────
 export const animation = {

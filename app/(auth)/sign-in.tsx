@@ -9,7 +9,7 @@
  */
 import GoogleIcon from "@/src/components/auth/google-icon";
 import SignInHero from "@/src/components/auth/sign-in-hero";
-import { colors, font, radius, type as t } from "@/src/constants/tokens";
+import { colors, colors as lightColors, font, gradients, radius, shadowsLight, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -57,7 +57,7 @@ function GradientText({
       }
     >
       <LinearGradient
-        colors={["#4647D3", "#9396FF"]}
+        colors={gradients.avatar}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
@@ -262,13 +262,13 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FAF4FF", // --surface
+    backgroundColor: lightColors.surface,
   },
 
   // Content panel — flex: 1, justify flex-end, matching HTML .content
   content: {
     flex: 1,
-    backgroundColor: "#FAF4FF",
+    backgroundColor: lightColors.surface,
     paddingHorizontal: 24,
     paddingTop: 8,
     justifyContent: "flex-end",
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 13 * 0.12,
     textTransform: "uppercase",
-    color: "#4647D3",
+    color: lightColors.primary,
     marginBottom: 10,
   },
 
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontFamily: font.sans.bold,
     fontWeight: "700",
-    color: "#302950",
+    color: lightColors.textPrimary,
     letterSpacing: -0.9,
     lineHeight: 34.5,
   },
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   sub: {
     fontSize: 14,
     fontFamily: font.sans.regular,
-    color: "#9590B0",
+    color: lightColors.textMuted,
     lineHeight: 14 * 1.55,
     marginTop: 10,
   },
@@ -319,9 +319,9 @@ const styles = StyleSheet.create({
   btnWrap: {
     marginBottom: 16,
     borderRadius: 100,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: lightColors.surfaceCard,
     // iOS shadow
-    shadowColor: "#302950",
+    shadowColor: lightColors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   // googleBtn: overflow:hidden clips the ripple to the pill shape
   googleBtn: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: lightColors.surfaceCard,
     borderRadius: 100,
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: "#302950",
+    color: lightColors.textPrimary,
     letterSpacing: -0.15,
     marginLeft: 12,
   },
@@ -357,11 +357,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 11,
     fontFamily: font.sans.regular,
-    color: "#9590B0",
+    color: lightColors.textMuted,
     lineHeight: 11 * 1.6,
   },
   legalLink: {
-    color: "#4647D3",
+    color: lightColors.primary,
     fontWeight: "500",
   },
   devResetBtn: {
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
-    color: "#5E5680",
+    color: lightColors.textSecondary,
     textDecorationLine: "underline",
   },
 

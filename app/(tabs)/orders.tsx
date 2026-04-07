@@ -88,10 +88,10 @@ export default function OrdersScreen() {
       orderId={o.order_number ? `#${o.order_number}` : `TRK-${o.id.slice(0, 6).toUpperCase()}`}
       item={o.item}
       customer={o.customer_name ?? "Unknown"}
-      rider={o.rider_name}
+      rider={o.rider_name ?? "—"}
       area={o.city ?? o.delivery_address?.split(",").pop()?.trim() ?? "—"}
       status={(o.status ?? "pending") as any}
-      time={formatRelativeTime(o.created_at)}
+      time={formatRelativeTime(o.created_at ?? '')}
     />
   );
 
@@ -148,7 +148,6 @@ export default function OrdersScreen() {
           data={orders}
           keyExtractor={(o) => o.id}
           renderItem={renderItem}
-          estimatedItemSize={72}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

@@ -57,7 +57,7 @@ export default function DeleteCustomerSheet() {
     },
   });
 
-  const handleDelete = () => deleteMutation.mutate();
+  const handleDelete = () => deleteMutation.mutate(undefined);
 
   const handleClose = useCallback(() => router.back(), []);
   const renderBackdrop = useCallback(

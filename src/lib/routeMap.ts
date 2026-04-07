@@ -74,7 +74,5 @@ export function getRedirectForSegments(
       return isProfileSetupRoute(segments) ? null : targetRoute;
     case "authenticated":
       return isPublicRoute(segments) ? targetRoute : null;
-    case "loading":
-      return null;
   }
 }

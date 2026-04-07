@@ -297,7 +297,7 @@ export default function CustomerDetailScreen() {
                 ? colors.info
                 : colors.warning;
 
-            const formattedDate = new Date(order.created_at).toLocaleDateString("en-NG", {
+            const formattedDate = new Date(order.created_at ?? '').toLocaleDateString("en-NG", {
               day: "numeric",
               month: "short",
             });

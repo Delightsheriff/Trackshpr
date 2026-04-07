@@ -26,6 +26,7 @@ import type { TLState } from "@/src/components/orders/timeline-item";
 // Components
 import { StatusPill } from "@/src/components/home/status-pill";
 import { Order } from "@/src/components/orders/order-types";
+import { OrderStatus } from "@/src/components/home/home-types";
 import { ProgressSteps, Step } from "@/src/components/orders/progress-steps";
 import { DetailRow } from "@/src/components/orders/detail-row";
 import { TimelineItem } from "@/src/components/orders/timeline-item";
@@ -81,16 +82,16 @@ export default function OrderDetailScreen() {
         rider: (dbOrder.riders as any)?.name ?? dbOrder.rider_name ?? "—",
         riderPhone: (dbOrder.riders as any)?.phone ?? dbOrder.rider_phone ?? "—",
         amount: (dbOrder as any).delivery_fee ?? 0,
-        status: dbOrder.status,
+        status: (dbOrder.status ?? "pending") as OrderStatus,
         riderToken: dbOrder.rider_token ?? "",
         customerToken: dbOrder.customer_token ?? "",
-        createdAt: formatTime(dbOrder.created_at),
+        createdAt: formatTime(dbOrder.created_at ?? ''),
         pickedUpAt: null,
         deliveredAt: dbOrder.delivered_at ? formatTime(dbOrder.delivered_at) : null,
         failedAt: null,
         failureReason: null,
         pickedUpLocation: null,
-        elapsedLabel: formatRelativeTime(dbOrder.created_at),
+        elapsedLabel: formatRelativeTime(dbOrder.created_at ?? ''),
       }
     : null;
 
@@ -584,7 +585,7 @@ export default function OrderDetailScreen() {
               <DetailRow label="Rider" value={order.rider} separator />
               <DetailRow
                 label="Picked up"
-                value={order.pickedUpAt}
+                value={order.pickedUpAt ?? "—"}
                 mono
                 valueStyle={{ color: colors.success }}
                 separator

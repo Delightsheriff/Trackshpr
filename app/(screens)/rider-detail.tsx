@@ -326,7 +326,7 @@ export default function RiderDetailScreen() {
                     ? colors.info
                     : colors.warning;
 
-                const formattedDate = new Date(delivery.created_at).toLocaleDateString(
+                const formattedDate = new Date(delivery.created_at ?? '').toLocaleDateString(
                   'en-NG',
                   { day: 'numeric', month: 'short' },
                 );

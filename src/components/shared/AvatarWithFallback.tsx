@@ -7,7 +7,7 @@
  *   <AvatarWithFallback name="Emeka Musa" size={36} />
  */
 import React from "react";
-import { Text, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import { Text, StyleSheet, StyleProp, View, ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { font, gradients } from "@/src/constants/tokens";
@@ -33,14 +33,18 @@ export const AvatarWithFallback = React.memo(function AvatarWithFallback({
 }: AvatarWithFallbackProps) {
   const borderRadius = Math.round(size * 0.33);
   const fontSize = Math.round(size * 0.38);
+  const baseStyle = { width: size, height: size, borderRadius };
 
   if (uri) {
+    // Wrap in View so ViewStyle (position, margin etc) applies correctly
     return (
-      <Image
-        source={{ uri }}
-        style={[{ width: size, height: size, borderRadius }, style]}
-        contentFit="cover"
-      />
+      <View style={[baseStyle, { overflow: "hidden" }, style]}>
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size }}
+          contentFit="cover"
+        />
+      </View>
     );
   }
 
@@ -49,7 +53,7 @@ export const AvatarWithFallback = React.memo(function AvatarWithFallback({
       colors={gradients.avatar}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[{ width: size, height: size, borderRadius, alignItems: "center", justifyContent: "center" }, style]}
+      style={[baseStyle, { alignItems: "center", justifyContent: "center" }, style]}
     >
       <Text style={[styles.initials, { fontSize }]}>{getInitials(name)}</Text>
     </LinearGradient>
@@ -58,9 +62,9 @@ export const AvatarWithFallback = React.memo(function AvatarWithFallback({
 
 const styles = StyleSheet.create({
   initials: {
-    fontFamily: font.sans.bold,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily:    font.sans.bold,
+    fontWeight:    "700",
+    color:         "#FFFFFF",
     letterSpacing: -0.5,
   },
 });

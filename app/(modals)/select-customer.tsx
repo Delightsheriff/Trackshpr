@@ -145,7 +145,6 @@ export default function SelectCustomerScreen() {
           data={filtered}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
-          estimatedItemSize={72}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={

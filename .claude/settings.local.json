@@ -17,7 +17,11 @@
       "Bash(ls:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(find \"C:\\\\Users\\\\delig\\\\Documents\\\\Code\\\\Trackshpr\\\\app\" -name \"settings.tsx\" -exec grep -n \"Saved Riders\\\\|rider\\\\|Rider\" {} \\\\;)"
+      "Bash(find \"C:\\\\Users\\\\delig\\\\Documents\\\\Code\\\\Trackshpr\\\\app\" -name \"settings.tsx\" -exec grep -n \"Saved Riders\\\\|rider\\\\|Rider\" {} \\\\;)",
+      "Bash(npx tsc:*)",
+      "Bash(sed -n '55,65p' \"app/\\(modals\\)/delete-customer.tsx\")",
+      "Bash(sed -n '295,305p' \"app/\\(screens\\)/customer-detail.tsx\")",
+      "Bash(sed -n '65,100p' \"app/\\(screens\\)/order-detail.tsx\")"
     ]
   }
 }

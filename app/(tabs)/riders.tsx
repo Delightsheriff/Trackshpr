@@ -142,7 +142,6 @@ export default function RidersScreen() {
           data={filtered}
           keyExtractor={(r) => r.id}
           renderItem={renderRider}
-          estimatedItemSize={80}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

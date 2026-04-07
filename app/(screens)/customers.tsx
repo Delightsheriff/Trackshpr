@@ -193,7 +193,6 @@ export default function CustomersScreen() {
           data={filtered}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
-          estimatedItemSize={88}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

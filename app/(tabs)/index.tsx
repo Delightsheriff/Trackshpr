@@ -210,7 +210,6 @@ export default function HomeScreen() {
       <FlashList
         data={ordersLoading || ordersError ? [] : dashboardOrders}
         keyExtractor={(item: Order) => item.id}
-        estimatedItemSize={70}
         renderItem={({ item: o }: { item: Order }) => (
           <OrderCard
             key={o.id}

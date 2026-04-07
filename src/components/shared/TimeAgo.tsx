@@ -7,7 +7,7 @@
  *   <TimeAgo date={new Date()} style={{ color: colors.textSecondary }} />
  */
 import React, { useState, useEffect } from "react";
-import { Text, StyleProp, TextStyle } from "react-native";
+import { Text, StyleSheet, StyleProp, TextStyle } from "react-native";
 import { useTheme } from "@/src/stores/themeStore";
 import { font } from "@/src/constants/tokens";
 
@@ -46,23 +46,17 @@ export const TimeAgo = React.memo(function TimeAgo({
   }, [date]);
 
   return (
-    <Text
-      style={[
-        styles.text,
-        { color: colors.textMuted },
-        style,
-      ]}
-    >
+    <Text style={[styles.text, { color: colors.textMuted }, style]}>
       {label}
     </Text>
   );
 });
 
-const styles = {
+const styles = StyleSheet.create({
   text: {
-    fontSize: 11,
-    fontFamily: font.mono.regular,
-    fontWeight: "400" as const,
-    fontVariant: ["tabular-nums"] as const,
+    fontSize:      11,
+    fontFamily:    font.mono.regular,
+    fontWeight:    "400",
+    fontVariant:   ["tabular-nums"],
   },
-};
+});

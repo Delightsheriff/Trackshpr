@@ -149,10 +149,10 @@ export const signInColors = {
 // ── Gradients ─────────────────────────────────────────────────────────────────
 // Rule: max 2 gradient elements visible on screen at once.
 export const gradients = {
-  primary:     ['#4647D3', '#5354e8', '#6366F1'] as string[],
-  primaryHero: ['#1e1f4a', '#2d2f6b', '#3a3b82'] as string[],
-  success:     ['#00873A', '#00A347'] as string[],
-  avatar:      ['#4647D3', '#9396FF'] as string[],
+  primary:     ['#4647D3', '#5354e8', '#6366F1'] as [string, string, string],
+  primaryHero: ['#1e1f4a', '#2d2f6b', '#3a3b82'] as [string, string, string],
+  success:     ['#00873A', '#00A347'] as [string, string],
+  avatar:      ['#4647D3', '#9396FF'] as [string, string],
 }
 
 // ── Shadows — Light Mode ──────────────────────────────────────────────────────

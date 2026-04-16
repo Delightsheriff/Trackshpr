@@ -9,7 +9,7 @@
  */
 import GoogleIcon from "@/src/components/auth/google-icon";
 import SignInHero from "@/src/components/auth/sign-in-hero";
-import { colors, colors as lightColors, font, gradients, radius, shadowsLight, type as t } from "@/src/constants/tokens";
+import { colors, colors as lightColors, font, gradients, radius, type as t } from "@/src/constants/tokens";
 import { signInWithGoogle } from "@/src/lib/auth";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -80,10 +80,18 @@ export default function SignInScreen() {
   const signIn = useMutation({
     mutationFn: signInWithGoogle,
     onError: (err: Error) => {
+      if ((err as any).dismissed) {
+        console.log(
+          "[SignIn] Browser returned control to the app. Waiting for callback...",
+        );
+        return;
+      }
+
       if ((err as any).cancelled) {
         console.log("[SignIn] User cancelled.");
         return;
       }
+
       console.log("[SignIn] Sign-in error:", err.message);
       showToast(err.message ?? "Sign-in failed. Please try again.");
     },

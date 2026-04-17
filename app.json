@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.trackshpr.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Trackshpr uses the camera so you can attach a photo to an order (for example, a packed bag or a delivery proof).",
         "NSPhotoLibraryUsageDescription": "Trackshpr accesses your photo library so you can pick an existing photo to attach to an order or to use as your brand logo.",
@@ -51,6 +52,7 @@
         }
       ],
       "expo-localization",
+      "expo-apple-authentication",
       "@react-native-google-signin/google-signin"
     ],
     "experiments": {

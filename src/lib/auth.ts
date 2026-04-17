@@ -208,6 +208,60 @@ export async function signInWithGoogle(): Promise<void> {
   await signInWithGoogleBrowser();
 }
 
+/**
+ * Native Sign in with Apple — iOS only.
+ *
+ * Apple requires this button whenever another social login (e.g. Google)
+ * is offered on iOS. Available only on real iOS devices + development /
+ * production builds — not in Expo Go and not on Android/web.
+ */
+export async function signInWithApple(): Promise<void> {
+  if (Platform.OS !== "ios") {
+    throw new Error("Sign in with Apple is only available on iOS.");
+  }
+
+  const AppleAuthentication = await import("expo-apple-authentication");
+  const available = await AppleAuthentication.isAvailableAsync();
+  if (!available) {
+    throw new Error("Apple sign-in is not available on this device.");
+  }
+
+  let credential: Awaited<
+    ReturnType<typeof AppleAuthentication.signInAsync>
+  >;
+  try {
+    credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "ERR_REQUEST_CANCELED"
+    ) {
+      throw new AuthCancelledError();
+    }
+    throw err;
+  }
+
+  if (!credential.identityToken) {
+    throw new Error("Apple did not return an identity token.");
+  }
+
+  const { error } = await supabase.auth.signInWithIdToken({
+    provider: "apple",
+    token: credential.identityToken,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? "Could not complete Apple sign-in.");
+  }
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) {

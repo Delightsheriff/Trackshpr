@@ -31,6 +31,10 @@ export default function OAuthCallbackScreen() {
       try {
         console.log("[AuthCallback] Received URL:", url);
 
+        if (!url) {
+          throw new Error("Missing callback URL.");
+        }
+
         const completed = await completeGoogleSignInFromUrl(url);
 
         if (!completed) {

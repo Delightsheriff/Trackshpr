@@ -3,20 +3,30 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 
 import { queryClient } from "@/src/lib/queryClient";
 import { useAuthState } from "@/src/hooks/useAuthState";
+import { useSession } from "@/src/hooks/useSession";
 import { getRedirectForSegments } from "@/src/lib/routeMap";
+import { identifyUser, initMonitoring } from "@/src/lib/monitoring";
 import SplashScreen from "@/src/components/splash";
 import ToastOverlay from "@/src/components/shared/ToastOverlay";
 import { useThemeStore } from "@/src/stores/themeStore";
 
 import "../global.css";
 
+initMonitoring();
+
 export default function RootLayout() {
   const status = useAuthState();
   const segments = useSegments();
   const redirectRoute = getRedirectForSegments(status, segments);
+  const { userId } = useSession();
+
+  useEffect(() => {
+    identifyUser(userId);
+  }, [userId]);
 
   const colors = useThemeStore((s) => s.colors);
   const isDark = useThemeStore((s) => s.isDark);

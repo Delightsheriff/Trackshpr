@@ -11,7 +11,7 @@ export {
   useAnalyticsTopRiders,
 } from "./useAnalytics";
 
-export { useProfile, useSaveProfile, useUploadLogo, useProfileComplete, useDeleteAccount } from "./useProfile";
+export { useProfile, useSaveProfile, useUploadLogo, useProfileComplete, useDeleteAccount, useCancelPro } from "./useProfile";
 export {
   useOrders,
   useFleetMapOrders,

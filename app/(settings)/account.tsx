@@ -2,6 +2,7 @@
  * Account screen — sign out and delete account.
  */
 import { font, layout, radius } from "@/src/constants/tokens";
+import { useProfile, useSession } from "@/src/hooks";
 import { supabase } from "@/src/lib/supabase";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
@@ -56,6 +57,8 @@ export default function AccountScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState<string | null>(null);
+  const { userId } = useSession();
+  const { data: profile } = useProfile(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -105,6 +108,31 @@ export default function AccountScreen() {
               </Text>
             </View>
           </View>
+        )}
+
+        {/* Subscription — only shown when the user is on Pro */}
+        {profile?.is_pro && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              Subscription
+            </Text>
+            <View
+              style={[
+                styles.group,
+                { backgroundColor: colors.surfaceCard },
+                cardShadow,
+              ]}
+            >
+              <SettingRow
+                icon="x-circle"
+                iconColor={colors.warning}
+                iconBg={colors.warningBg}
+                label="Cancel Pro"
+                sublabel="Return to the Free plan"
+                onPress={() => router.push("/(modals)/cancel-pro")}
+              />
+            </View>
+          </>
         )}
 
         {/* Session */}

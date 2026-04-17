@@ -65,6 +65,7 @@ export default function RootLayout() {
               <Stack.Screen name="(modals)/delete-customer" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/sign-out" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/delete-account" options={{ presentation: "transparentModal" }} />
+              <Stack.Screen name="(modals)/cancel-pro" options={{ presentation: "transparentModal" }} />
             </Stack>
           )}
 

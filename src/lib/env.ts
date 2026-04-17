@@ -6,6 +6,7 @@
  * All vars here are EXPO_PUBLIC_* — they're bundled into the client bundle.
  * Never put secrets in this file.
  */
+import { Platform } from "react-native";
 
 function required(name: string, value: string | undefined): string {
   if (!value || !value.trim()) {
@@ -97,7 +98,15 @@ export function canSendNotifications(): boolean {
   return env.termii.apiKey !== null;
 }
 
-/** True if Paystack purchase flow should be shown. */
+/**
+ * True if Paystack purchase flow should be shown.
+ *
+ * iOS is excluded: Apple requires StoreKit / in-app purchases for digital
+ * subscriptions unlocked inside the app. Shipping a Paystack button on iOS
+ * is an almost-certain App Store rejection. Until IAP is implemented,
+ * iOS falls through to the Pro waitlist flow.
+ */
 export function canShowPaymentUpgrade(): boolean {
+  if (Platform.OS === "ios") return false;
   return env.payments.enabled && env.payments.paystackPublicKey !== null;
 }

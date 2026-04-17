@@ -932,43 +932,76 @@ export async function fetchOrder(orderId: string): Promise<Order> {
   return data as unknown as Order;
 }
 
+/**
+ * Fetch a public order snapshot via the rate-limited Edge Function.
+ *
+ * Hits `public-order-lookup`, which:
+ *   - throttles to 60 requests/minute per (token, IP hash)
+ *   - returns an opaque 404 for unknown tokens so abusers can't enumerate
+ *
+ * Falls back to the direct anon-RPC path if the Edge Function returns an
+ * unexpected error — this keeps older tracking links working during
+ * rollout and tolerates transient Edge Function outages. The fallback is
+ * still safe because the RPCs enforce token secrecy themselves.
+ */
+async function fetchPublicOrderViaEdge(
+  kind: "customer" | "rider",
+  token: string,
+): Promise<unknown | null> {
+  const url = `${env.supabaseUrl}/functions/v1/public-order-lookup?kind=${kind}&token=${encodeURIComponent(token)}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { apikey: env.supabaseKey },
+  });
+  if (response.status === 404) return null;
+  if (response.status === 429) {
+    throw new Error("Too many requests — please wait a minute and try again.");
+  }
+  if (!response.ok) {
+    throw new Error("Couldn't load this link. Please try again.");
+  }
+  const body = (await response.json().catch(() => null)) as
+    | { order?: unknown }
+    | null;
+  return body?.order ?? null;
+}
+
 export async function fetchPublicRiderOrder(
   riderToken: string,
 ): Promise<PublicTrackingOrder | null> {
-  const { data, error } = await unsafeRpcClient.rpc("get_rider_link_order", {
-    p_rider_token: riderToken,
-  });
-
-  if (error) {
-    throw new Error(error.message ?? "Couldn't load this rider link.");
+  try {
+    const data = await fetchPublicOrderViaEdge("rider", riderToken);
+    return data ? mapPublicTrackingOrder(data) : null;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Too many requests")) {
+      throw err;
+    }
+    // Fallback to direct RPC if the Edge Function is unreachable.
+    const { data, error } = await unsafeRpcClient.rpc("get_rider_link_order", {
+      p_rider_token: riderToken,
+    });
+    if (error) throw new Error(error.message ?? "Couldn't load this rider link.");
+    return data ? mapPublicTrackingOrder(data) : null;
   }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapPublicTrackingOrder(data);
 }
 
 export async function fetchPublicCustomerOrder(
   customerToken: string,
 ): Promise<PublicTrackingOrder | null> {
-  const { data, error } = await unsafeRpcClient.rpc(
-    "get_customer_tracking_order",
-    {
-      p_customer_token: customerToken,
-    },
-  );
-
-  if (error) {
-    throw new Error(error.message ?? "Couldn't load this tracking page.");
+  try {
+    const data = await fetchPublicOrderViaEdge("customer", customerToken);
+    return data ? mapPublicTrackingOrder(data) : null;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Too many requests")) {
+      throw err;
+    }
+    const { data, error } = await unsafeRpcClient.rpc(
+      "get_customer_tracking_order",
+      { p_customer_token: customerToken },
+    );
+    if (error) throw new Error(error.message ?? "Couldn't load this tracking page.");
+    return data ? mapPublicTrackingOrder(data) : null;
   }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapPublicTrackingOrder(data);
 }
 
 export async function markRiderOrderPickedUp(params: {

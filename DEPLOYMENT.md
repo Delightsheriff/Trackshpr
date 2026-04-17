@@ -29,8 +29,6 @@ eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://...supabase.c
 eas secret:create --name EXPO_PUBLIC_SUPABASE_KEY --value "..."
 eas secret:create --name EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID --value "..."
 eas secret:create --name EXPO_PUBLIC_TRACKSHPR_WEB_URL --value "https://trackshpr.app"
-eas secret:create --name EXPO_PUBLIC_TERMII_API_KEY --value "..."
-eas secret:create --name EXPO_PUBLIC_TERMII_SENDER_ID --value "Trackshpr"
 eas secret:create --name EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY --value "pk_test_..."
 eas secret:create --name EXPO_PUBLIC_PAYMENTS_ENABLED --value "false"
 ```

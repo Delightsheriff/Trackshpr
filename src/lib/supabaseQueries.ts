@@ -748,6 +748,7 @@ export async function insertOrder(payload: InsertOrderPayload): Promise<Order> {
     deliveryAddress: createdOrder.delivery_address,
     trackLink: buildPublicOrderLink("track", createdOrder.customer_token),
     riderLink: buildPublicOrderLink("rider", createdOrder.rider_token),
+    orderId: createdOrder.id,
   };
 
   // Fire-and-forget: never block order creation on notification delivery.

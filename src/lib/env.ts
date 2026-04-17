@@ -50,24 +50,6 @@ export const env = {
     process.env.EXPO_PUBLIC_TRACKSHPR_WEB_URL ?? "https://trackshpr.app"
   ).replace(/\/$/, ""),
 
-  // ── Termii (Nigeria SMS + WhatsApp) ───────────────────────────────────────
-  termii: {
-    apiKey: optional(process.env.EXPO_PUBLIC_TERMII_API_KEY),
-    baseUrl:
-      process.env.EXPO_PUBLIC_TERMII_BASE_URL ?? "https://api.ng.termii.com",
-    senderId: process.env.EXPO_PUBLIC_TERMII_SENDER_ID ?? "Trackshpr",
-    // Default transport channel. "whatsapp" | "dnd" | "generic"
-    smsChannel: (process.env.EXPO_PUBLIC_TERMII_SMS_CHANNEL ?? "generic") as
-      | "generic"
-      | "dnd",
-    // If true, send via WhatsApp first, fall back to SMS on failure.
-    // If false, send via SMS only.
-    whatsappEnabled: optionalBool(
-      process.env.EXPO_PUBLIC_TERMII_WHATSAPP_ENABLED,
-      true,
-    ),
-  },
-
   // ── Payments (Paystack, Nigeria) ──────────────────────────────────────────
   payments: {
     // Master flag — flips whether the app shows purchase CTAs or the
@@ -92,11 +74,6 @@ export const env = {
       "paystack-verify",
   },
 } as const;
-
-/** True if Termii is configured and we can send messages. */
-export function canSendNotifications(): boolean {
-  return env.termii.apiKey !== null;
-}
 
 /**
  * True if Paystack purchase flow should be shown.

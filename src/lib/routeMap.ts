@@ -38,12 +38,17 @@ function isPublicTrackingRoute(segments: readonly string[]): boolean {
   );
 }
 
+function isLegalRoute(segments: readonly string[]): boolean {
+  return segments[0] === "legal";
+}
+
 function isPublicRoute(segments: readonly string[]): boolean {
   return (
     isRootIndex(segments) ||
     isAuthRoute(segments) ||
     isOnboardingRoute(segments) ||
-    isPublicTrackingRoute(segments)
+    isPublicTrackingRoute(segments) ||
+    isLegalRoute(segments)
   );
 }
 

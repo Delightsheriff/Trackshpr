@@ -234,8 +234,19 @@ export default function SignInScreen() {
         <Animated.View style={w4s}>
           <Text style={styles.legal}>
             By continuing you agree to our{" "}
-            <Text style={styles.legalLink}>Terms of Service</Text>
-            {"\n"}and <Text style={styles.legalLink}>Privacy Policy</Text>
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push("/legal/terms")}
+            >
+              Terms of Service
+            </Text>
+            {"\n"}and{" "}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push("/legal/privacy")}
+            >
+              Privacy Policy
+            </Text>
           </Text>
           {__DEV__ && (
             <Pressable

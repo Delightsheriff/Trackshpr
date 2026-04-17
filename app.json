@@ -9,7 +9,16 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trackshpr.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Trackshpr uses the camera so you can attach a photo to an order (for example, a packed bag or a delivery proof).",
+        "NSPhotoLibraryUsageDescription": "Trackshpr accesses your photo library so you can pick an existing photo to attach to an order or to use as your brand logo.",
+        "NSPhotoLibraryAddUsageDescription": "Trackshpr saves delivery photos back to your library when you choose to download them.",
+        "NSLocationWhenInUseUsageDescription": "Trackshpr uses your location while a delivery is active so customers can see the rider on the map in real time.",
+        "NSMicrophoneUsageDescription": "Trackshpr uses the microphone only when you use voice entry to dictate order details.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.trackshpr.app",

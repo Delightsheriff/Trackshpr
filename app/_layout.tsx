@@ -55,6 +55,8 @@ export default function RootLayout() {
               <Stack.Screen name="(screens)/fleet-map" />
               <Stack.Screen name="(screens)/rider-link" />
               <Stack.Screen name="(screens)/track-link" />
+              <Stack.Screen name="legal/privacy" />
+              <Stack.Screen name="legal/terms" />
               <Stack.Screen name="(modals)/add-rider" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/edit-rider" options={{ presentation: "transparentModal" }} />
               <Stack.Screen name="(modals)/delete-rider" options={{ presentation: "transparentModal" }} />

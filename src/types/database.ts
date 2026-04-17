@@ -139,6 +139,63 @@ export type Database = {
           },
         ]
       }
+      notification_log: {
+        Row: {
+          id: string
+          seller_id: string
+          order_id: string | null
+          recipient_phone: string
+          recipient_kind: "customer" | "rider"
+          event: "order_created" | "order_picked_up" | "order_delivered" | "order_failed"
+          channel: "whatsapp" | "sms"
+          status: "sent" | "failed"
+          provider_message_id: string | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          seller_id: string
+          order_id?: string | null
+          recipient_phone: string
+          recipient_kind: "customer" | "rider"
+          event: "order_created" | "order_picked_up" | "order_delivered" | "order_failed"
+          channel: "whatsapp" | "sms"
+          status: "sent" | "failed"
+          provider_message_id?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          seller_id?: string
+          order_id?: string | null
+          recipient_phone?: string
+          recipient_kind?: "customer" | "rider"
+          event?: "order_created" | "order_picked_up" | "order_delivered" | "order_failed"
+          channel?: "whatsapp" | "sms"
+          status?: "sent" | "failed"
+          provider_message_id?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null

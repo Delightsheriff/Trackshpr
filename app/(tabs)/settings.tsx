@@ -2,7 +2,11 @@
  * Settings tab - profile, plan upgrade, preferences, account.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useProfile, useSession } from "@/src/hooks";
+import {
+  useNotificationFailures,
+  useProfile,
+  useSession,
+} from "@/src/hooks";
 import { supabase } from "@/src/lib/supabase";
 import { useTheme, useThemeStore } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
@@ -221,6 +225,7 @@ export default function SettingsScreen() {
     isError,
     refetch,
   } = useProfile(userId);
+  const { data: failures = [] } = useNotificationFailures(userId);
   const showToast = useToastStore((state) => state.show);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -468,6 +473,38 @@ export default function SettingsScreen() {
               </Pressable>
             ) : null}
 
+            {failures.length > 0 && (
+              <View
+                style={[
+                  styles.alertBanner,
+                  { backgroundColor: colors.warningBg },
+                ]}
+              >
+                <View style={styles.alertRow}>
+                  <Feather
+                    name="alert-triangle"
+                    size={16}
+                    color={colors.warning}
+                  />
+                  <View style={styles.alertBody}>
+                    <Text
+                      style={[styles.alertTitle, { color: colors.warning }]}
+                    >
+                      {failures.length === 1
+                        ? "1 delivery SMS didn't go through"
+                        : `${failures.length} delivery messages didn't go through`}
+                    </Text>
+                    <Text
+                      style={[styles.alertSub, { color: colors.textSecondary }]}
+                    >
+                      Last 24h. Check the order, confirm the number, or contact
+                      the recipient directly.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             <SectionLabel label="Business" />
             <SettingGroup>
               <SettingRow
@@ -679,6 +716,30 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.bold,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  alertBanner: {
+    marginHorizontal: layout.screenPaddingH,
+    marginBottom: layout.sectionGap,
+    borderRadius: radius.xl,
+    padding: 14,
+  },
+  alertRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  alertBody: { flex: 1 },
+  alertTitle: {
+    fontSize: 13,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    letterSpacing: -0.13,
+    marginBottom: 2,
+  },
+  alertSub: {
+    fontSize: 11,
+    fontFamily: font.sans.regular,
+    lineHeight: 15,
   },
   sectionLabel: {
     fontSize: 11,

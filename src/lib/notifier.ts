@@ -11,6 +11,7 @@
  */
 
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { reportError } from "./monitoring";
 import { supabase } from "./supabase";
 
 export type NotifyChannel = "whatsapp" | "sms";
@@ -104,17 +105,36 @@ async function sendNotification({
 
     if (error) {
       console.warn("[notifier] send-notification invoke failed", error.message);
+      reportError(error, {
+        scope: "notifier.invoke",
+        event,
+        recipientKind,
+        orderId,
+      });
       return null;
     }
 
     if (!data || data.status !== "sent") {
       console.warn("[notifier] send-notification returned failure", data);
+      reportError(new Error("send-notification returned failure"), {
+        scope: "notifier.result",
+        event,
+        recipientKind,
+        orderId,
+        data,
+      });
       return null;
     }
 
     return data.channel;
   } catch (err) {
     console.warn("[notifier] send-notification threw", err);
+    reportError(err, {
+      scope: "notifier.throw",
+      event,
+      recipientKind,
+      orderId,
+    });
     return null;
   }
 }

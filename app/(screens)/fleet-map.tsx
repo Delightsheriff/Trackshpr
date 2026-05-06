@@ -1,6 +1,7 @@
 /**
  * Fleet Map screen - live rider map with synced order cards.
  */
+import { Platform } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { font, layout, radius } from "@/src/constants/tokens";
 import { useFleetMapOrders, useSession } from "@/src/hooks";
@@ -17,7 +18,6 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -27,6 +27,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Database } from "@/src/types/database";
+
+const isNative = Platform.OS !== "web";
+const MapView = isNative ? require("react-native-maps").default : null;
+const Marker = isNative ? require("react-native-maps").Marker : null;
+const PROVIDER_DEFAULT = isNative ? require("react-native-maps").PROVIDER_DEFAULT : null;
 
 const STALE_PING_MS = 15 * 60 * 1000;
 const INITIAL_REGION = {
@@ -544,14 +549,21 @@ export default function FleetMapScreen() {
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        provider={PROVIDER_DEFAULT}
-        initialRegion={INITIAL_REGION}
-        showsUserLocation={false}
-        showsCompass={false}
-      >
+      {!MapView ? (
+        <View style={[styles.emptyState, { backgroundColor: colors.surfaceCard }]}>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+            MapView is not available on web
+          </Text>
+        </View>
+      ) : (
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          provider={PROVIDER_DEFAULT}
+          initialRegion={INITIAL_REGION}
+          showsUserLocation={false}
+          showsCompass={false}
+        >
         {markerOrders.map((order) => (
           <FleetMarker
             key={order.id}
@@ -562,6 +574,7 @@ export default function FleetMapScreen() {
           />
         ))}
       </MapView>
+      )}
 
       <ScreenHeader activeCount={orders.length} overlay />
 
@@ -589,6 +602,14 @@ export default function FleetMapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+  },
   headerWrap: {
     paddingHorizontal: layout.screenPaddingH,
     paddingBottom: 10,

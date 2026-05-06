@@ -29,7 +29,6 @@
         "backgroundImage": "./assets/images/splash.png",
         "monochromeImage": "./assets/images/icon.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {

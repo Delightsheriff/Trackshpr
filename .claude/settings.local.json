@@ -21,7 +21,11 @@
       "Bash(npx tsc:*)",
       "Bash(sed -n '55,65p' \"app/\\(modals\\)/delete-customer.tsx\")",
       "Bash(sed -n '295,305p' \"app/\\(screens\\)/customer-detail.tsx\")",
-      "Bash(sed -n '65,100p' \"app/\\(screens\\)/order-detail.tsx\")"
+      "Bash(sed -n '65,100p' \"app/\\(screens\\)/order-detail.tsx\")",
+      "Read(//c/Users/delig/.agents/**)",
+      "Bash(npx eslint *)",
+      "Bash(supabase migration *)",
+      "Bash(supabase functions *)"
     ]
   }
 }

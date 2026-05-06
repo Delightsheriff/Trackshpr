@@ -15,12 +15,12 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Platform } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +28,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const IS_WEB = Platform.OS === "web";
 
 type TrackPageStatus =
   | "pending"
@@ -60,13 +62,15 @@ function formatAmount(value: number | null | undefined): string {
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "Just now";
 
-  return new Intl.DateTimeFormat("en-NG", {
+  return new DateTimeFormat("en-NG", {
     hour: "numeric",
     minute: "2-digit",
     day: "numeric",
     month: "short",
   }).format(new Date(value));
 }
+
+const DateTimeFormat = Intl.DateTimeFormat;
 
 function getBusinessName(order: PublicTrackingOrder): string {
   return (
@@ -77,197 +81,245 @@ function getBusinessName(order: PublicTrackingOrder): string {
 }
 
 function getBrandColor(order: PublicTrackingOrder | null | undefined): string {
-  return order?.profile.brand_color?.trim() || "#16A34A";
+  return order?.profile.brand_color ?? "#4647D3";
 }
 
-function getStatusMessage(status: TrackPageStatus): string {
+function getStatusTone(
+  status: TrackPageStatus,
+): "success" | "warning" | "error" | "neutral" {
   switch (status) {
-    case "pending":
-      return "Your order is being prepared";
-    case "picked_up":
-      return "Your rider has picked up your order";
-    case "in_transit":
-      return "Your order is on the way";
     case "delivered":
-      return "Your order has been delivered";
+      return "success";
     case "failed":
-      return "There was an issue with your delivery";
+      return "error";
+    case "pending":
+      return "neutral";
+    default:
+      return "warning";
   }
 }
 
-function getStatusTone(status: TrackPageStatus) {
+function getStatusLabel(status: TrackPageStatus): string {
   switch (status) {
     case "pending":
-      return {
-        icon: "shopping-bag" as const,
-        color: colors.warning,
-        bg: colors.warningBg,
-      };
+      return "Order Confirmed";
     case "picked_up":
-      return {
-        icon: "package" as const,
-        color: colors.info,
-        bg: colors.infoBg,
-      };
+      return "Picked Up";
     case "in_transit":
-      return {
-        icon: "truck" as const,
-        color: colors.warning,
-        bg: colors.warningBg,
-      };
-    case "delivered":
-      return {
-        icon: "check-circle" as const,
-        color: colors.success,
-        bg: colors.successBg,
-      };
-    case "failed":
-      return {
-        icon: "x-circle" as const,
-        color: colors.error,
-        bg: colors.errorBg,
-      };
-  }
-}
-
-function mapTimelineLabel(status: string): string {
-  switch (status) {
-    case "pending":
-    case "created":
-      return "Order confirmed";
-    case "picked_up":
-      return "Item picked up";
-    case "in_transit":
-      return "In transit";
+      return "In Transit";
     case "delivered":
       return "Delivered";
     case "failed":
-      return "Delivery failed";
-    default:
-      return status;
+      return "Failed";
   }
 }
 
 function getTimeline(events: OrderEvent[]) {
-  return events.map((event) => ({
-    id: event.id,
-    label: mapTimelineLabel(event.status),
-    note: event.note,
-    time: formatDateTime(event.created_at),
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+  return sorted.map((e) => ({
+    ...e,
+    label: STEP_LABELS.indexOf(e.new_status ?? "") >= 0
+      ? e.new_status!
+      : (e.new_status ?? "").replace(/_/g, " "),
   }));
 }
 
-function getStepState(stepIndex: number, status: TrackPageStatus) {
-  if (status === "pending") {
-    return stepIndex === 0 ? "active" : "upcoming";
-  }
-
-  if (status === "picked_up") {
-    if (stepIndex === 0) return "complete";
-    if (stepIndex === 1) return "active";
-    return "upcoming";
-  }
-
-  if (status === "in_transit") {
-    if (stepIndex <= 1) return "complete";
-    if (stepIndex === 2) return "active";
-    return "upcoming";
-  }
-
-  if (status === "delivered") {
-    return "complete";
-  }
-
-  if (status === "failed") {
-    if (stepIndex <= 1) return "complete";
-    return "upcoming";
-  }
-
-  return "upcoming";
-}
-
-function ProgressSteps({
-  status,
-  brandColor,
-}: {
-  status: TrackPageStatus;
-  brandColor: string;
-}) {
-  return (
-    <View style={ss.progressWrap}>
-      <View style={ss.progressTrack} />
-      <View style={ss.progressRow}>
-        {STEP_LABELS.map((label, index) => {
-          const state = getStepState(index, status);
-          const dotStyle =
-            state === "complete"
-              ? { backgroundColor: COMPLETED_COLOR }
-              : state === "active"
-                ? { backgroundColor: brandColor }
-                : { backgroundColor: colors.surfaceContainer };
-
-          const textColor =
-            state === "complete"
-              ? COMPLETED_COLOR
-              : state === "active"
-                ? brandColor
-                : colors.textMuted;
-
-          return (
-            <View key={label} style={ss.progressStep}>
-              <View style={[ss.progressDot, dotStyle]} />
-              <Text style={[ss.progressLabel, { color: textColor }]}>
-                {label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function Timeline({
-  events,
-}: {
-  events: ReturnType<typeof getTimeline>;
-}) {
-  return (
-    <View style={ss.section}>
-      <Text style={ss.sectionTitle}>Delivery timeline</Text>
-      <View style={ss.timelineCard}>
-        {events.length === 0 ? (
-          <Text style={ss.helperText}>No delivery updates yet.</Text>
-        ) : null}
-        {events.map((event, index) => {
-          const last = index === events.length - 1;
-
-          return (
-            <View key={event.id || `${event.label}-${index}`} style={ss.eventRow}>
-              <View style={ss.eventRail}>
-                <View style={ss.eventDot} />
-                {!last ? <View style={ss.eventConnector} /> : null}
-              </View>
-              <View style={ss.eventBody}>
-                <Text style={ss.eventLabel}>{event.label}</Text>
-                {event.note ? (
-                  <Text style={ss.eventNote}>{event.note}</Text>
-                ) : null}
-                <Text style={ss.eventTime}>{event.time}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
+const ss = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: "#666666",
+  },
+  errorRoot: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  errorIcon: {
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 15,
+    color: "#666666",
+    textAlign: "center",
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  header: {
+    paddingHorizontal: layout.screenPaddingH,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  businessLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 16,
+  },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#111111",
+    letterSpacing: -0.5,
+  },
+  orderNumber: {
+    fontSize: 14,
+    color: "#666666",
+    marginTop: 4,
+  },
+  statusCard: {
+    marginHorizontal: layout.screenPaddingH,
+    borderRadius: radius.xl,
+    padding: 20,
+    marginBottom: 24,
+  },
+  statusIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  statusLabel: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 4,
+  },
+  statusSubtitle: {
+    fontSize: 14,
+    color: "#666666",
+  },
+  timelineSection: {
+    paddingHorizontal: layout.screenPaddingH,
+    marginBottom: 24,
+  },
+  timelineTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#666666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 16,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    paddingBottom: 24,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    marginLeft: 5,
+  },
+  timelineContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  timelineLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111111",
+    marginBottom: 4,
+  },
+  timelineDate: {
+    fontSize: 13,
+    color: "#666666",
+  },
+  timelineNote: {
+    fontSize: 13,
+    color: "#666666",
+    marginTop: 4,
+  },
+  detailsSection: {
+    paddingHorizontal: layout.screenPaddingH,
+    marginBottom: 32,
+  },
+  detailsTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#666666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  detailLabel: {
+    fontSize: 15,
+    color: "#666666",
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#111111",
+  },
+  detailValueMono: {
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  actionRow: {
+    paddingHorizontal: layout.screenPaddingH,
+    marginBottom: 32,
+  },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  ctaText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  footer: {
+    paddingHorizontal: layout.screenPaddingH,
+    paddingBottom: 24,
+    alignItems: "center",
+  },
+  poweredBy: {
+    fontSize: 12,
+    color: "#666666",
+  },
+});
 
 export default function TrackLinkScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useLocalSearchParams<{ token?: string }>();
   const queryClient = useQueryClient();
-  const [mapModule, setMapModule] = useState<MapModule | null>(null);
 
   const {
     data: order,
@@ -312,42 +364,6 @@ export default function TrackLinkScreen() {
     };
   }, [queryClient, token]);
 
-  const status = (order?.status ?? "pending") as TrackPageStatus;
-  const showLiveMap = status === "picked_up" || status === "in_transit";
-
-  useEffect(() => {
-    let active = true;
-
-    if (!showLiveMap || !order?.latest_ping) {
-      setMapModule(null);
-      return () => {
-        active = false;
-      };
-    }
-
-    import("react-native-maps")
-      .then((module) => {
-        if (!active) {
-          return;
-        }
-
-        setMapModule({
-          MapView: module.default,
-          Marker: module.Marker,
-          providerDefault: module.PROVIDER_DEFAULT,
-        });
-      })
-      .catch(() => {
-        if (active) {
-          setMapModule(null);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [order?.latest_ping, showLiveMap]);
-
   const businessName = order ? getBusinessName(order) : "Trackshpr seller";
   const brandColor = getBrandColor(order);
   const sellerPhone = order ? getPrimaryContactNumber(order.profile) : null;
@@ -358,7 +374,7 @@ export default function TrackLinkScreen() {
     return (
       <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
         <StatusBar style="dark" />
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color="#4647D3" />
         <Text style={ss.loadingText}>Loading your tracking page...</Text>
       </View>
     );
@@ -368,514 +384,144 @@ export default function TrackLinkScreen() {
     return (
       <View style={[ss.root, ss.centered, { paddingTop: insets.top }]}>
         <StatusBar style="dark" />
-        <View style={ss.errorIcon}>
-          <Feather name="link-2" size={32} color={colors.info} />
-        </View>
-        <Text style={ss.errorTitle}>This link isn&apos;t valid</Text>
-        <Text style={ss.errorBody}>
-          This tracking page may have expired or already been closed.
+        <Feather name="alert-circle" size={48} color="#DC2626" style={ss.errorIcon} />
+        <Text style={ss.errorTitle}>Unable to load tracking</Text>
+        <Text style={ss.errorMessage}>
+          This link may be invalid or expired. Please check with the seller.
         </Text>
-        <Pressable style={ss.secondaryButton} onPress={() => refetch()}>
-          <Text style={ss.secondaryButtonText}>Try again</Text>
-        </Pressable>
       </View>
     );
   }
 
-  const MapViewComponent = mapModule?.MapView ?? null;
-  const MarkerComponent = mapModule?.Marker ?? null;
-  const providerDefault = mapModule?.providerDefault;
-
   return (
-    <View style={[ss.root, { paddingTop: insets.top }]}>
+    <View style={ss.root}>
       <StatusBar style="dark" />
-
-      <View style={ss.header}>
-        {order.profile.logo_url ? (
-          <Image
-            source={{ uri: order.profile.logo_url }}
-            style={ss.logo}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View style={ss.headerCopy}>
-          <Text style={ss.brandName}>{businessName}</Text>
-          <Text style={ss.brandSub}>Customer tracking</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        style={ss.scroll}
-        contentContainerStyle={[
-          ss.content,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={ss.heroCard}>
-          <View style={[ss.heroIcon, { backgroundColor: tone.bg }]}>
-            <Feather name={tone.icon} size={24} color={tone.color} />
-          </View>
-          <Text style={ss.heroTitle}>{getStatusMessage(status)}</Text>
-          <Text style={ss.heroBody}>
-            Order #{order.order_number ?? order.id.slice(0, 6).toUpperCase()}
-          </Text>
-          <ProgressSteps status={status} brandColor={brandColor} />
-        </View>
-
-        <View style={ss.card}>
-          <View style={ss.detailRow}>
-            <Text style={ss.detailLabel}>Item</Text>
-            <Text style={ss.detailValue}>{order.item || "No item added"}</Text>
-          </View>
-          <View style={[ss.detailRow, ss.detailAlt]}>
-            <Text style={ss.detailLabel}>Delivery address</Text>
-            <Text style={ss.detailValue}>
-              {order.delivery_address || "No address added"}
-              {order.city ? `, ${order.city}` : ""}
-            </Text>
-          </View>
-          <View style={ss.detailRow}>
-            <Text style={ss.detailLabel}>Amount to pay</Text>
-            <Text style={ss.amountValue}>{formatAmount(order.delivery_fee)}</Text>
-          </View>
-        </View>
-
-        {showLiveMap ? (
-          order.latest_ping ? (
-            <View style={ss.section}>
-              <Text style={ss.sectionTitle}>Live location</Text>
-              <View style={ss.mapCard}>
-                {MapViewComponent && MarkerComponent ? (
-                  <MapViewComponent
-                    provider={providerDefault}
-                    style={ss.map}
-                    initialRegion={{
-                      latitude: order.latest_ping.latitude,
-                      longitude: order.latest_ping.longitude,
-                      latitudeDelta: 0.015,
-                      longitudeDelta: 0.015,
-                    }}
-                    region={{
-                      latitude: order.latest_ping.latitude,
-                      longitude: order.latest_ping.longitude,
-                      latitudeDelta: 0.015,
-                      longitudeDelta: 0.015,
-                    }}
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                    rotateEnabled={false}
-                    pitchEnabled={false}
-                  >
-                    <MarkerComponent
-                      coordinate={{
-                        latitude: order.latest_ping.latitude,
-                        longitude: order.latest_ping.longitude,
-                      }}
-                      title="Rider location"
-                    />
-                  </MapViewComponent>
-                ) : (
-                  <View style={ss.mapLoading}>
-                    <ActivityIndicator size="small" color={brandColor} />
-                    <Text style={ss.helperText}>Loading map...</Text>
-                  </View>
-                )}
-                <View style={ss.mapBadge}>
-                  <Text style={ss.mapBadgeText}>
-                    Updated {formatDateTime(order.latest_ping.created_at)}
-                  </Text>
-                </View>
-              </View>
-            </View>
+      <ScrollView contentContainerStyle={ss.scrollContent}>
+        <View style={[ss.header, { paddingTop: insets.top + 16 }]}>
+          {order.profile.logo_url ? (
+            <Image
+              source={{ uri: order.profile.logo_url }}
+              style={ss.businessLogo}
+              contentFit="cover"
+            />
           ) : (
-            <View style={ss.mapPlaceholder}>
-              <Feather name="map-pin" size={18} color={brandColor} />
-              <Text style={ss.mapPlaceholderText}>Locating your rider...</Text>
-            </View>
-          )
-        ) : null}
+            <View style={[ss.businessLogo, { backgroundColor: brandColor }]} />
+          )}
+          <Text style={ss.businessName}>{businessName}</Text>
+          <Text style={ss.orderNumber}>Order #{order.order_number ?? order.id.slice(0, 6)}</Text>
+        </View>
 
-        <Pressable
-          style={ss.callCard}
-          disabled={!sellerPhone}
-          onPress={() => {
-            if (sellerPhone) {
-              Linking.openURL(`tel:${sellerPhone}`);
-            }
-          }}
-        >
-          <View style={ss.callCopy}>
-            <Text style={ss.callLabel}>
-              {status === "failed" ? "Need help?" : "Call seller"}
-            </Text>
-            <Text style={ss.callValue}>{businessName}</Text>
-          </View>
-          <View style={ss.callButton}>
+        <View style={[ss.statusCard, { backgroundColor: colors[`${tone}Bg` as keyof typeof colors] }]}>
+          <View style={[ss.statusIcon, { backgroundColor: colors[tone as keyof typeof colors] }]}>
             <Feather
-              name="phone-call"
-              size={18}
-              color={sellerPhone ? colors.success : colors.textMuted}
+              name={
+                status === "delivered"
+                  ? "check"
+                  : status === "failed"
+                    ? "x"
+                    : "truck"
+              }
+              size={24}
+              color="#FFFFFF"
             />
           </View>
-        </Pressable>
+          <Text style={ss.statusLabel}>{getStatusLabel(status)}</Text>
+          {order.estimated_delivery && status !== "delivered" && (
+            <Text style={ss.statusSubtitle}>
+              Estimated: {formatDateTime(order.estimated_delivery)}
+            </Text>
+          )}
+        </View>
 
-        {(status === "delivered" || status === "failed") && (
-          <View style={ss.stateCard}>
-            <Text style={ss.stateTitle}>
-              {status === "delivered"
-                ? "Delivery complete"
-                : "Delivery issue reported"}
-            </Text>
-            <Text style={ss.stateBody}>
-              {status === "delivered"
-                ? `Delivered ${formatDateTime(order.delivered_at)}.`
-                : "Please contact the seller for the next update."}
-            </Text>
-            {status === "delivered" ? (
-              <Pressable style={ss.secondaryButton}>
-                <Text style={ss.secondaryButtonText}>Rate your experience</Text>
-              </Pressable>
-            ) : null}
+        {events.length > 0 && (
+          <View style={ss.timelineSection}>
+            <Text style={ss.timelineTitle}>Timeline</Text>
+            {events.map((event, index) => {
+              const isLast = index === events.length - 1;
+              const stepIndex = STEP_LABELS.indexOf(event.new_status ?? "");
+              const stepComplete = stepIndex >= 0;
+              const isCompleted =
+                stepComplete && index === events.length - 1
+                  ? false
+                  : stepComplete;
+
+              return (
+                <View key={event.id} style={ss.timelineItem}>
+                  <View
+                    style={[
+                      ss.timelineDot,
+                      { backgroundColor: isCompleted ? COMPLETED_COLOR : "#D1D5DB" },
+                    ]}
+                  />
+                  {!isLast && (
+                    <View
+                      style={[
+                        ss.timelineLine,
+                        { backgroundColor: isCompleted ? COMPLETED_COLOR : "#D1D5DB" },
+                      ]}
+                    />
+                  )}
+                  <View style={ss.timelineContent}>
+                    <Text style={ss.timelineLabel}>{event.label}</Text>
+                    <Text style={ss.timelineDate}>
+                      {formatDateTime(event.created_at ?? null)}
+                    </Text>
+                    {event.note && (
+                      <Text style={ss.timelineNote}>{event.note}</Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
-        <Timeline events={events} />
-
-        <Pressable
-          style={ss.viralCard}
-          onPress={() => Linking.openURL(PUBLIC_APP_URL)}
-        >
-          <Text style={ss.viralLabel}>Powered by Trackshpr</Text>
-          <View style={ss.viralActionRow}>
-            <Text style={ss.viralAction}>Track yours →</Text>
-            <Feather name="package" size={14} color={colors.primary} />
+        <View style={ss.detailsSection}>
+          <Text style={ss.detailsTitle}>Order Details</Text>
+          <View style={ss.detailRow}>
+            <Text style={ss.detailLabel}>Item</Text>
+            <Text style={ss.detailValue}>{order.item_name}</Text>
           </View>
-        </Pressable>
+          {order.item_quantity && order.item_quantity > 1 && (
+            <View style={ss.detailRow}>
+              <Text style={ss.detailLabel}>Quantity</Text>
+              <Text style={ss.detailValue}>{order.item_quantity}</Text>
+            </View>
+          )}
+          {order.amount && (
+            <View style={ss.detailRow}>
+              <Text style={ss.detailLabel}>Total</Text>
+              <Text style={[ss.detailValue, ss.detailValueMono]}>
+                {formatAmount(order.amount)}
+              </Text>
+            </View>
+          )}
+          {order.delivery_address && (
+            <View style={ss.detailRow}>
+              <Text style={ss.detailLabel}>Delivery Address</Text>
+              <Text style={[ss.detailValue, { flex: 1, textAlign: "right" }]}>
+                {order.delivery_address}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {sellerPhone && (
+          <View style={ss.actionRow}>
+            <Pressable
+              style={[ss.ctaBtn, { backgroundColor: brandColor }]}
+              onPress={() => Linking.openText(`tel:${sellerPhone}`)}
+            >
+              <Feather name="phone" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={ss.ctaText}>Contact Seller</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={ss.footer}>
+          <Text style={ss.poweredBy}>Powered by Trackshpr</Text>
+        </View>
       </ScrollView>
     </View>
   );
 }
-
-const ss = StyleSheet.create<any>({
-  root: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: layout.screenPaddingH,
-  },
-  loadingText: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-    marginTop: 12,
-  },
-  errorIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: colors.infoBg,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  errorTitle: {
-    ...typography.headingSm,
-    color: colors.textPrimary,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  errorBody: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: layout.screenPaddingH,
-    paddingVertical: 14,
-    backgroundColor: colors.surfaceCard,
-  },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-  },
-  headerCopy: {
-    flex: 1,
-  },
-  brandName: {
-    ...typography.labelLg,
-    color: colors.textPrimary,
-  },
-  brandSub: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: layout.screenPaddingH,
-    gap: 16,
-  },
-  heroCard: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.card,
-    padding: 18,
-    alignItems: "center",
-    gap: 12,
-  },
-  heroIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroTitle: {
-    ...typography.headingSm,
-    color: colors.textPrimary,
-    textAlign: "center",
-  },
-  heroBody: {
-    ...typography.bodySm,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
-  progressWrap: {
-    width: "100%",
-    gap: 8,
-    marginTop: 4,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceContainer,
-  },
-  progressRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 6,
-  },
-  progressStep: {
-    flex: 1,
-    alignItems: "center",
-    gap: 6,
-  },
-  progressDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  progressLabel: {
-    ...typography.labelXs,
-    textAlign: "center",
-  },
-  card: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    overflow: "hidden",
-  },
-  detailRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 6,
-    backgroundColor: colors.surfaceCard,
-  },
-  detailAlt: {
-    backgroundColor: colors.surface,
-  },
-  detailLabel: {
-    ...typography.labelXs,
-    color: colors.textMuted,
-  },
-  detailValue: {
-    ...typography.bodyLg,
-    color: colors.textPrimary,
-  },
-  amountValue: {
-    ...typography.monoSm,
-    color: colors.success,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...typography.labelMd,
-    color: colors.textPrimary,
-  },
-  mapCard: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    padding: 8,
-    gap: 8,
-  },
-  map: {
-    height: 200,
-    borderRadius: radius.lg,
-  },
-  mapLoading: {
-    height: 200,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  mapBadge: {
-    alignSelf: "flex-end",
-    backgroundColor: colors.surface,
-    borderRadius: radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  mapBadgeText: {
-    ...typography.monoXs,
-    color: colors.textMuted,
-  },
-  mapPlaceholder: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  mapPlaceholderText: {
-    ...typography.bodySm,
-    color: colors.textSecondary,
-  },
-  callCard: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  callCopy: {
-    flex: 1,
-  },
-  callLabel: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-    marginBottom: 2,
-  },
-  callValue: {
-    ...typography.labelMd,
-    color: colors.textPrimary,
-  },
-  callButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.successBg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stateCard: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    padding: 16,
-    gap: 10,
-  },
-  stateTitle: {
-    ...typography.headingSm,
-    color: colors.textPrimary,
-  },
-  stateBody: {
-    ...typography.bodySm,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  secondaryButton: {
-    minHeight: 48,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceContainer,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: {
-    ...typography.labelMd,
-    color: colors.textSecondary,
-  },
-  timelineCard: {
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.xl,
-    padding: 16,
-    gap: 14,
-  },
-  helperText: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-  },
-  eventRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  eventRail: {
-    width: 18,
-    alignItems: "center",
-  },
-  eventDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    marginTop: 6,
-  },
-  eventConnector: {
-    width: 2,
-    flex: 1,
-    backgroundColor: colors.surfaceContainer,
-    marginTop: 4,
-    minHeight: 24,
-  },
-  eventBody: {
-    flex: 1,
-    gap: 3,
-    paddingBottom: 4,
-  },
-  eventLabel: {
-    ...typography.labelSm,
-    color: colors.textPrimary,
-  },
-  eventNote: {
-    ...typography.bodySm,
-    color: colors.textSecondary,
-  },
-  eventTime: {
-    ...typography.monoXs,
-    color: colors.textMuted,
-  },
-  viralCard: {
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: radius.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 6,
-  },
-  viralLabel: {
-    ...typography.bodySm,
-    color: colors.textMuted,
-  },
-  viralActionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  viralAction: {
-    ...typography.labelSm,
-    color: colors.primary,
-  },
-});

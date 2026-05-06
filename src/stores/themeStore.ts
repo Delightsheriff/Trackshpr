@@ -28,6 +28,25 @@ const initialThemeState = {
   hasHydrated: false,
 };
 
+const isWeb = typeof window !== "undefined" && typeof localStorage !== "undefined";
+
+function createWebStorage() {
+  return {
+    getItem: async (name: string): Promise<string | null> => {
+      if (!isWeb) return null;
+      return localStorage.getItem(name);
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      if (!isWeb) return;
+      localStorage.setItem(name, value);
+    },
+    removeItem: async (name: string): Promise<void> => {
+      if (!isWeb) return;
+      localStorage.removeItem(name);
+    },
+  };
+}
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
@@ -43,7 +62,7 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "trackshpr-theme",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(isWeb ? createWebStorage : AsyncStorage),
       partialize: (state) => ({ isDark: state.isDark }),
       onRehydrateStorage: () => (state, error) => {
         if (error || !state) {
@@ -58,9 +77,6 @@ export const useThemeStore = create<ThemeState>()(
 );
 
 export const useTheme = () => {
-  const colors = useThemeStore((state) => state.colors);
-  const isDark = useThemeStore((state) => state.isDark);
-  const hasHydrated = useThemeStore((state) => state.hasHydrated);
-
-  return { colors, isDark, hasHydrated };
+  const { colors, isDark } = useThemeStore();
+  return { colors, isDark };
 };

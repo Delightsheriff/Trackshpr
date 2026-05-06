@@ -2,32 +2,49 @@ import "react-native-get-random-values";
 import "react-native-url-polyfill/auto";
 
 import type { Database } from "@/src/types/database";
-import * as SecureStore from "expo-secure-store";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env";
 
-function getStorageItem(key: string): Promise<string | null> {
-  try {
-    return SecureStore.getItemAsync(key);
-  } catch {
-    return Promise.resolve(null);
+function createWebStorage() {
+  if (typeof window === "undefined") {
+    return {
+      getItem: async () => null,
+      setItem: async () => undefined,
+      removeItem: async () => undefined,
+    };
   }
+  return {
+    getItem: async (key: string): Promise<string | null> => {
+      return localStorage.getItem(key);
+    },
+    setItem: async (key: string, value: string): Promise<void> => {
+      localStorage.setItem(key, value);
+    },
+    removeItem: async (key: string): Promise<void> => {
+      localStorage.removeItem(key);
+    },
+  };
 }
 
-function setStorageItem(key: string, value: string): Promise<void> {
-  try {
-    return SecureStore.setItemAsync(key, value);
-  } catch {
-    return Promise.resolve();
+async function getItem(key: string): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
   }
+  return localStorage.getItem(key);
 }
 
-function removeStorageItem(key: string): Promise<void> {
-  try {
-    return SecureStore.deleteItemAsync(key);
-  } catch {
-    return Promise.resolve();
+async function setItem(key: string, value: string): Promise<void> {
+  if (typeof window === "undefined") {
+    return undefined;
   }
+  return localStorage.setItem(key, value);
+}
+
+async function removeItem(key: string): Promise<void> {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return localStorage.removeItem(key);
 }
 
 const supabase = createClient<Database>(
@@ -36,9 +53,9 @@ const supabase = createClient<Database>(
   {
     auth: {
       storage: {
-        getItem: getStorageItem,
-        setItem: setStorageItem,
-        removeItem: removeStorageItem,
+        getItem,
+        setItem,
+        removeItem,
       },
       autoRefreshToken: true,
       persistSession: true,

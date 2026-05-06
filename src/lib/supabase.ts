@@ -2,49 +2,34 @@ import "react-native-get-random-values";
 import "react-native-url-polyfill/auto";
 
 import type { Database } from "@/src/types/database";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env";
 
-function createWebStorage() {
-  if (typeof window === "undefined") {
-    return {
-      getItem: async () => null,
-      setItem: async () => undefined,
-      removeItem: async () => undefined,
-    };
-  }
-  return {
-    getItem: async (key: string): Promise<string | null> => {
-      return localStorage.getItem(key);
-    },
-    setItem: async (key: string, value: string): Promise<void> => {
-      localStorage.setItem(key, value);
-    },
-    removeItem: async (key: string): Promise<void> => {
-      localStorage.removeItem(key);
-    },
-  };
-}
+// Use AsyncStorage for native platforms, localStorage for web
+const isWeb = typeof window !== "undefined";
 
 async function getItem(key: string): Promise<string | null> {
-  if (typeof window === "undefined") {
-    return null;
+  if (isWeb) {
+    return localStorage.getItem(key);
   }
-  return localStorage.getItem(key);
+  return AsyncStorage.getItem(key);
 }
 
 async function setItem(key: string, value: string): Promise<void> {
-  if (typeof window === "undefined") {
-    return undefined;
+  if (isWeb) {
+    localStorage.setItem(key, value);
+  } else {
+    await AsyncStorage.setItem(key, value);
   }
-  return localStorage.setItem(key, value);
 }
 
 async function removeItem(key: string): Promise<void> {
-  if (typeof window === "undefined") {
-    return undefined;
+  if (isWeb) {
+    localStorage.removeItem(key);
+  } else {
+    await AsyncStorage.removeItem(key);
   }
-  return localStorage.removeItem(key);
 }
 
 const supabase = createClient<Database>(

@@ -3,12 +3,5 @@
   "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
   "devCommand": "npx expo start --web",
-  "framework": null,
-  "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/:path*",
-      "destination": "/"
-    }
-  ]
+  "framework": null
 }

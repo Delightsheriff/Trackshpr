@@ -1,14 +1,22 @@
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useSession } from "@/src/hooks";
+import { useProfile, useSession } from "@/src/hooks";
 import { PRO_FEATURES } from "@/src/lib/proFeatures";
 import { supabase } from "@/src/lib/supabase";
+import { env, canShowPaymentUpgrade } from "@/src/lib/env";
+import {
+  PaymentCancelledError,
+  formatPriceFromKobo,
+  purchasePro,
+} from "@/src/lib/paystack";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useTheme } from "@/src/stores/themeStore";
 import { useToastStore } from "@/src/stores/toastStore";
 import { Feather } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -21,16 +29,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FEATURE_LIST = [
   PRO_FEATURES.inventory,
-  PRO_FEATURES["voice-entry"],
+  PRO_FEATURES.inventory_analytics,
+  PRO_FEATURES.order_items,
   PRO_FEATURES["white-label-branding"],
+  PRO_FEATURES["brand-customization"],
+  PRO_FEATURES["voice-entry"],
 ];
 
 export default function ProUpgradeScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { userId } = useSession();
+  const { data: profile } = useProfile(userId);
   const showToast = useToastStore((state) => state.show);
+  const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+
+  const paymentsEnabled = canShowPaymentUpgrade();
+  const isPro = profile?.is_pro === true;
+
+  useEffect(() => {
+    if (!paymentsEnabled) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setEmail(session?.user.email ?? null);
+    });
+  }, [paymentsEnabled]);
 
   const backBtnShadow = isDark
     ? {
@@ -92,6 +116,30 @@ export default function ProUpgradeScreen() {
     }
   };
 
+  const handlePurchase = async () => {
+    if (!userId || !email || isPending) return;
+    setIsPending(true);
+    try {
+      const ok = await purchasePro({ userId, email });
+      if (ok) {
+        showToast("Welcome to Pro!", "success");
+        await queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
+        router.back();
+      } else {
+        showToast("Payment is pending confirmation.", "info");
+      }
+    } catch (error) {
+      if (error instanceof PaymentCancelledError) {
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : "Payment failed. Try again.";
+      showToast(message, "error");
+    } finally {
+      setIsPending(false);
+    }
+  };
+
   return (
     <View
       style={[
@@ -132,12 +180,31 @@ export default function ProUpgradeScreen() {
           style={styles.heroCard}
         >
           <View style={styles.heroOrb} />
-          <Text style={styles.heroEyebrow}>Pro coming soon</Text>
-          <Text style={styles.heroTitle}>We&apos;re getting Pro ready</Text>
-          <Text style={styles.heroSub}>
-            Join the waitlist to hear when advanced seller tools are ready for
-            your account.
-          </Text>
+          {paymentsEnabled ? (
+            <>
+              <Text style={styles.heroEyebrow}>
+                {env.payments.paystackEnv === "test" ? "Test mode · " : ""}
+                Unlock Pro
+              </Text>
+              <Text style={styles.heroTitle}>
+                {isPro ? "You're on Pro" : "Get every Pro feature"}
+              </Text>
+              <Text style={styles.heroSub}>
+                {isPro
+                  ? "Thanks for supporting Trackshpr. Manage your subscription anytime."
+                  : `${formatPriceFromKobo(env.payments.proMonthlyKobo)} / month. Cancel anytime.`}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.heroEyebrow}>Pro coming soon</Text>
+              <Text style={styles.heroTitle}>We&apos;re getting Pro ready</Text>
+              <Text style={styles.heroSub}>
+                Join the waitlist to hear when advanced seller tools are ready for
+                your account.
+              </Text>
+            </>
+          )}
         </LinearGradient>
 
         <View
@@ -187,37 +254,61 @@ export default function ProUpgradeScreen() {
           style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}
         >
           <Feather
-            name="bell"
+            name={paymentsEnabled ? "shield" : "bell"}
             size={16}
             color={colors.primary}
             style={styles.infoIcon}
           />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            The notify button stores your interest against your seller account
-            so we can prioritize the right launch list.
+            {paymentsEnabled
+              ? `Payments are processed securely by Paystack${
+                  env.payments.paystackEnv === "test" ? " (test mode — no real charges)" : ""
+                }. You can cancel anytime from Settings.`
+              : "The notify button stores your interest against your seller account so we can prioritize the right launch list."}
           </Text>
         </View>
 
-        <View style={[styles.saveShadow, { backgroundColor: colors.primary }]}>
-          <Pressable
-            onPress={handleNotifyMe}
-            disabled={isPending}
-            style={styles.savePressable}
+        {paymentsEnabled && isPro ? (
+          <View
+            style={[styles.saveShadow, { backgroundColor: colors.success }]}
           >
-            <LinearGradient
-              colors={gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.saveBtn}
+            <View style={styles.savePressable}>
+              <LinearGradient
+                colors={gradients.success}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveBtnText}>Pro active</Text>
+              </LinearGradient>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.saveShadow, { backgroundColor: colors.primary }]}>
+            <Pressable
+              onPress={paymentsEnabled ? handlePurchase : handleNotifyMe}
+              disabled={isPending || (paymentsEnabled && !email)}
+              style={styles.savePressable}
             >
-              {isPending ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.saveBtnText}>Notify me</Text>
-              )}
-            </LinearGradient>
-          </Pressable>
-        </View>
+              <LinearGradient
+                colors={gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.saveBtn}
+              >
+                {isPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>
+                    {paymentsEnabled
+                      ? `Upgrade for ${formatPriceFromKobo(env.payments.proMonthlyKobo)} / month`
+                      : "Notify me"}
+                  </Text>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

@@ -73,6 +73,29 @@ export function useDeleteAccount() {
   });
 }
 
+// ── Cancel Pro subscription ──────────────────────────────────────────────────
+
+export function useCancelPro(userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke<{
+        status: "cancelled";
+      }>("paystack-cancel", { body: {} });
+      if (error) throw new Error(error.message ?? "Could not cancel Pro.");
+      if (!data || data.status !== "cancelled") {
+        throw new Error("Could not cancel Pro.");
+      }
+    },
+    onSuccess: () => {
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
+      }
+    },
+  });
+}
+
 // ── Quick profile completeness check (lightweight) ─────────────────────────────
 
 export function useProfileComplete(userId: string | null) {

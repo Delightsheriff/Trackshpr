@@ -1,6 +1,10 @@
-import type { Database } from "@/src/types/database"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import "react-native-get-random-values";
+import "react-native-url-polyfill/auto";
+
+import type { Database } from "@/src/types/database";
 import * as SecureStore from "expo-secure-store";
 import { createClient } from "@supabase/supabase-js";
+import { env } from "./env";
 
 function getStorageItem(key: string): Promise<string | null> {
   try {
@@ -27,8 +31,8 @@ function removeStorageItem(key: string): Promise<void> {
 }
 
 const supabase = createClient<Database>(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_KEY!,
+  env.supabaseUrl,
+  env.supabaseKey,
   {
     auth: {
       storage: {
@@ -39,6 +43,7 @@ const supabase = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
+      flowType: "pkce",
     },
   },
 );

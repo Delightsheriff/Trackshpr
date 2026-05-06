@@ -12,6 +12,11 @@ import type { Database } from "@/src/types/database";
 import {
   startOfDay,
 } from "date-fns";
+import { env } from "./env";
+import {
+  notifyOrderCreated,
+  type OrderNotifyContext,
+} from "./notifier";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -305,12 +310,10 @@ function isUuid(value: string | null | undefined): value is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function buildPublicOrderLink(type: "rider" | "track", token: string) {
-  const baseUrl = process.env.EXPO_PUBLIC_TRACKSHPR_WEB_URL ?? "https://trackshpr.app";
-  const cleanBase = baseUrl.replace(/\/$/, "");
+export function buildPublicOrderLink(type: "rider" | "track", token: string) {
   return type === "rider"
-    ? `${cleanBase}/rider/${token}`
-    : `${cleanBase}/track/${token}`;
+    ? `${env.webUrl}/rider/${token}`
+    : `${env.webUrl}/track/${token}`;
 }
 
 async function uploadOrderPhoto({
@@ -357,43 +360,6 @@ async function uploadOrderPhoto({
 
   const { data } = supabase.storage.from("order-photos").getPublicUrl(filePath);
   return { filePath, publicUrl: data.publicUrl };
-}
-
-async function sendTermiiWhatsAppMessage({
-  to,
-  sellerPhone,
-  message,
-}: {
-  to: string;
-  sellerPhone: string | null;
-  message: string;
-}) {
-  const apiKey = process.env.EXPO_PUBLIC_TERMII_API_KEY;
-  if (!apiKey || !to) {
-    return;
-  }
-
-  const response = await fetch(
-    process.env.EXPO_PUBLIC_TERMII_BASE_URL ?? "https://api.ng.termii.com/api/sms/send",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        api_key: apiKey,
-        to,
-        from: sellerPhone ?? process.env.EXPO_PUBLIC_TERMII_SENDER_ID ?? "Trackshpr",
-        sms: message,
-        type: "plain",
-        channel: "whatsapp",
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error("Couldn't send WhatsApp notifications right now.");
-  }
 }
 
 export async function fetchOrdersPage(params: {
@@ -765,45 +731,30 @@ export async function insertOrder(payload: InsertOrderPayload): Promise<Order> {
 
   const profile = await fetchProfile(seller_id);
   const sellerPrimaryPhone = getPrimaryContactNumber(profile);
+  const sellerBrandName =
+    profile?.brand_name?.trim() ||
+    profile?.business_name?.trim() ||
+    "Trackshpr seller";
 
-  const riderMessage = [
-    `New delivery assigned: ${createdOrder.item}`,
-    `Customer: ${createdOrder.customer_name ?? customer_name}`,
-    `Address: ${createdOrder.delivery_address ?? ""}`,
-    sellerPrimaryPhone ? `Seller contact: ${sellerPrimaryPhone}` : null,
-    `Open rider link: ${buildPublicOrderLink("rider", createdOrder.rider_token)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const notifyCtx: OrderNotifyContext = {
+    sellerBrandName,
+    sellerPhone: sellerPrimaryPhone,
+    orderItem: createdOrder.item,
+    orderNumber: createdOrder.order_number,
+    customerName: createdOrder.customer_name ?? customer_name,
+    customerPhone: createdOrder.customer_phone ?? customer_phone,
+    riderName: createdOrder.rider_name,
+    riderPhone: createdOrder.rider_phone ?? rider_phone ?? null,
+    deliveryAddress: createdOrder.delivery_address,
+    trackLink: buildPublicOrderLink("track", createdOrder.customer_token),
+    riderLink: buildPublicOrderLink("rider", createdOrder.rider_token),
+    orderId: createdOrder.id,
+  };
 
-  const customerMessage = [
-    `Your order is on Trackshpr: ${createdOrder.item}`,
-    sellerPrimaryPhone ? `Seller contact: ${sellerPrimaryPhone}` : null,
-    `Track here: ${buildPublicOrderLink("track", createdOrder.customer_token)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  try {
-    await Promise.all([
-      createdOrder.rider_phone
-        ? sendTermiiWhatsAppMessage({
-            to: createdOrder.rider_phone,
-            sellerPhone: sellerPrimaryPhone,
-            message: riderMessage,
-          })
-        : Promise.resolve(),
-      createdOrder.customer_phone
-        ? sendTermiiWhatsAppMessage({
-            to: createdOrder.customer_phone,
-            sellerPhone: sellerPrimaryPhone,
-            message: customerMessage,
-          })
-        : Promise.resolve(),
-    ]);
-  } catch (error) {
-    console.warn("Order notifications failed", error);
-  }
+  // Fire-and-forget: never block order creation on notification delivery.
+  notifyOrderCreated(notifyCtx).catch((error) => {
+    console.warn("[insertOrder] notifyOrderCreated failed", error);
+  });
 
   return createdOrder;
 }
@@ -981,43 +932,76 @@ export async function fetchOrder(orderId: string): Promise<Order> {
   return data as unknown as Order;
 }
 
+/**
+ * Fetch a public order snapshot via the rate-limited Edge Function.
+ *
+ * Hits `public-order-lookup`, which:
+ *   - throttles to 60 requests/minute per (token, IP hash)
+ *   - returns an opaque 404 for unknown tokens so abusers can't enumerate
+ *
+ * Falls back to the direct anon-RPC path if the Edge Function returns an
+ * unexpected error — this keeps older tracking links working during
+ * rollout and tolerates transient Edge Function outages. The fallback is
+ * still safe because the RPCs enforce token secrecy themselves.
+ */
+async function fetchPublicOrderViaEdge(
+  kind: "customer" | "rider",
+  token: string,
+): Promise<unknown | null> {
+  const url = `${env.supabaseUrl}/functions/v1/public-order-lookup?kind=${kind}&token=${encodeURIComponent(token)}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { apikey: env.supabaseKey },
+  });
+  if (response.status === 404) return null;
+  if (response.status === 429) {
+    throw new Error("Too many requests — please wait a minute and try again.");
+  }
+  if (!response.ok) {
+    throw new Error("Couldn't load this link. Please try again.");
+  }
+  const body = (await response.json().catch(() => null)) as
+    | { order?: unknown }
+    | null;
+  return body?.order ?? null;
+}
+
 export async function fetchPublicRiderOrder(
   riderToken: string,
 ): Promise<PublicTrackingOrder | null> {
-  const { data, error } = await unsafeRpcClient.rpc("get_rider_link_order", {
-    p_rider_token: riderToken,
-  });
-
-  if (error) {
-    throw new Error(error.message ?? "Couldn't load this rider link.");
+  try {
+    const data = await fetchPublicOrderViaEdge("rider", riderToken);
+    return data ? mapPublicTrackingOrder(data) : null;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Too many requests")) {
+      throw err;
+    }
+    // Fallback to direct RPC if the Edge Function is unreachable.
+    const { data, error } = await unsafeRpcClient.rpc("get_rider_link_order", {
+      p_rider_token: riderToken,
+    });
+    if (error) throw new Error(error.message ?? "Couldn't load this rider link.");
+    return data ? mapPublicTrackingOrder(data) : null;
   }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapPublicTrackingOrder(data);
 }
 
 export async function fetchPublicCustomerOrder(
   customerToken: string,
 ): Promise<PublicTrackingOrder | null> {
-  const { data, error } = await unsafeRpcClient.rpc(
-    "get_customer_tracking_order",
-    {
-      p_customer_token: customerToken,
-    },
-  );
-
-  if (error) {
-    throw new Error(error.message ?? "Couldn't load this tracking page.");
+  try {
+    const data = await fetchPublicOrderViaEdge("customer", customerToken);
+    return data ? mapPublicTrackingOrder(data) : null;
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Too many requests")) {
+      throw err;
+    }
+    const { data, error } = await unsafeRpcClient.rpc(
+      "get_customer_tracking_order",
+      { p_customer_token: customerToken },
+    );
+    if (error) throw new Error(error.message ?? "Couldn't load this tracking page.");
+    return data ? mapPublicTrackingOrder(data) : null;
   }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapPublicTrackingOrder(data);
 }
 
 export async function markRiderOrderPickedUp(params: {

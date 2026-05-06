@@ -9,19 +9,21 @@
  */
 import GoogleIcon from "@/src/components/auth/google-icon";
 import SignInHero from "@/src/components/auth/sign-in-hero";
-import { colors, colors as lightColors, font, gradients, radius, shadowsLight, type as t } from "@/src/constants/tokens";
-import { signInWithGoogle } from "@/src/lib/auth";
+import { colors, colors as lightColors, font, gradients, radius, type as t } from "@/src/constants/tokens";
+import { signInWithApple, signInWithGoogle } from "@/src/lib/auth";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_SEEN_KEY } from "@/src/lib/storageKeys";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useMutation } from "@tanstack/react-query";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -80,16 +82,36 @@ export default function SignInScreen() {
   const signIn = useMutation({
     mutationFn: signInWithGoogle,
     onError: (err: Error) => {
+      if ((err as any).dismissed) {
+        console.log(
+          "[SignIn] Browser returned control to the app. Waiting for callback...",
+        );
+        return;
+      }
+
       if ((err as any).cancelled) {
         console.log("[SignIn] User cancelled.");
         return;
       }
+
       console.log("[SignIn] Sign-in error:", err.message);
       showToast(err.message ?? "Sign-in failed. Please try again.");
     },
   });
 
-  const loading = signIn.isPending;
+  const appleSignIn = useMutation({
+    mutationFn: signInWithApple,
+    onError: (err: Error) => {
+      if ((err as any).cancelled) {
+        console.log("[SignIn] User cancelled Apple sign-in.");
+        return;
+      }
+      console.log("[SignIn] Apple sign-in error:", err.message);
+      showToast(err.message ?? "Apple sign-in failed. Please try again.");
+    },
+  });
+
+  const loading = signIn.isPending || appleSignIn.isPending;
 
   // Staggered content entrance — matches HTML fadeUp keyframe
   const w0 = useSharedValue(0); // wordmark     delay 200ms
@@ -157,6 +179,11 @@ export default function SignInScreen() {
     signIn.mutate(undefined);
   }, [signIn]);
 
+  const handleAppleSignIn = useCallback(() => {
+    console.log("[SignIn] Starting Apple sign-in...");
+    appleSignIn.mutate(undefined);
+  }, [appleSignIn]);
+
   const handleResetOnboarding = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(ONBOARDING_SEEN_KEY);
@@ -211,7 +238,7 @@ export default function SignInScreen() {
             android_ripple={{ color: "rgba(48,41,80,0.06)", borderless: false }}
             style={styles.googleBtn}
           >
-            {loading ? (
+            {signIn.isPending ? (
               <ActivityIndicator color={colors.textPrimary} size="small" />
             ) : (
               <>
@@ -222,12 +249,48 @@ export default function SignInScreen() {
           </Pressable>
         </Animated.View>
 
+        {/* Apple sign-in — iOS only. Apple's HIG requires using their
+             native button component + this button must appear when any
+             other social login is offered on iOS. */}
+        {Platform.OS === "ios" && (
+          <Animated.View style={[styles.appleBtnWrap, w3s]}>
+            {appleSignIn.isPending ? (
+              <View style={styles.appleBtnLoading}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              </View>
+            ) : (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                }
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={100}
+                style={styles.appleBtn}
+                onPress={() => !loading && handleAppleSignIn()}
+              />
+            )}
+          </Animated.View>
+        )}
+
         {/* Legal */}
         <Animated.View style={w4s}>
           <Text style={styles.legal}>
             By continuing you agree to our{" "}
-            <Text style={styles.legalLink}>Terms of Service</Text>
-            {"\n"}and <Text style={styles.legalLink}>Privacy Policy</Text>
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push("/legal/terms")}
+            >
+              Terms of Service
+            </Text>
+            {"\n"}and{" "}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push("/legal/privacy")}
+            >
+              Privacy Policy
+            </Text>
           </Text>
           {__DEV__ && (
             <Pressable
@@ -348,6 +411,31 @@ const styles = StyleSheet.create({
     fontFamily: font.sans.semiBold,
     fontWeight: "600",
     color: lightColors.textPrimary,
+    letterSpacing: -0.15,
+    marginLeft: 12,
+  },
+
+  // Apple button (iOS only)
+  appleBtnWrap: {
+    marginBottom: 16,
+  },
+  appleBtn: {
+    height: 54,
+    width: "100%",
+  },
+  appleBtnLoading: {
+    height: 54,
+    width: "100%",
+    borderRadius: 100,
+    backgroundColor: "#000000",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  appleBtnText: {
+    fontSize: 15,
+    fontFamily: font.sans.semiBold,
+    fontWeight: "600",
+    color: "#FFFFFF",
     letterSpacing: -0.15,
     marginLeft: 12,
   },

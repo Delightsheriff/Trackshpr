@@ -5,13 +5,15 @@ export { useAuthState } from "./useAuthState";
 export type { AuthStatus } from "./useAuthState";
 
 export { useSession } from "./useSession";
+export { useNotificationFailures } from "./useNotificationFailures";
+export type { NotificationFailure } from "./useNotificationFailures";
 export {
   useAnalyticsOverview,
   useAnalyticsDailyChart,
   useAnalyticsTopRiders,
 } from "./useAnalytics";
 
-export { useProfile, useSaveProfile, useUploadLogo, useProfileComplete, useDeleteAccount } from "./useProfile";
+export { useProfile, useSaveProfile, useUploadLogo, useProfileComplete, useDeleteAccount, useCancelPro } from "./useProfile";
 export {
   useOrders,
   useFleetMapOrders,

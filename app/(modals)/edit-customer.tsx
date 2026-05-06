@@ -125,7 +125,7 @@ export default function EditCustomerSheet() {
     if (customer) {
       reset({
         name: customer.name,
-        phone: customer.phone,
+        phone: customer.phone ?? "",
         notes: customer.notes ?? "",
       });
     }

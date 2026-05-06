@@ -131,7 +131,7 @@ export default function OrdersScreen() {
             <Feather name="wifi-off" size={28} color={colors.error} />
           </View>
           <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>
-            Couldn't load orders
+            Couldn&apos;t load orders
           </Text>
           <Text style={[styles.errorSub, { color: colors.textMuted }]}>
             Check your connection and try again.

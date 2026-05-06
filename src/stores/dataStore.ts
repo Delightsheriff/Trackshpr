@@ -4,30 +4,7 @@
  * handle optimistic updates locally.
  */
 import { create } from "zustand";
-
-export interface Rider {
-  id: string;
-  seller_id: string;
-  name: string;
-  phone: string;
-  notes: string | null;
-  total_deliveries: number;
-  created_at: string;
-}
-
-export interface Customer {
-  id: string;
-  seller_id: string;
-  name: string;
-  phone: string;
-  notes: string | null;
-  order_count: number;
-  failed_count: number;
-  address: string | null; // denormalized default address from customer_addresses
-  city: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { Customer, Rider } from "@/src/lib/supabaseQueries";
 
 interface DataState {
   riders: Rider[];
@@ -69,6 +46,7 @@ export const useDataStore = create<DataState>((set) => ({
           ...data,
           id: crypto.randomUUID(),
           seller_id: "",
+          phone: data.phone ?? null,
           notes: null,
           order_count: 0,
           failed_count: 0,

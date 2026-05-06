@@ -399,7 +399,7 @@ function EmptyState() {
 export default function FleetMapScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const { userId } = useSession();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);

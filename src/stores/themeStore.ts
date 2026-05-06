@@ -62,7 +62,9 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "trackshpr-theme",
-      storage: createJSONStorage(isWeb ? createWebStorage : AsyncStorage),
+      storage: createJSONStorage(() =>
+        isWeb ? createWebStorage() : AsyncStorage,
+      ),
       partialize: (state) => ({ isDark: state.isDark }),
       onRehydrateStorage: () => (state, error) => {
         if (error || !state) {

@@ -12,7 +12,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -176,7 +175,7 @@ export default function CustomersScreen() {
             <Feather name="wifi-off" size={28} color={colors.error} />
           </View>
           <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>
-            Couldn't load customers
+            Couldn&apos;t load customers
           </Text>
           <Text style={[styles.errorSub, { color: colors.textMuted }]}>
             Check your connection and try again.

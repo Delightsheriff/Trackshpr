@@ -50,6 +50,8 @@ export const env = {
     proMonthlyKobo: Number(
       process.env.EXPO_PUBLIC_PRO_MONTHLY_KOBO ?? "500000",
     ),
+    initEndpoint: "paystack-initialize",
+    verifyEndpoint: "paystack-verify",
   },
 } as const;
 

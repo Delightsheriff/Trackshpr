@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/src/lib/supabase";
 import type { ContactNumber } from "@/src/lib/supabaseQueries";
 import { useToastStore } from "@/src/stores/toastStore";
+import type { Database } from "@/src/types/database";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -111,7 +112,10 @@ export default function ProfileSetupScreen() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .upsert({ id: userId, onboarding_complete: true });
+        .upsert(
+          { id: userId, onboarding_complete: true } satisfies Database["public"]["Tables"]["profiles"]["Insert"],
+          { onConflict: "id" },
+        );
       if (error) throw new Error(error.message);
     } catch {
       // Non-critical: if this fails, the user will be re-routed to setup
@@ -123,13 +127,18 @@ export default function ProfileSetupScreen() {
 
   // ── Logo upload ─────────────────────────────────────────────────────────────
   const handleUploadLogo = useCallback(
-    async (uri: string) => {
-      if (!userId) return { error: new Error("No user id") };
+    async (
+      uri: string,
+    ): Promise<{ error?: string; publicUrl?: string | null }> => {
+      if (!userId) return { error: "No user id" };
       const result = await uploadMutation.mutateAsync({ userId, uri });
       if (result.error) {
         showToast("Logo upload failed. Try again.", "error");
       }
-      return result;
+      return {
+        error: result.error,
+        publicUrl: result.publicUrl,
+      };
     },
     [userId, uploadMutation, showToast],
   );

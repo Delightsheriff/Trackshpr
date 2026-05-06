@@ -135,7 +135,7 @@ export default function SelectCustomerScreen() {
           <View style={[styles.errorIconWrap, { backgroundColor: colors.errorBg }]}>
             <Feather name="wifi-off" size={24} color={colors.error} />
           </View>
-          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Couldn't load customers</Text>
+          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Couldn&apos;t load customers</Text>
           <Pressable onPress={() => refetch()} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
             <Text style={styles.retryText}>Try Again</Text>
           </Pressable>

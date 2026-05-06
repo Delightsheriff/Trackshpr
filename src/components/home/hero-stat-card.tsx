@@ -18,7 +18,7 @@ export function HeroStatCard({ total = 0 }: { total?: number }) {
         <View style={styles.heroLeft}>
           <Text style={styles.heroLabel}>Today&apos;s Deliveries</Text>
           <Text style={styles.heroNum}>{total}</Text>
-          <Text style={styles.heroSub}>Today's total</Text>
+          <Text style={styles.heroSub}>Today&apos;s total</Text>
         </View>
         <View style={styles.heroIconWrap}>
           <Feather name="truck" size={22} color="#FFFFFF" />

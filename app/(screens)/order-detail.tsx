@@ -698,7 +698,7 @@ export default function OrderDetailScreen() {
                   key={ev.id}
                   state={state}
                   event={statusLabel(ev.status)}
-                  meta={formatTime(ev.created_at)}
+                  meta={formatTime(ev.created_at ?? "")}
                   hasLine={!isLast}
                   lineColor={state === "done" ? colors.successBg : colors.surfaceContainer}
                 />

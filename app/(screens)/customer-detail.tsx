@@ -113,6 +113,7 @@ export default function CustomerDetailScreen() {
 
   const avatarColor = AVATAR_COLORS[hashIdx(customer.id, AVATAR_COLORS.length)];
   const initials = getInitials(customer.name);
+  const customerPhone = customer.phone ?? "";
   const delivered = orders.filter((o) => o.status === "delivered").length;
   const failed = orders.filter((o) => o.status === "failed").length;
 
@@ -142,13 +143,14 @@ export default function CustomerDetailScreen() {
           </View>
 
           <Text style={[styles.heroName, { color: colors.white }]}>{customer.name}</Text>
-          <Text style={styles.heroPhone}>{customer.phone}</Text>
+          <Text style={styles.heroPhone}>{customer.phone ?? "No phone number"}</Text>
 
           <View style={styles.heroActions}>
             <View style={styles.heroActionsRow}>
               <Pressable
                 style={styles.heroActionBtn}
-                onPress={() => Linking.openURL("tel:" + customer.phone.replace(/\s/g, ""))}
+                onPress={() => Linking.openURL("tel:" + customerPhone.replace(/\s/g, ""))}
+                disabled={!customerPhone}
               >
                 <View style={styles.heroActionContent}>
                   <Feather name="phone" size={12} color={colors.white} />
@@ -158,8 +160,9 @@ export default function CustomerDetailScreen() {
               <Pressable
                 style={styles.heroActionBtn}
                 onPress={() =>
-                  Linking.openURL("https://wa.me/" + customer.phone.replace(/\D/g, ""))
+                  Linking.openURL("https://wa.me/" + customerPhone.replace(/\D/g, ""))
                 }
+                disabled={!customerPhone}
               >
                 <View style={styles.heroActionContent}>
                   <Feather name="message-circle" size={12} color={colors.white} />

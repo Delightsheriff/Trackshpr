@@ -2,11 +2,11 @@ import {
   colors,
   layout,
   radius,
-  type as typography,
 } from "@/src/constants/tokens";
 import {
   fetchPublicCustomerOrder,
   getPrimaryContactNumber,
+  type OrderStatus,
   type OrderEvent,
   type PublicTrackingOrder,
 } from "@/src/lib/supabaseQueries";
@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -29,27 +29,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const IS_WEB = Platform.OS === "web";
-
-type TrackPageStatus =
-  | "pending"
-  | "picked_up"
-  | "in_transit"
-  | "delivered"
-  | "failed";
-
-type MapModule = {
-  MapView: any;
-  Marker: any;
-  providerDefault: any;
-};
-
-const PUBLIC_APP_URL =
-  process.env.EXPO_PUBLIC_TRACKSHPR_WEB_URL?.replace(/\/$/, "") ??
-  "https://trackshpr.app";
+type TrackPageStatus = OrderStatus;
 
 const COMPLETED_COLOR = "#16A34A";
-const STEP_LABELS = ["Confirmed", "Picked Up", "In Transit", "Delivered"];
+const STEP_LABELS: TrackPageStatus[] = [
+  "pending",
+  "picked_up",
+  "in_transit",
+  "delivered",
+];
 
 function formatAmount(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-NG", {
@@ -116,13 +104,13 @@ function getStatusLabel(status: TrackPageStatus): string {
 
 function getTimeline(events: OrderEvent[]) {
   const sorted = [...events].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    (a, b) =>
+      new Date(a.created_at ?? 0).getTime() -
+      new Date(b.created_at ?? 0).getTime(),
   );
   return sorted.map((e) => ({
     ...e,
-    label: STEP_LABELS.indexOf(e.new_status ?? "") >= 0
-      ? e.new_status!
-      : (e.new_status ?? "").replace(/_/g, " "),
+    label: getStatusLabel(e.status),
   }));
 }
 
@@ -325,7 +313,6 @@ export default function TrackLinkScreen() {
     data: order,
     error,
     isLoading,
-    refetch,
   } = useQuery({
     queryKey: ["public-customer-order", token],
     queryFn: () => fetchPublicCustomerOrder(token!),
@@ -367,6 +354,7 @@ export default function TrackLinkScreen() {
   const businessName = order ? getBusinessName(order) : "Trackshpr seller";
   const brandColor = getBrandColor(order);
   const sellerPhone = order ? getPrimaryContactNumber(order.profile) : null;
+  const status = (order?.status ?? "pending") as TrackPageStatus;
   const tone = getStatusTone(status);
   const events = useMemo(() => getTimeline(order?.events ?? []), [order?.events]);
 
@@ -402,12 +390,12 @@ export default function TrackLinkScreen() {
             <Image
               source={{ uri: order.profile.logo_url }}
               style={ss.businessLogo}
-              contentFit="cover"
+              resizeMode="cover"
             />
           ) : (
             <View style={[ss.businessLogo, { backgroundColor: brandColor }]} />
           )}
-          <Text style={ss.businessName}>{businessName}</Text>
+          <Text style={ss.brandName}>{businessName}</Text>
           <Text style={ss.orderNumber}>Order #{order.order_number ?? order.id.slice(0, 6)}</Text>
         </View>
 
@@ -426,9 +414,9 @@ export default function TrackLinkScreen() {
             />
           </View>
           <Text style={ss.statusLabel}>{getStatusLabel(status)}</Text>
-          {order.estimated_delivery && status !== "delivered" && (
+          {order.delivered_at && status === "delivered" && (
             <Text style={ss.statusSubtitle}>
-              Estimated: {formatDateTime(order.estimated_delivery)}
+              Delivered: {formatDateTime(order.delivered_at)}
             </Text>
           )}
         </View>
@@ -438,7 +426,7 @@ export default function TrackLinkScreen() {
             <Text style={ss.timelineTitle}>Timeline</Text>
             {events.map((event, index) => {
               const isLast = index === events.length - 1;
-              const stepIndex = STEP_LABELS.indexOf(event.new_status ?? "");
+              const stepIndex = STEP_LABELS.indexOf(event.status);
               const stepComplete = stepIndex >= 0;
               const isCompleted =
                 stepComplete && index === events.length - 1
@@ -480,19 +468,13 @@ export default function TrackLinkScreen() {
           <Text style={ss.detailsTitle}>Order Details</Text>
           <View style={ss.detailRow}>
             <Text style={ss.detailLabel}>Item</Text>
-            <Text style={ss.detailValue}>{order.item_name}</Text>
+            <Text style={ss.detailValue}>{order.item}</Text>
           </View>
-          {order.item_quantity && order.item_quantity > 1 && (
+          {order.delivery_fee != null && (
             <View style={ss.detailRow}>
-              <Text style={ss.detailLabel}>Quantity</Text>
-              <Text style={ss.detailValue}>{order.item_quantity}</Text>
-            </View>
-          )}
-          {order.amount && (
-            <View style={ss.detailRow}>
-              <Text style={ss.detailLabel}>Total</Text>
+              <Text style={ss.detailLabel}>Delivery Fee</Text>
               <Text style={[ss.detailValue, ss.detailValueMono]}>
-                {formatAmount(order.amount)}
+                {formatAmount(order.delivery_fee)}
               </Text>
             </View>
           )}
@@ -510,7 +492,7 @@ export default function TrackLinkScreen() {
           <View style={ss.actionRow}>
             <Pressable
               style={[ss.ctaBtn, { backgroundColor: brandColor }]}
-              onPress={() => Linking.openText(`tel:${sellerPhone}`)}
+              onPress={() => void Linking.openURL(`tel:${sellerPhone}`)}
             >
               <Feather name="phone" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={ss.ctaText}>Contact Seller</Text>

@@ -76,7 +76,7 @@ export interface Customer {
   id: string;
   seller_id: string;
   name: string;
-  phone: string;
+  phone: string | null;
   notes: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -132,9 +132,9 @@ export const ORDER_PAGE_SIZE = 20;
 export interface OrderEvent {
   id: string;
   order_id: string;
-  status: string;
+  status: OrderStatus;
   note: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 export interface PublicTrackingProfile {
@@ -887,9 +887,10 @@ function mapPublicTrackingOrder(data: unknown): PublicTrackingOrder {
       return {
         id: String(row.id ?? ""),
         order_id: String(record.id ?? ""),
-        status: String(row.status ?? ""),
+        status: (row.status ?? "pending") as OrderStatus,
         note: typeof row.note === "string" ? row.note : null,
-        created_at: String(row.created_at ?? ""),
+        created_at:
+          typeof row.created_at === "string" ? row.created_at : null,
       };
     }),
     latest_ping: rawPing

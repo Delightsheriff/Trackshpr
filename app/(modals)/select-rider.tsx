@@ -3,14 +3,22 @@
  * Sets selected rider in orderStore, then navigates back.
  */
 import { font, gradients, layout, radius } from "@/src/constants/tokens";
-import { useDataStore } from "@/src/stores/dataStore";
+import { useRiders, useSession } from "@/src/hooks";
 import { useOrderStore } from "@/src/stores/orderStore";
 import { useTheme } from "@/src/stores/themeStore";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function initials(name: string) {
@@ -20,7 +28,8 @@ function initials(name: string) {
 export default function SelectRiderScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const riders = useDataStore((s) => s.riders);
+  const { userId } = useSession();
+  const { data: riders = [], isLoading, isError, refetch } = useRiders(userId);
   const current = useOrderStore((s) => s.draft.rider);
   const setRider = useOrderStore((s) => s.setRider);
 
@@ -75,6 +84,23 @@ export default function SelectRiderScreen() {
         </View>
       </View>
 
+      {isLoading ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : isError ? (
+        <View style={styles.centerState}>
+          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>
+            Couldn&apos;t load riders
+          </Text>
+          <Pressable
+            onPress={() => refetch()}
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.retryText}>Try Again</Text>
+          </Pressable>
+        </View>
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {filtered.map((rider, index) => {
           const accent = avatarColors[index % avatarColors.length];
@@ -125,6 +151,7 @@ export default function SelectRiderScreen() {
           <Text style={[styles.addLabel, { color: colors.primary }]}>Add a new rider</Text>
         </Pressable>
       </ScrollView>
+      )}
 
       <View style={[styles.cta, { paddingBottom: insets.bottom + 16 }]}>
         <View
@@ -224,6 +251,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingH,
     gap: 8,
     paddingBottom: 16,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: layout.screenPaddingH,
+  },
+  errorTitle: {
+    fontSize: 15,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  retryBtn: {
+    borderRadius: radius.full,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: font.sans.bold,
+    fontWeight: "700",
   },
   card: {
     flexDirection: "row",

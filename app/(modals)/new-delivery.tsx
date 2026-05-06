@@ -579,9 +579,9 @@ export default function NewDeliveryScreen() {
     const query = customerSearch.trim().toLowerCase();
     if (!query) return customers;
     return customers.filter((customer) =>
-      [customer.name, customer.phone]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(query)),
+      [customer.name, customer.phone ?? ""].some((value) =>
+        value.toLowerCase().includes(query),
+      ),
     );
   }, [customerSearch, customers]);
   const filteredRiders = useMemo(() => {
@@ -598,7 +598,7 @@ export default function NewDeliveryScreen() {
         id: prefillCustomerId ?? "",
         seller_id: userId ?? "",
         name: prefillCustomerName,
-        phone: prefillCustomerPhone ?? "",
+        phone: prefillCustomerPhone ?? null,
         notes: null,
         order_count: 0,
         failed_count: 0,
@@ -736,7 +736,7 @@ export default function NewDeliveryScreen() {
         notes: values.notes?.trim() || null,
         customer_id: draft.customer.id,
         customer_name: draft.customer.name,
-        customer_phone: draft.customer.phone,
+        customer_phone: draft.customer.phone ?? "",
         delivery_address: deliveryAddress,
         city,
         rider_id: draft.rider?.id ?? null,

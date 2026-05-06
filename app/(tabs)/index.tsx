@@ -199,7 +199,7 @@ export default function HomeScreen() {
         No active orders
       </Text>
       <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
-        Tap "New Delivery" to create your first order.
+        Tap &quot;New Delivery&quot; to create your first order.
       </Text>
     </View>
   ) : null;

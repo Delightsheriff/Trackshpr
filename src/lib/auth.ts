@@ -1,8 +1,6 @@
 import "react-native-url-polyfill/auto";
 
-import { makeRedirectUri } from "expo-auth-session";
-import Constants, { ExecutionEnvironment } from "expo-constants";
-import { Platform } from "react-native";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 
@@ -10,35 +8,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 export const GOOGLE_AUTH_CALLBACK_PATH = "oauth";
 
-const redirectUri = makeRedirectUri({
-  path: GOOGLE_AUTH_CALLBACK_PATH,
-});
-const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-
-class AuthCancelledError extends Error {
-  readonly cancelled = true;
-  constructor() {
-    super("Sign-in was cancelled");
-    this.name = "AuthCancelledError";
-  }
-}
-
-class AuthDismissedError extends Error {
-  readonly dismissed = true;
-  constructor() {
-    super("Sign-in is waiting for the app callback.");
-    this.name = "AuthDismissedError";
-  }
-}
-
-function isExpoGoRuntime() {
-  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-}
-
-function shouldUseNativeGoogleSignIn() {
-  return Platform.OS === "android" && !isExpoGoRuntime();
-}
+const redirectUri = Linking.createURL(GOOGLE_AUTH_CALLBACK_PATH);
 
 function readOAuthParams(url: string) {
   const parsedUrl = new URL(url);
@@ -65,9 +35,7 @@ export function getGoogleRedirectUri() {
   return redirectUri;
 }
 
-async function signInWithGoogleBrowser(): Promise<void> {
-  console.log("[Auth] Using browser Google sign-in with redirect URI:", redirectUri);
-
+export async function signInWithGoogle(): Promise<void> {
   const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: redirectUri, skipBrowserRedirect: true },
@@ -86,77 +54,10 @@ async function signInWithGoogleBrowser(): Promise<void> {
   }
 
   if (result.type === "dismiss") {
-    throw new AuthDismissedError();
+    throw new Error("Sign-in is waiting for the app callback.");
   }
 
-  throw new AuthCancelledError();
-}
-
-async function signInWithGoogleNativeAndroid(): Promise<void> {
-  if (!googleWebClientId) {
-    throw new Error(
-      "Native Google sign-in needs EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.",
-    );
-  }
-
-  try {
-    const { GoogleSignin } = await import(
-      "@react-native-google-signin/google-signin"
-    );
-
-    GoogleSignin.configure({
-      webClientId: googleWebClientId,
-      iosClientId: googleIosClientId,
-      scopes: ["email", "profile"],
-    });
-
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-    const response = await GoogleSignin.signIn();
-
-    if (response.type !== "success") {
-      throw new AuthCancelledError();
-    }
-
-    const idToken = response.data.idToken;
-
-    if (!idToken) {
-      throw new Error(
-        "Google did not return an ID token. Check the Web client ID setup.",
-      );
-    }
-
-    const tokens = await GoogleSignin.getTokens();
-
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: "google",
-      token: idToken,
-      access_token: tokens.accessToken,
-    });
-
-    if (error) {
-      throw new Error(error.message ?? "Could not complete sign-in.");
-    }
-  } catch (error) {
-    if (error instanceof AuthCancelledError) {
-      throw error;
-    }
-
-    if (error instanceof Error) {
-      if (
-        error.message.includes("RNGoogleSignin") ||
-        error.message.includes("RNGoogleSignIn")
-      ) {
-        throw new Error(
-          "Native Google sign-in is installed, but it needs an Android development build before it can run.",
-        );
-      }
-
-      throw error;
-    }
-
-    throw new Error("Could not complete native Google sign-in.");
-  }
+  throw new Error("Sign-in was cancelled");
 }
 
 export async function completeGoogleSignInFromUrl(
@@ -196,30 +97,7 @@ export async function completeGoogleSignInFromUrl(
   return true;
 }
 
-export async function signInWithGoogle(): Promise<void> {
-  // TODO: Once iOS also moves to a development build, switch that platform
-  // to native Google sign-in and remove the browser fallback entirely.
-  if (shouldUseNativeGoogleSignIn()) {
-    console.log("[Auth] Using native Google sign-in for Android dev builds.");
-    await signInWithGoogleNativeAndroid();
-    return;
-  }
-
-  await signInWithGoogleBrowser();
-}
-
-/**
- * Native Sign in with Apple — iOS only.
- *
- * Apple requires this button whenever another social login (e.g. Google)
- * is offered on iOS. Available only on real iOS devices + development /
- * production builds — not in Expo Go and not on Android/web.
- */
 export async function signInWithApple(): Promise<void> {
-  if (Platform.OS !== "ios") {
-    throw new Error("Sign in with Apple is only available on iOS.");
-  }
-
   const AppleAuthentication = await import("expo-apple-authentication");
   const available = await AppleAuthentication.isAvailableAsync();
   if (!available) {
@@ -243,7 +121,7 @@ export async function signInWithApple(): Promise<void> {
       "code" in err &&
       (err as { code?: string }).code === "ERR_REQUEST_CANCELED"
     ) {
-      throw new AuthCancelledError();
+      throw new Error("Sign-in was cancelled");
     }
     throw err;
   }

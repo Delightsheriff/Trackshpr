@@ -53,7 +53,6 @@
       ],
       "expo-localization",
       "expo-apple-authentication",
-      "@react-native-google-signin/google-signin",
       "@sentry/react-native"
     ],
     "experiments": {

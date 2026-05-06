@@ -1,8 +1,5 @@
 /**
  * Runtime env validation.
- * Fails loudly at module load if required vars are missing, so bugs show up
- * immediately instead of as silent nulls at call sites.
- *
  * All vars here are EXPO_PUBLIC_* — they're bundled into the client bundle.
  * Never put secrets in this file.
  */
@@ -28,7 +25,7 @@ function optionalBool(value: string | undefined, fallback: boolean): boolean {
 }
 
 export const env = {
-  // ── Supabase ──────────────────────────────────────────────────────────────
+  // ── Supabase (required) ─────────────────────────────────────────────────────────
   supabaseUrl: required(
     "EXPO_PUBLIC_SUPABASE_URL",
     process.env.EXPO_PUBLIC_SUPABASE_URL,
@@ -38,51 +35,24 @@ export const env = {
     process.env.EXPO_PUBLIC_SUPABASE_KEY,
   ),
 
-  // ── Google OAuth ──────────────────────────────────────────────────────────
-  googleWebClientId: optional(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
-  googleIosClientId: optional(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
-  googleAndroidClientId: optional(
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  ),
-
-  // ── Public web (tracking / rider pages) ───────────────────────────────────
+  // ── Public web origin (tracking / rider pages) ─────────────────────────────
   webUrl: (
     process.env.EXPO_PUBLIC_TRACKSHPR_WEB_URL ?? "https://trackshpr.app"
   ).replace(/\/$/, ""),
 
-  // ── Payments (Paystack, Nigeria) ──────────────────────────────────────────
+  // ── Payments (Paystack, Nigeria) — optional ────────────────────────────────
   payments: {
-    // Master flag — flips whether the app shows purchase CTAs or the
-    // "coming soon / waitlist" flow. Default is disabled.
     enabled: optionalBool(process.env.EXPO_PUBLIC_PAYMENTS_ENABLED, false),
-    // Paystack publishable key. Public by design — keep secret key server-side.
     paystackPublicKey: optional(process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY),
-    // "test" or "live" — used to label the UI and pick the right key.
     paystackEnv: (process.env.EXPO_PUBLIC_PAYSTACK_ENV ?? "test") as
       | "test"
       | "live",
-    // Monthly Pro price in kobo (₦5,000.00 = 500000 kobo).
     proMonthlyKobo: Number(
       process.env.EXPO_PUBLIC_PRO_MONTHLY_KOBO ?? "500000",
     ),
-    // Supabase Edge Function that initializes + verifies Paystack transactions.
-    initEndpoint:
-      process.env.EXPO_PUBLIC_PAYSTACK_INIT_ENDPOINT ??
-      "paystack-initialize",
-    verifyEndpoint:
-      process.env.EXPO_PUBLIC_PAYSTACK_VERIFY_ENDPOINT ??
-      "paystack-verify",
   },
 } as const;
 
-/**
- * True if Paystack purchase flow should be shown.
- *
- * iOS is excluded: Apple requires StoreKit / in-app purchases for digital
- * subscriptions unlocked inside the app. Shipping a Paystack button on iOS
- * is an almost-certain App Store rejection. Until IAP is implemented,
- * iOS falls through to the Pro waitlist flow.
- */
 export function canShowPaymentUpgrade(): boolean {
   if (Platform.OS === "ios") return false;
   return env.payments.enabled && env.payments.paystackPublicKey !== null;

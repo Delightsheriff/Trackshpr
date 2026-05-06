@@ -4,7 +4,7 @@
     "slug": "Trackshpr",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./generated-assets/icons/icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "trackshpr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -25,16 +25,16 @@
       "package": "com.trackshpr.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./generated-assets/icons/android-icon-foreground.png",
-        "backgroundImage": "./generated-assets/icons/android-icon-background.png",
-        "monochromeImage": "./generated-assets/icons/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundImage": "./assets/images/splash.png",
+        "monochromeImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./generated-assets/icons/favicon.png",
+      "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -42,7 +42,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./generated-assets/icons/splash-icon.png",
+          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#4647D3",
